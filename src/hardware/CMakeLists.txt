@@ -9,7 +9,22 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(ros2_utils REQUIRED)
 
+include_directories(
+  include
+  /usr/local/include
+  /home/wildan/proyek/iris/SOEM/install/include
+)
+
+add_executable(beckhoff src/beckhoff.cpp)
+ament_target_dependencies(beckhoff rclcpp std_msgs ros2_utils)
+target_link_libraries(beckhoff /home/wildan/proyek/iris/SOEM/install/lib/libsoem.a)
+
+install(TARGETS
+  beckhoff
+  DESTINATION lib/${PROJECT_NAME}
+)
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   # the following line skips the linter which checks for copyrights

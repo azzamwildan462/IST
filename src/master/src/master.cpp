@@ -1,34 +1,102 @@
 #include "rclcpp/rclcpp.hpp"
-#include "std_msgs/msg/string.hpp"
+#include "master/master.hpp"
 
-class Master : public rclcpp::Node
+Master::Master() : Node("master")
 {
-public:
-    rclcpp::TimerBase::SharedPtr tim_50hz;
-    rclcpp::Publisher<std_msgs::msg::String>::SharedPtr pub_test;
-
-    Master() : Node("master")
+    if (!logger.init())
     {
-        //----Timer
-        tim_50hz = this->create_wall_timer(std::chrono::milliseconds(20), std::bind(&Master::callback_tim_50hz, this));
-
-        //----Publisher
-        pub_test = this->create_publisher<std_msgs::msg::String>("chatter", 1);
+        RCLCPP_ERROR(this->get_logger(), "Failed to initialize logger");
+        rclcpp::shutdown();
     }
 
-    void callback_tim_50hz()
+    logger.info("Master init success");
+
+    //----Timer
+    tim_50hz = this->create_wall_timer(std::chrono::milliseconds(20), std::bind(&Master::callback_tim_50hz, this));
+}
+Master::~Master()
+{
+}
+
+void Master::callback_tim_50hz()
+{
+    if (!marker.init(this->shared_from_this()))
     {
-        static int count = 0;
-        std::string message = "Hello, World! " + std::to_string(count);
-        RCLCPP_INFO(this->get_logger(), "%s", message.c_str());
-
-        std_msgs::msg::String msg;
-        msg.data = message;
-        pub_test->publish(msg);
-
-        count++;
+        rclcpp::shutdown();
     }
-};
+
+    process_marker();
+}
+
+// ===============================================================================================
+
+geometry_msgs::msg::Point
+Master::get_point(double x, double y, double z)
+{
+    geometry_msgs::msg::Point p_msg;
+    p_msg.x = x;
+    p_msg.y = y;
+    p_msg.z = z;
+    return p_msg;
+}
+
+geometry_msgs::msg::Quaternion
+Master::get_quat(double r, double p, double y)
+{
+    tf2::Quaternion q_tf2;
+    q_tf2.setRPY(r, p, y);
+    geometry_msgs::msg::Quaternion q_msg;
+    q_msg.x = q_tf2.x();
+    q_msg.y = q_tf2.y();
+    q_msg.z = q_tf2.z();
+    q_msg.w = q_tf2.w();
+    return q_msg;
+}
+
+std::vector<geometry_msgs::msg::Point>
+Master::get_path(float x0, float y0, float x1, float y1, float resolution)
+{
+    std::vector<geometry_msgs::msg::Point> ps;
+
+    float dx = x1 - x0;
+    float dy = y1 - y0;
+
+    int n = sqrt(dx * dx + dy * dy) / resolution;
+    for (int i = 0; i < n; i++)
+    {
+        float x = x0 + dx * i / n;
+        float y = y0 + dy * i / n;
+        ps.push_back(get_point(x, y, 0));
+    }
+    float x = x1;
+    float y = y1;
+    ps.push_back(get_point(x, y, 0));
+
+    return ps;
+}
+
+geometry_msgs::msg::Point
+Master::get_near(float x, float y, std::vector<geometry_msgs::msg::Point> ps)
+{
+    geometry_msgs::msg::Point p;
+
+    float d_min = __FLT_MAX__;
+
+    for (auto i : ps)
+    {
+        float dx = x - i.x;
+        float dy = y - i.y;
+
+        float d = sqrt(dx * dx + dy * dy);
+        if (d_min > d)
+        {
+            d_min = d;
+            p = i;
+        }
+    }
+
+    return p;
+}
 
 int main(int argc, char **argv)
 {

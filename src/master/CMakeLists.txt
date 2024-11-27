@@ -6,13 +6,25 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 
 # find dependencies
-find_package(ament_cmake REQUIRED)
-find_package(rclcpp REQUIRED)
-find_package(std_msgs REQUIRED)
-find_package(ros2_utils REQUIRED)
+set(var_dependencies
+    ament_cmake
+    rclcpp
+    std_msgs
+    nav_msgs
+    ros2_utils
+    tf2_geometry_msgs
+    tf2_ros 
+    fmt)
+    
+foreach(var_dependency ${var_dependencies})
+  find_package(${var_dependency} REQUIRED)
+endforeach()
 
-add_executable(master src/master.cpp)
-ament_target_dependencies(master rclcpp std_msgs ros2_utils)
+include_directories(include)
+
+add_executable(master src/master.cpp src/master_process.cpp)
+ament_target_dependencies(master ${var_dependencies})
+target_link_libraries(master fmt::fmt)
 
 install(TARGETS
   master
