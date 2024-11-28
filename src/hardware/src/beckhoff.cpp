@@ -111,7 +111,7 @@ public:
     {
         static int count = 0;
         std::string message = "Beckhoff! " + std::to_string(count);
-        RCLCPP_INFO(this->get_logger(), "%s", message.c_str());
+        // RCLCPP_INFO(this->get_logger(), "%s", message.c_str());
 
         std_msgs::msg::String msg;
         msg.data = message;

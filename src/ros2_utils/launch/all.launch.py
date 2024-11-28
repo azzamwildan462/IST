@@ -25,6 +25,14 @@ def generate_launch_description():
         respawn=True,
     )
 
+    web_video_server = Node(
+        package='web_video_server',
+        executable='web_video_server',
+        name='web_video_server',
+        output='screen',
+        respawn=True,
+    )
+
     rviz2 = Node(
         package="rviz2",
         executable="rviz2",
@@ -83,6 +91,24 @@ def generate_launch_description():
         output='screen',
         respawn=True,
         prefix='nice -n -10 chrt -f 99'
+    )
+
+    vision_capture = Node(
+        package='vision',
+        executable='vision_capture',
+        name='vision_capture',
+        output='screen',
+        respawn=True,
+        prefix='nice -n -8'
+    )
+
+    lane_detection = Node(
+        package='vision',
+        executable='lane_detection',
+        name='lane_detection',
+        output='screen',
+        respawn=True,
+        prefix='nice -n -8'
     )
 
     # =============================================================================
@@ -251,13 +277,16 @@ def generate_launch_description():
 
     return LaunchDescription(
         [
+            vision_capture,
+            lane_detection,
             pose_estimator,
             tf_base_link_to_body_link,
             tf_base_link_to_lidar1_link,
             tf_map_empty,
-            livox_lidar_driver,
+            # livox_lidar_driver,
             rviz2,
             rosbridge_server, 
+            web_video_server,
             beckhoff,
             master,
             TimerAction(

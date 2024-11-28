@@ -11,6 +11,8 @@ Master::Master() : Node("master")
 
     logger.info("Master init success");
 
+    pub_initialpose = this->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>("slam/initialpose", 10);
+
     //----Timer
     tim_50hz = this->create_wall_timer(std::chrono::milliseconds(20), std::bind(&Master::callback_tim_50hz, this));
 }
@@ -24,6 +26,13 @@ void Master::callback_tim_50hz()
     {
         rclcpp::shutdown();
     }
+
+    // geometry_msgs::msg::PoseWithCovarianceStamped msg_initialpose;
+    // msg_initialpose.header.frame_id = "map";
+    // msg_initialpose.header.stamp = this->now();
+    // msg_initialpose.pose.pose.position = get_point(0, 0, 0);
+    // msg_initialpose.pose.pose.orientation = get_quat(0, 0, 0);
+    // pub_initialpose->publish(msg_initialpose);
 
     process_marker();
 }

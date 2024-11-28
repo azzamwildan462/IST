@@ -6,9 +6,36 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 
 # find dependencies
-find_package(ament_cmake REQUIRED)
-find_package(rclcpp REQUIRED)
-find_package(std_msgs REQUIRED)
+set(var_dependencies
+    ament_cmake
+    cv_bridge
+    OpenCV
+    rclcpp
+    std_msgs
+    nav_msgs
+    ros2_utils
+    fmt
+    yaml-cpp
+    tf2_geometry_msgs
+    tf2_ros)
+    
+foreach(var_dependency ${var_dependencies})
+  find_package(${var_dependency} REQUIRED)
+endforeach()
+
+add_executable(vision_capture src/vision_capture.cpp)
+ament_target_dependencies(vision_capture ${var_dependencies})
+target_link_libraries(vision_capture fmt::fmt)
+
+add_executable(lane_detection src/lane_detection.cpp)
+ament_target_dependencies(lane_detection ${var_dependencies})
+target_link_libraries(lane_detection fmt::fmt ${YAML_CPP_LIBRARIES})
+
+install(TARGETS
+  vision_capture
+  lane_detection
+  DESTINATION lib/${PROJECT_NAME}
+)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
