@@ -143,6 +143,7 @@ def generate_launch_description():
                 "odom_tf_linear_variance": 0.01,
                 "odom_tf_angular_variance": 0.01,
                 "publish_tf": False,
+                "publish_map": True,
                 "approx_sync": True,
                 # "publish_tf_map_odom": True,
                 "Grid/CellSize": "0.025",  # Added by Pandu
@@ -185,7 +186,7 @@ def generate_launch_description():
                 "subscribe_scan_cloud": True,
                 "subscribe_stereo": False,
                 "subscribe_rgbd": False,
-                "subscribe_rgbd": False,
+                "subscribe_rgb": False,
                 "subscribe_Odometry": True,
                 "frame_id": "base_link",
                 "odom_frame_id": "odom",
@@ -215,7 +216,7 @@ def generate_launch_description():
                 "two_d_mode": True,
                 "smooth_lagged_data": True,
                 "history_length": 1.0,
-                "frequency": 50.0,
+                "frequency": 10.0,
                 "odom0": "/odom",
                 # fmt: off
                 "odom0_config": [
@@ -239,8 +240,8 @@ def generate_launch_description():
                     False,False,False,
                 ],
                 # fmt: on
-                # "pose0_differential": False,
-                # "pose0_relative": False,
+                "pose0_differential": False,
+                "pose0_relative": False,
             }
         ],
         arguments=["--ros-args", "--log-level", "warn"],
@@ -257,13 +258,13 @@ def generate_launch_description():
             livox_lidar_driver,
             rviz2,
             rosbridge_server, 
-            # beckhoff,
+            beckhoff,
             master,
             TimerAction(
                 period=4.0,
                 actions=[
                     rtabmap_slam_rtabmap,
-                    rtabmap_viz_rtabmap_viz,
+                    # rtabmap_viz_rtabmap_viz,
                     ekf_node,
                 ],
             ),
