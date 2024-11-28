@@ -29,10 +29,6 @@ public:
 
         //----Publisher
         pub_odom = this->create_publisher<nav_msgs::msg::Odometry>("odom", 10);
-
-        // final_pose_xyo[0] = 0.5;
-        // final_pose_xyo[1] = 2.0;
-        // final_pose_xyo[2] = 0.5;
     }
 
     void callback_tim_50hz()
@@ -45,39 +41,7 @@ public:
 
         // Kalkulasi odometry disini
         // Hadrcode, dia akan membenarkan sendiri
-        {
-            static uint8_t c = 0;
-            static rclcpp::Time last_time_change = this->now();
-
-            if ((time_now - last_time_change).seconds() > 45)
-            {
-                c++;
-                if (c > 2)
-                {
-                    c = 0;
-                }
-                last_time_change = time_now;
-            }
-
-            if (c == 0)
-            {
-                final_pose_xyo[0] = -0.99;
-                final_pose_xyo[1] = -2;
-                final_pose_xyo[2] = 0.0;
-            }
-            else if (c == 1)
-            {
-                final_pose_xyo[0] = -1;
-                final_pose_xyo[1] = 1;
-                final_pose_xyo[2] = -0.0;
-            }
-            else if (c == 2)
-            {
-                final_pose_xyo[0] = -1;
-                final_pose_xyo[1] = -2;
-                final_pose_xyo[2] = -0.0;
-            }
-        }
+        // final_pose_xyo[0] += 0.2;
 
         final_vel_dxdydo[0] = (final_pose_xyo[0] - prev_final_pose_xyo[0]) / dt;
         final_vel_dxdydo[1] = (final_pose_xyo[1] - prev_final_pose_xyo[1]) / dt;

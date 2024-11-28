@@ -10,20 +10,33 @@ set(var_dependencies
     ament_cmake
     rclcpp
     std_msgs
+    fmt
     nav_msgs
     ros2_utils
     tf2_geometry_msgs
+    pcl_conversions
+    pcl_ros
     tf2_ros)
     
 foreach(var_dependency ${var_dependencies})
   find_package(${var_dependency} REQUIRED)
 endforeach()
+find_package(PCL REQUIRED)
+
+include_directories(${PCL_INCLUDE_DIRS})
+link_directories(${PCL_LIBRARY_DIRS})
+add_definitions(${PCL_DEFINITIONS})
 
 add_executable(pose_estimator src/pose_estimator.cpp)
 ament_target_dependencies(pose_estimator ${var_dependencies})
 
+add_executable(obstacle_filter src/obstacle_filter.cpp)
+ament_target_dependencies(obstacle_filter ${var_dependencies})
+target_link_libraries(obstacle_filter ${PCL_LIBRARIES} fmt::fmt)
+
 install(TARGETS
   pose_estimator
+  obstacle_filter
   DESTINATION lib/${PROJECT_NAME}
 )
 

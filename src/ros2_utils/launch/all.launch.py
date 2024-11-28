@@ -60,6 +60,9 @@ def generate_launch_description():
                 "lvx_file_path": "/home/livox/livox_test.lvx",
                 "user_config_path": livox_config,
                 "cmdline_input_bd_code": "livox0000000001",
+                "use_full_angle": False,
+                "azimuth_yaw_start": 0.0,
+                "azimuth_yaw_end": 3.14,
             }
         ]
     )
@@ -82,6 +85,15 @@ def generate_launch_description():
         output='screen',
         respawn=True,
         prefix='nice -n -9'
+    )
+
+    obstacle_filter = Node(
+        package='world_model',
+        executable='obstacle_filter',
+        name='obstacle_filter',
+        output='screen',
+        respawn=True,
+        prefix='nice -n -8'
     )
 
     beckhoff = Node(
@@ -129,7 +141,7 @@ def generate_launch_description():
         executable="static_transform_publisher",
         name="tf_base_link_to_lidar1_link",
         # fmt: off
-        arguments=["0.20","0.00","0.35","1.57","0.00","0.00","base_link","lidar1_link",
+        arguments=["0.20","0.00","0.35","0.00","0.00","0.00","base_link","lidar1_link",
             "--ros-args","--log-level","error",],
         # fmt: on
         respawn=True,
@@ -280,10 +292,11 @@ def generate_launch_description():
             vision_capture,
             lane_detection,
             pose_estimator,
+            obstacle_filter,
             tf_base_link_to_body_link,
             tf_base_link_to_lidar1_link,
             tf_map_empty,
-            # livox_lidar_driver,
+            livox_lidar_driver,
             rviz2,
             rosbridge_server, 
             web_video_server,
