@@ -2,6 +2,7 @@ import os
 
 from launch import LaunchDescription
 from launch_ros.actions import Node
+from launch.actions import EmitEvent, RegisterEventHandler, TimerAction
 
 from ament_index_python.packages import get_package_share_directory
 
@@ -9,6 +10,8 @@ path_config_buffer = os.getenv('AMENT_PREFIX_PATH', '')
 path_config_buffer_split = path_config_buffer.split(":")
 ws_path = path_config_buffer_split[0] + "/../../"
 path_config = ws_path + "src/ros2_utils/configs/"
+
+livox_config = path_config + "livox_MID360.json"
 
 print("ws_path: ", ws_path)
 print("path_config: ", path_config)
@@ -30,7 +33,27 @@ def generate_launch_description():
         arguments=["-d",os.path.join(path_config,"robot.rviz"),
                    "--ros-args","--log-level","error",]
         # fmt: on
-        
+    )
+
+    livox_lidar_driver = Node(
+        package='livox_ros_driver2',
+        executable='livox_ros_driver2_node',
+        name='livox_lidar_publisher',
+        namespace='lidar1',
+        output='screen',
+        parameters=[
+            {
+                "xfer_format": 0,
+                "multi_topic": 0,
+                "data_src": 0,
+                "publish_freq": 10.0,
+                "output_data_type": 0,
+                "frame_id": "lidar1_link",
+                "lvx_file_path": "/home/livox/livox_test.lvx",
+                "user_config_path": livox_config,
+                "cmdline_input_bd_code": "livox0000000001",
+            }
+        ]
     )
 
     # =============================================================================
@@ -91,7 +114,7 @@ def generate_launch_description():
         executable="static_transform_publisher",
         name="tf_map_empty",
         # fmt: off
-        arguments=["0.00","0.00","0.00","0.00","0.00","0.00","odom","map",
+        arguments=["0.00","0.00","0.00","0.00","0.00","0.00","map","odom",
             "--ros-args","--log-level","error",],
         # fmt: on
         respawn=True,
@@ -111,7 +134,9 @@ def generate_launch_description():
                 "subscribe_scan_cloud": True,
                 "subscribe_stereo": False,
                 "subscribe_rgbd": False,
-                "scan_cloud_topic": "/fused_pointcloud", # The topic for the fused point cloud
+                "subscribe_rgb": False,
+                "subscribe_Odometry": True,
+                # "scan_cloud_topic": "/fused_pointcloud", # The topic for the fused point cloud
                 "frame_id": "base_link",
                 "map_frame_id": "map",
                 "odom_frame_id": "odom",
@@ -119,6 +144,7 @@ def generate_launch_description():
                 "odom_tf_angular_variance": 0.01,
                 "publish_tf": False,
                 "approx_sync": True,
+                # "publish_tf_map_odom": True,
                 "Grid/CellSize": "0.025",  # Added by Pandu
                 "Grid/FootprintHeight": "1.5",  # Added by Pandu
                 "Grid/FootprintLength": "0.5",  # Added by Pandu
@@ -140,10 +166,38 @@ def generate_launch_description():
             }
         ],
         remappings=[
-            ("fused_pointcloud", "/multi_lidar_cloud"),
+            ("scan_cloud", "/lidar1/livox/lidar"),
         ],
         arguments=["--ros-args", "--log-level", "warn"],
+        prefix='nice -n -9',
         respawn=True,
+    )
+
+    rtabmap_viz_rtabmap_viz = Node(
+        package="rtabmap_viz",
+        executable="rtabmap_viz",
+        name="rtabmap_viz",
+        namespace="slam",
+        parameters=[
+            {
+                "subscribe_depth": False,
+                "subscribe_scan": False,
+                "subscribe_scan_cloud": True,
+                "subscribe_stereo": False,
+                "subscribe_rgbd": False,
+                "subscribe_rgbd": False,
+                "subscribe_Odometry": True,
+                "frame_id": "base_link",
+                "odom_frame_id": "odom",
+                "approx_sync": True,
+                "use_sim_time": True,
+            }
+        ],
+        remappings=[
+            ("scan_cloud", "/lidar1/livox/lidar"),
+        ],
+        arguments=["--ros-args", "--log-level", "warn"],
+        respawn=False,
     )
 
     ekf_node = Node(
@@ -153,6 +207,7 @@ def generate_launch_description():
         namespace="slam",
         parameters=[
             {
+                # "use_sim_time": True,
                 "map_frame": "map",
                 "odom_frame": "odom",
                 "base_link_frame": "base_link",
@@ -171,24 +226,25 @@ def generate_launch_description():
                     False,False,False,
                 ],
                 # fmt: on
+                "odom0_differential": True,
+                "odom0_relative": True,
 
-                # "odom0_differential": True,
-                # "odom0_relative": True,
-                # "pose0": "localization_pose",
-                # # fmt: off
-                # "pose0_config":[
-                #     True,True,False,
-                #     False,False,True,
-                #     False,False,False,
-                #     False,False,False,
-                #     False,False,False,
-                # ],
-                # # fmt: on
+                "pose0": "localization_pose",
+                # fmt: off
+                "pose0_config":[
+                    True,True,False,
+                    False,False,True,
+                    False,False,False,
+                    False,False,False,
+                    False,False,False,
+                ],
+                # fmt: on
                 # "pose0_differential": False,
                 # "pose0_relative": False,
             }
         ],
         arguments=["--ros-args", "--log-level", "warn"],
+        prefix='nice -n -9',
         respawn=True,
     )
 
@@ -198,11 +254,18 @@ def generate_launch_description():
             tf_base_link_to_body_link,
             tf_base_link_to_lidar1_link,
             tf_map_empty,
+            livox_lidar_driver,
             rviz2,
             rosbridge_server, 
             # beckhoff,
             master,
-            # rtabmap_slam_rtabmap,
-            ekf_node,
+            TimerAction(
+                period=4.0,
+                actions=[
+                    rtabmap_slam_rtabmap,
+                    rtabmap_viz_rtabmap_viz,
+                    ekf_node,
+                ],
+            ),
         ]
     )

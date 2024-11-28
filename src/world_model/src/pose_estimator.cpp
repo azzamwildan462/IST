@@ -28,7 +28,7 @@ public:
         tim_50hz = this->create_wall_timer(std::chrono::milliseconds(20), std::bind(&PoseEstimator::callback_tim_50hz, this));
 
         //----Publisher
-        pub_odom = this->create_publisher<nav_msgs::msg::Odometry>("odom", 1);
+        pub_odom = this->create_publisher<nav_msgs::msg::Odometry>("odom", 10);
     }
 
     void callback_tim_50hz()
@@ -41,7 +41,7 @@ public:
 
         // Kalkulasi odometry disini
         // Hadrcode
-        final_pose_xyo[0] += 0.02;
+        final_pose_xyo[0] = 0.5;
 
         final_vel_dxdydo[0] = (final_pose_xyo[0] - prev_final_pose_xyo[0]) / dt;
         final_vel_dxdydo[1] = (final_pose_xyo[1] - prev_final_pose_xyo[1]) / dt;
