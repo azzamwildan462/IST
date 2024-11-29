@@ -69,6 +69,21 @@ def generate_launch_description():
 
     # =============================================================================
 
+    ui_server = Node(
+        package="web_ui",
+        executable="ui_server.py",
+        name="ui_server",
+        parameters=[
+            {
+                "ui_root_path": os.path.join(ws_path,"src/web_ui/src")
+            },
+        ],
+        output="screen",
+        respawn=True,
+    )
+
+    # =============================================================================
+
     master = Node(
         package='master',
         executable='master',
@@ -296,12 +311,13 @@ def generate_launch_description():
             tf_base_link_to_body_link,
             tf_base_link_to_lidar1_link,
             tf_map_empty,
-            livox_lidar_driver,
+            # livox_lidar_driver,
             rviz2,
             rosbridge_server, 
             web_video_server,
             beckhoff,
             master,
+            ui_server,
             TimerAction(
                 period=4.0,
                 actions=[
