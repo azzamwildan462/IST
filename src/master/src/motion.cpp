@@ -5,6 +5,8 @@ void Master::manual_motion(float vx, float vy, float wz)
     static float vx_buffer = 0; // Throttle velocity
     static float wz_buffer = 0; // Steering angle
 
+    (void)vy;
+
     /**
      * Menghitung kecepatan mobil
      */
@@ -78,6 +80,9 @@ void Master::follow_lane(float vx, float vy, float wz)
     static float target_steering_angle = 0;
     static float target_max_velocity = 0;
 
+    (void)vy;
+    (void)wz;
+
     /**
      * Panic state!
      * Ketika tidak atau kurang mendeteksi garis
@@ -147,4 +152,7 @@ void Master::follow_lane(float vx, float vy, float wz)
 
 float Master::obstacle_influence(float gain)
 {
+    (void)gain;
+
+    return 0.0;
 }

@@ -30,7 +30,7 @@ public:
 
     PoseEstimator() : Node("master")
     {
-        this->declare_parameter("encoder_to_meter", 1);
+        this->declare_parameter("encoder_to_meter", 0.231);
         this->get_parameter("encoder_to_meter", encoder_to_meter);
 
         tf_broadcaster = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
