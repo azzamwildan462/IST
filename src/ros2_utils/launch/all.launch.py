@@ -329,7 +329,7 @@ def generate_launch_description():
             tf_base_link_to_body_link,
             tf_base_link_to_lidar1_link,
             tf_map_empty,
-            # livox_lidar_driver,
+            livox_lidar_driver,
             # rviz2,
             rosbridge_server, 
             web_video_server,
