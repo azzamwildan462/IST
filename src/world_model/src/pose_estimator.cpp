@@ -16,12 +16,23 @@ public:
     //----TransformBroadcaster
     std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster;
 
+    // Configs (static)
+    // =======================================================
+    float encoder_to_meter = 1;
+
+    uint16_t encoder[2] = {0, 0};
+    uint16_t prev_encoder[2] = {0, 0};
+    float gyro = 0;
+    float prev_gyro = 0;
+
     float final_pose_xyo[3] = {0, 0, 0};
-    float prev_final_pose_xyo[3] = {0, 0, 0};
     float final_vel_dxdydo[3] = {0, 0, 0};
 
     PoseEstimator() : Node("master")
     {
+        this->declare_parameter("encoder_to_meter", 1);
+        this->get_parameter("encoder_to_meter", encoder_to_meter);
+
         tf_broadcaster = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
 
         //----Timer
@@ -39,14 +50,27 @@ public:
         time_now = this->now();
         double dt = (time_now - time_old).seconds();
 
-        // Kalkulasi odometry disini
-        // Hadrcode, dia akan membenarkan sendiri
-        // final_pose_xyo[0] += 0.2;
+        if (dt < FLT_EPSILON)
+            return;
 
-        final_vel_dxdydo[0] = (final_pose_xyo[0] - prev_final_pose_xyo[0]) / dt;
-        final_vel_dxdydo[1] = (final_pose_xyo[1] - prev_final_pose_xyo[1]) / dt;
-        final_vel_dxdydo[2] = (final_pose_xyo[2] - prev_final_pose_xyo[2]) / dt;
-        memcpy(prev_final_pose_xyo, final_pose_xyo, sizeof(final_pose_xyo));
+        int16_t d_left_encoder = encoder[0] - prev_encoder[0];
+        int16_t d_right_encoder = encoder[1] - prev_encoder[1];
+        float d_gyro = gyro - prev_gyro;
+        memcpy(prev_encoder, encoder, sizeof(prev_encoder));
+        prev_gyro = gyro;
+
+        final_vel_dxdydo[0] = (d_left_encoder + d_right_encoder) / 2.0 * cosf(final_pose_xyo[2]) * encoder_to_meter / dt;
+        final_vel_dxdydo[1] = (d_left_encoder + d_right_encoder) / 2.0 * sinf(final_pose_xyo[2]) * encoder_to_meter / dt;
+        final_vel_dxdydo[2] = d_gyro;
+
+        final_pose_xyo[0] += final_vel_dxdydo[0] * dt;
+        final_pose_xyo[1] += final_vel_dxdydo[1] * dt;
+        final_pose_xyo[2] += final_vel_dxdydo[2] * dt;
+
+        while (final_pose_xyo[2] > M_PI)
+            final_pose_xyo[2] -= 2 * M_PI;
+        while (final_pose_xyo[2] < -M_PI)
+            final_pose_xyo[2] += 2 * M_PI;
 
         tf2::Quaternion q;
         q.setRPY(0, 0, final_pose_xyo[2]);

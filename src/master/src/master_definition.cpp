@@ -8,9 +8,23 @@ void Master::process_marker()
     marker.cube("body_link", "body", 1, get_point(0, 0, 0), get_quat(0, 0, 0), {0.2, 0.2, 0.2, 0.5}, 0.5, 1.5, 1.5);
 }
 
-void Master::process_fsm()
+void Master::process_local_fsm()
 {
+    switch (local_fsm.value)
+    {
+    case 0:
+        break;
+    }
 }
+
+void Master::process_transmitter()
+{
+    std_msgs::msg::Int16 msg_global_fsm;
+    msg_global_fsm.data = global_fsm.value;
+    pub_global_fsm->publish(msg_global_fsm);
+}
+
+//=================================================================================================
 
 geometry_msgs::msg::Point
 Master::get_point(double x, double y, double z)
