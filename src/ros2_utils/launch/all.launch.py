@@ -134,6 +134,16 @@ def generate_launch_description():
         executable='lane_detection',
         name='lane_detection',
         output='screen',
+        parameters=[{
+            "low_h": 27,
+            "high_h": 255,
+            "low_l": 153,
+            "high_l": 255,
+            "low_s": 0,
+            "high_s": 255,
+            "gray_threshold": 200
+        }
+        ],
         respawn=True,
         prefix='nice -n -8'
     )
@@ -312,19 +322,19 @@ def generate_launch_description():
             tf_base_link_to_lidar1_link,
             tf_map_empty,
             # livox_lidar_driver,
-            rviz2,
+            # rviz2,
             rosbridge_server, 
             web_video_server,
             beckhoff,
             master,
-            ui_server,
-            TimerAction(
-                period=4.0,
-                actions=[
-                    rtabmap_slam_rtabmap,
-                    # rtabmap_viz_rtabmap_viz,
-                    ekf_node,
-                ],
-            ),
+            # ui_server,
+            # TimerAction(
+            #     period=4.0,
+            #     actions=[
+            #         rtabmap_slam_rtabmap,
+            #         # rtabmap_viz_rtabmap_viz,
+            #         ekf_node,
+            #     ],
+            # ),
         ]
     )

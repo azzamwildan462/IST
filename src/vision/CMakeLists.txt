@@ -14,6 +14,7 @@ set(var_dependencies
     std_msgs
     nav_msgs
     ros2_utils
+    ros2_interface
     fmt
     yaml-cpp
     tf2_geometry_msgs
