@@ -6,6 +6,10 @@ from launch.actions import EmitEvent, RegisterEventHandler, TimerAction
 
 from ament_index_python.packages import get_package_share_directory
 
+BECKHOFF_NORMAL = int(3)
+BECKHOFF_DELETE_EEPROM = int(2)
+BECKHOFF_SCAN_SLAVES = int(1)
+
 path_config_buffer = os.getenv('AMENT_PREFIX_PATH', '')
 path_config_buffer_split = path_config_buffer.split(":")
 ws_path = path_config_buffer_split[0] + "/../../"
@@ -116,6 +120,10 @@ def generate_launch_description():
         executable='beckhoff',
         name='beckhoff',
         output='screen',
+        parameters=[{
+            "if_name": "enxf8e43b2adb32",
+            "po2so_config": BECKHOFF_NORMAL
+        }],
         respawn=True,
         prefix='nice -n -10 chrt -f 99'
     )

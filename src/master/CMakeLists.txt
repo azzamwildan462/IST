@@ -13,8 +13,7 @@ set(var_dependencies
     nav_msgs
     ros2_utils
     tf2_geometry_msgs
-    tf2_ros 
-    fmt)
+    tf2_ros)
     
 foreach(var_dependency ${var_dependencies})
   find_package(${var_dependency} REQUIRED)
@@ -24,7 +23,6 @@ include_directories(include)
 
 add_executable(master src/master.cpp src/master_process.cpp)
 ament_target_dependencies(master ${var_dependencies})
-target_link_libraries(master fmt::fmt)
 
 install(TARGETS
   master

@@ -14,6 +14,7 @@ set(var_dependencies
   std_msgs
   geometry_msgs
   visualization_msgs
+  fmt
 )
 
 # Find dependencies
@@ -26,6 +27,7 @@ add_library(
   src/help_logger.cpp
   src/help_marker.cpp)
 ament_target_dependencies(${PROJECT_NAME} ${var_dependencies})
+target_link_libraries(${PROJECT_NAME} fmt::fmt)
 
 target_include_directories(
   ${PROJECT_NAME}

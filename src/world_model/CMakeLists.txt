@@ -10,7 +10,6 @@ set(var_dependencies
     ament_cmake
     rclcpp
     std_msgs
-    fmt
     nav_msgs
     ros2_utils
     tf2_geometry_msgs
@@ -32,7 +31,7 @@ ament_target_dependencies(pose_estimator ${var_dependencies})
 
 add_executable(obstacle_filter src/obstacle_filter.cpp)
 ament_target_dependencies(obstacle_filter ${var_dependencies})
-target_link_libraries(obstacle_filter ${PCL_LIBRARIES} fmt::fmt)
+target_link_libraries(obstacle_filter ${PCL_LIBRARIES})
 
 install(TARGETS
   pose_estimator

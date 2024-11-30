@@ -15,7 +15,6 @@ set(var_dependencies
     nav_msgs
     ros2_utils
     ros2_interface
-    fmt
     yaml-cpp
     tf2_geometry_msgs
     tf2_ros)
@@ -26,11 +25,10 @@ endforeach()
 
 add_executable(vision_capture src/vision_capture.cpp)
 ament_target_dependencies(vision_capture ${var_dependencies})
-target_link_libraries(vision_capture fmt::fmt)
 
 add_executable(lane_detection src/lane_detection.cpp)
 ament_target_dependencies(lane_detection ${var_dependencies})
-target_link_libraries(lane_detection fmt::fmt ${YAML_CPP_LIBRARIES})
+target_link_libraries(lane_detection ${YAML_CPP_LIBRARIES})
 
 install(TARGETS
   vision_capture
