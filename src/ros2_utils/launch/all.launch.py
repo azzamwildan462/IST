@@ -333,7 +333,7 @@ def generate_launch_description():
             # rviz2,
             rosbridge_server, 
             web_video_server,
-            beckhoff,
+            # beckhoff,
             master,
             # ui_server,
             # TimerAction(

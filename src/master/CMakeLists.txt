@@ -12,6 +12,7 @@ set(var_dependencies
     std_msgs
     nav_msgs
     ros2_utils
+    ros2_interface
     tf2_geometry_msgs
     tf2_ros)
     
@@ -21,7 +22,7 @@ endforeach()
 
 include_directories(include)
 
-add_executable(master src/master.cpp src/master_process.cpp)
+add_executable(master src/master.cpp src/master_definition.cpp src/motion.cpp)
 ament_target_dependencies(master ${var_dependencies})
 
 install(TARGETS
