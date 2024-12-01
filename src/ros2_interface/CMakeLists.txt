@@ -21,7 +21,7 @@ endforeach()
 
 set(msg_files
     msg/PointArray.msg)
-set(srv_files srv/Dummy.srv)
+set(srv_files srv/Params.srv)
 
 rosidl_generate_interfaces(
   ${PROJECT_NAME}

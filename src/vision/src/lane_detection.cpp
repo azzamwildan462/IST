@@ -7,6 +7,7 @@
 #include <thread>
 #include <mutex>
 #include "ros2_interface/msg/point_array.hpp"
+#include "ros2_interface/srv/params.hpp"
 
 class LaneDetection : public rclcpp::Node
 {
@@ -17,6 +18,10 @@ public:
     rclcpp::Publisher<ros2_interface::msg::PointArray>::SharedPtr pub_point_kiri;
     rclcpp::Publisher<ros2_interface::msg::PointArray>::SharedPtr pub_point_kanan;
     rclcpp::Publisher<ros2_interface::msg::PointArray>::SharedPtr pub_point_tengah;
+    rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr pub_frame_display;
+    rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr pub_frame_binary;
+
+    rclcpp::Service<ros2_interface::srv::Params>::SharedPtr srv_params;
 
     // Configs (dynamic)
     // =======================================================
@@ -104,6 +109,12 @@ public:
         pub_point_kanan = this->create_publisher<ros2_interface::msg::PointArray>("/lane_detection/point_kanan", 1);
         pub_point_tengah = this->create_publisher<ros2_interface::msg::PointArray>("/lane_detection/point_tengah", 1);
 
+        pub_frame_display = this->create_publisher<sensor_msgs::msg::Image>("/lane_detection/frame_display", 1);
+        pub_frame_binary = this->create_publisher<sensor_msgs::msg::Image>("/lane_detection/frame_binary", 1);
+
+        srv_params = this->create_service<ros2_interface::srv::Params>(
+            "/lane_detection/params", std::bind(&LaneDetection::callback_srv_params, this, std::placeholders::_1, std::placeholders::_2));
+
         //----Timer
         tim_50hz = this->create_wall_timer(std::chrono::milliseconds(20), std::bind(&LaneDetection::callback_tim_50hz, this));
 
@@ -150,6 +161,39 @@ public:
         {
             error_code = 2;
             logger.error("Failed to save config file: %s", e.what());
+        }
+    }
+
+    void callback_srv_params(const std::shared_ptr<ros2_interface::srv::Params::Request> request,
+                             std::shared_ptr<ros2_interface::srv::Params::Response> response)
+    {
+        if (request->req_type == 0)
+        {
+            response->data.push_back(low_h);
+            response->data.push_back(high_h);
+            response->data.push_back(low_l);
+            response->data.push_back(high_l);
+            response->data.push_back(low_s);
+            response->data.push_back(high_s);
+        }
+        else if (request->req_type == 1)
+        {
+            low_h = request->req_data[0];
+            high_h = request->req_data[1];
+            low_l = request->req_data[2];
+            high_l = request->req_data[3];
+            low_s = request->req_data[4];
+            high_s = request->req_data[5];
+            if (use_dynamic_config)
+            {
+                save_config();
+            }
+            response->data.push_back(low_h);
+            response->data.push_back(high_h);
+            response->data.push_back(low_l);
+            response->data.push_back(high_l);
+            response->data.push_back(low_s);
+            response->data.push_back(high_s);
         }
     }
 
@@ -256,7 +300,7 @@ public:
         ros2_interface::msg::PointArray msg_point_tengah;
         ros2_interface::msg::PointArray msg_point_kanan;
 
-        for (int i = 0; i < point_kiri.size(); i++)
+        for (size_t i = 0; i < point_kiri.size(); i++)
         {
             cv::circle(frame_bgr_copy, point_kiri[i], 1, cv::Scalar(0, 0, 255), 3);
             geometry_msgs::msg::Point p;
@@ -265,7 +309,7 @@ public:
             msg_point_kiri.points.push_back(p);
         }
 
-        for (int i = 0; i < point_kanan.size(); i++)
+        for (size_t i = 0; i < point_kanan.size(); i++)
         {
             cv::circle(frame_bgr_copy, point_kanan[i], 1, cv::Scalar(0, 255, 0), 3);
             geometry_msgs::msg::Point p;
@@ -274,7 +318,7 @@ public:
             msg_point_kanan.points.push_back(p);
         }
 
-        for (int i = 0; i < point_tengah.size(); i++)
+        for (size_t i = 0; i < point_tengah.size(); i++)
         {
             cv::circle(frame_bgr_copy, point_tengah[i], 1, cv::Scalar(255, 0, 0), 3);
             geometry_msgs::msg::Point p;
@@ -287,8 +331,11 @@ public:
         pub_point_kanan->publish(msg_point_kanan);
         pub_point_tengah->publish(msg_point_tengah);
 
-        cv::imshow("frame_bgr", frame_bgr_copy);
-        cv::waitKey(1);
+        auto msg_frame_display = cv_bridge::CvImage(std_msgs::msg::Header(), "bgr8", frame_bgr_copy).toImageMsg();
+        pub_frame_display->publish(*msg_frame_display);
+
+        auto msg_frame_binary = cv_bridge::CvImage(std_msgs::msg::Header(), "mono8", image_hls_threshold).toImageMsg();
+        pub_frame_binary->publish(*msg_frame_binary);
     }
 
     void process_frame_gray()
@@ -353,12 +400,6 @@ public:
                 left_lines.push_back(l);
             }
         }
-
-        // show image
-        cv::imshow("frame_gray", frame_gray_copy);
-        cv::imshow("frame_gray_binary", frame_gray_binary);
-        cv::imshow("frame_gray_canny", frame_gray_canny);
-        cv::waitKey(1);
     }
 
     void callback_tim_50hz()

@@ -149,7 +149,9 @@ def generate_launch_description():
             "high_l": 255,
             "low_s": 0,
             "high_s": 255,
-            "gray_threshold": 200
+            "gray_threshold": 200,
+            "use_dynamic_config": True,
+            "config_path": os.path.join(path_config,"dynamic_conf.yaml")
         }
         ],
         respawn=True,
@@ -324,18 +326,18 @@ def generate_launch_description():
         [
             vision_capture,
             lane_detection,
-            pose_estimator,
-            obstacle_filter,
-            tf_base_link_to_body_link,
-            tf_base_link_to_lidar1_link,
-            tf_map_empty,
-            livox_lidar_driver,
+            # pose_estimator,
+            # obstacle_filter,
+            # tf_base_link_to_body_link,
+            # tf_base_link_to_lidar1_link,
+            # tf_map_empty,
+            # livox_lidar_driver,
             # rviz2,
             rosbridge_server, 
             web_video_server,
             # beckhoff,
-            master,
-            # ui_server,
+            # master,
+            ui_server,
             # TimerAction(
             #     period=4.0,
             #     actions=[
