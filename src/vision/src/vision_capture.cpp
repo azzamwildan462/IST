@@ -119,13 +119,16 @@ public:
             // Hardcode sementara, image dari file
             cv::Mat frame2 = cv::imread("/home/wildan/proyek/robotika/IST/src/ros2_utils/configs/test_lane.webp");
 
+            cv::Mat flippedImg;
+            cv::flip(frame2, flippedImg, 1); // 1 specifies flipping around the Y-axis
+
             cv::Mat frame_bgr;
-            cv::resize(frame2, frame_bgr, cv::Size(output_width, output_height));
+            cv::resize(flippedImg, frame_bgr, cv::Size(output_width, output_height));
             auto msg_frame_bgr = cv_bridge::CvImage(std_msgs::msg::Header(), "bgr8", frame_bgr).toImageMsg();
             pub_image_bgr->publish(*msg_frame_bgr);
 
             cv::Mat frame_gray;
-            cv::cvtColor(frame2, frame_gray, cv::COLOR_BGR2GRAY);
+            cv::cvtColor(frame_bgr, frame_gray, cv::COLOR_BGR2GRAY);
             auto msg_frame_gray = cv_bridge::CvImage(std_msgs::msg::Header(), "mono8", frame_gray).toImageMsg();
             pub_image_gray->publish(*msg_frame_gray);
         }

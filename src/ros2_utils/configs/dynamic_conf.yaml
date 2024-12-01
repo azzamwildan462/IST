@@ -1,6 +1,6 @@
 Detection:
   low_h: 52
-  low_l: 165
+  low_l: 205
   low_s: 0
   high_h: 255
   high_l: 255

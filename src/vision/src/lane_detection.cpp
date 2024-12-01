@@ -336,6 +336,9 @@ public:
 
         auto msg_frame_binary = cv_bridge::CvImage(std_msgs::msg::Header(), "mono8", image_hls_threshold).toImageMsg();
         pub_frame_binary->publish(*msg_frame_binary);
+
+        // cv::imshow("Lane Detection", frame_bgr_copy);
+        // cv::waitKey(1);
     }
 
     void process_frame_gray()

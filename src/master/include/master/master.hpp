@@ -7,11 +7,13 @@
 #include "ros2_utils/help_logger.hpp"
 #include "ros2_utils/help_marker.hpp"
 #include "ros2_utils/simple_fsm.hpp"
+#include "ros2_utils/pid.hpp"
 #include "tf2/LinearMath/Quaternion.h"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 #include "geometry_msgs/msg/pose_with_covariance_stamped.hpp"
 #include "ros2_interface/msg/point_array.hpp"
 #include "nav_msgs/msg/odometry.hpp"
+#include "std_msgs/msg/float32_multi_array.hpp"
 #include "std_msgs/msg/int16.hpp"
 
 #define FSM_GLOBAL_INIT 0
@@ -25,6 +27,7 @@ public:
     rclcpp::TimerBase::SharedPtr tim_50hz;
     rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr pub_initialpose;
     rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr pub_global_fsm;
+    rclcpp::Publisher<std_msgs::msg::Float32MultiArray>::SharedPtr pub_to_ui;
     rclcpp::Subscription<ros2_interface::msg::PointArray>::SharedPtr sub_lane_kiri;
     rclcpp::Subscription<ros2_interface::msg::PointArray>::SharedPtr sub_lane_tengah;
     rclcpp::Subscription<ros2_interface::msg::PointArray>::SharedPtr sub_lane_kanan;
@@ -33,16 +36,20 @@ public:
     // Configs
     // ===============================================================================================
     bool use_ekf_odometry = false;
-    float profile_max_acceleration = 1;
-    float profile_max_decceleration = 1;
-    float profile_max_velocity = 1;
-    float profile_max_accelerate_jerk = 0.1;
-    float profile_max_decelerate_jerk = 0.9;
+    float profile_max_acceleration = 100;
+    float profile_max_decceleration = 100;
+    float profile_max_velocity = 10;
+    float profile_max_accelerate_jerk = 1000;
+    float profile_max_decelerate_jerk = 1000;
+    float profile_max_braking = 80;
+    float profile_max_braking_acceleration = 2000;
+    float profile_max_braking_jerk = 3000;
 
     HelpLogger logger;
     HelpMarker marker;
     MachineState local_fsm;
     MachineState global_fsm;
+    PID pid_vx;
 
     float actuation_ax = 0;
     float actuation_ay = 0;
@@ -58,6 +65,7 @@ public:
 
     float fb_final_pose_xyo[3];
     float fb_final_vel_dxdydo[3];
+    float fb_steering_angle = 0;
 
     float dt = 0.02;
 

@@ -10,6 +10,8 @@ Master::Master() : Node("master")
     }
 
     pub_initialpose = this->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>("slam/initialpose", 10);
+    pub_global_fsm = this->create_publisher<std_msgs::msg::Int16>("/master/global_fsm", 1);
+    pub_to_ui = this->create_publisher<std_msgs::msg::Float32MultiArray>("/master/to_ui", 1);
 
     sub_lane_kiri = this->create_subscription<ros2_interface::msg::PointArray>(
         "/lane_detection/point_kiri", 1, std::bind(&Master::callback_sub_lane_kiri, this, std::placeholders::_1));
@@ -27,6 +29,8 @@ Master::Master() : Node("master")
 
     //----Timer
     tim_50hz = this->create_wall_timer(std::chrono::milliseconds(20), std::bind(&Master::callback_tim_50hz, this));
+
+    pid_vx.init(20, 3.7, 0, dt, 0, 80, 0, 60);
 
     logger.info("Master init success");
     global_fsm.value = FSM_GLOBAL_PREOP;
@@ -75,6 +79,8 @@ void Master::callback_tim_50hz()
 
     process_marker();
 
+    follow_lane(10, 0, 1.57);
+
     switch (global_fsm.value)
     {
     case FSM_GLOBAL_PREOP:
@@ -89,6 +95,8 @@ void Master::callback_tim_50hz()
     }
 
     process_local_fsm();
+
+    process_transmitter();
 }
 
 // ===============================================================================================

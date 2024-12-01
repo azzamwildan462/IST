@@ -336,7 +336,7 @@ def generate_launch_description():
             rosbridge_server, 
             web_video_server,
             # beckhoff,
-            # master,
+            master,
             ui_server,
             # TimerAction(
             #     period=4.0,

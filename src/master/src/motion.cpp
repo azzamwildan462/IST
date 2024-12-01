@@ -9,9 +9,60 @@ void Master::manual_motion(float vx, float vy, float wz)
 
     /**
      * Menghitung kecepatan mobil
+     * Braking system aktif ketika vx < 0, sisanya kontrol kecepatan
      */
-    if (vx > vx_buffer)
+
+    /**
+     * Ketika brake
+     */
+    static uint8_t state_control = 0;
+    static uint8_t prev_state_control = 0;
+    if (vx < 0)
     {
+        state_control = 0;
+        if (prev_state_control != 0)
+            actuation_ax = 0;
+        logger.info("Brake");
+        actuation_ax += -profile_max_braking_jerk * 0.5 * dt * dt;
+        if (actuation_ax < -profile_max_braking_acceleration)
+        {
+            actuation_ax = -profile_max_braking_acceleration;
+        }
+        vx_buffer += actuation_ax * dt;
+        if (vx_buffer < vx)
+        {
+            vx_buffer = vx;
+        }
+    }
+    /**
+     * Accelerate setelah braking, segera lepas pedal brake
+     */
+    else if (vx > 0 && vx_buffer < 0)
+    {
+        state_control = 1;
+        if (prev_state_control != 1)
+            actuation_ax = 0;
+        logger.info("Accelerate after brake");
+        actuation_ax += profile_max_braking_jerk * 0.5 * dt * dt;
+        if (actuation_ax > profile_max_braking_acceleration)
+        {
+            actuation_ax = profile_max_braking_acceleration;
+        }
+        vx_buffer += actuation_ax * dt;
+        if (vx_buffer > vx)
+        {
+            vx_buffer = vx;
+        }
+    }
+    /**
+     * Normal acceleration
+     */
+    else if (vx > vx_buffer)
+    {
+        state_control = 2;
+        if (prev_state_control != 2)
+            actuation_ax = 0;
+        logger.info("Normal acceleration");
         actuation_ax += profile_max_accelerate_jerk * 0.5 * dt * dt;
         if (actuation_ax > profile_max_acceleration)
         {
@@ -23,8 +74,15 @@ void Master::manual_motion(float vx, float vy, float wz)
             vx_buffer = vx;
         }
     }
+    /**
+     * Normal deceleration
+     */
     else if (vx < vx_buffer)
     {
+        state_control = 3;
+        if (prev_state_control != 3)
+            actuation_ax = 0;
+        logger.info("Normal deceleration");
         actuation_ax -= profile_max_decelerate_jerk * 0.5 * dt * dt;
         if (actuation_ax < -profile_max_decceleration)
         {
@@ -36,6 +94,7 @@ void Master::manual_motion(float vx, float vy, float wz)
             vx_buffer = vx;
         }
     }
+    prev_state_control = state_control;
 
     /**
      * Menghitung kecepatan steer berdasarkan kecepatan mobil
@@ -68,15 +127,26 @@ void Master::manual_motion(float vx, float vy, float wz)
         }
     }
 
-    actuation_vx = vx_buffer;
-    actuation_ay = 0;
-    actuation_wz = wz_buffer;
+    if (vx_buffer < 0)
+    {
+        actuation_vx = vx_buffer;
+        actuation_ay = 0;
+        actuation_wz = wz_buffer;
+    }
+    else
+    {
+        actuation_vx = pid_vx.calculate(vx_buffer - fb_final_vel_dxdydo[0]);
+        actuation_ay = 0;
+        actuation_wz = wz_buffer;
+    }
+
+    logger.info("%.2f %.2f || %.2f %.2f || %.2f %.2f || %.2f %.2f", vx, wz, actuation_ax, steering_rate, vx_buffer, wz_buffer, actuation_vx, actuation_wz);
 }
 void Master::follow_lane(float vx, float vy, float wz)
 {
-    static const float pixel_to_world = 0.3;
+    static const float pixel_to_world = 0.06;
     static const float gain_kemiringan_terhadap_steering = 0.8;
-    static const float steer2lane_sf = 0.5; // Smooth factor
+    static const float steer2lane_sf = 0.99; // Smooth factor
     static float target_steering_angle = 0;
     static float target_max_velocity = 0;
 
@@ -90,7 +160,7 @@ void Master::follow_lane(float vx, float vy, float wz)
     if (lane_tengah.points.size() < 4)
     {
         target_steering_angle += target_steering_angle * (1 - steer2lane_sf) + 0 * steer2lane_sf;
-        manual_motion(0, 0, 0);
+        manual_motion(-profile_max_braking, 0, 0);
         return;
     }
 
@@ -113,29 +183,34 @@ void Master::follow_lane(float vx, float vy, float wz)
     }
 
     target_max_velocity = fabs(max_y_point - min_y_point) * pixel_to_world;
-    if (target_max_velocity > profile_max_velocity)
-    {
-        target_max_velocity = profile_max_velocity;
-    }
 
-    if (target_max_velocity > vx)
+    if (target_max_velocity > fmaxf(profile_max_velocity, vx))
     {
-        target_max_velocity = vx;
+        target_max_velocity = fmaxf(profile_max_velocity, vx);
     }
 
     /**
      * Menghitung steering angle
      */
-    float point_x_terdekat = lane_tengah.points[0].x;
-    float point_y_terdekat = lane_tengah.points[0].y;
-    float point_x_terjauh = lane_tengah.points[lane_tengah.points.size() - 1].x;
-    float point_y_terjauh = lane_tengah.points[lane_tengah.points.size() - 1].y;
+    float point_x_terdekat = lane_tengah.points[lane_tengah.points.size() - 1].x;
+    float point_y_terdekat = lane_tengah.points[lane_tengah.points.size() - 1].y - lane_tengah.points[lane_tengah.points.size() - 1].y;
+    float point_x_terjauh = lane_tengah.points[0].x;
+    float point_y_terjauh = lane_tengah.points[lane_tengah.points.size() - 1].y - lane_tengah.points[0].y;
 
     float dx = point_x_terjauh - point_x_terdekat;
     float dy = point_y_terjauh - point_y_terdekat;
-    float kemiringan_lane = atan2f(dy, dx) * gain_kemiringan_terhadap_steering;
+    float kemiringan_lane = (atan2f(dy, dx) - 1.57) * gain_kemiringan_terhadap_steering;
 
-    target_steering_angle += target_steering_angle * (1 - steer2lane_sf) + kemiringan_lane * steer2lane_sf;
+    target_steering_angle += target_steering_angle * steer2lane_sf + kemiringan_lane * (1 - steer2lane_sf);
+
+    if (kemiringan_lane > 0 && target_steering_angle > kemiringan_lane)
+    {
+        target_steering_angle = kemiringan_lane;
+    }
+    else if (kemiringan_lane < 0 && target_steering_angle < kemiringan_lane)
+    {
+        target_steering_angle = kemiringan_lane;
+    }
 
     /**
      * Menghitung efek obstacle
