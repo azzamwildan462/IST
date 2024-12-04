@@ -22,7 +22,7 @@ void Master::manual_motion(float vx, float vy, float wz)
         state_control = 0;
         if (prev_state_control != 0)
             actuation_ax = 0;
-        logger.info("Brake");
+        // logger.info("Brake");
         actuation_ax += -profile_max_braking_jerk * 0.5 * dt * dt;
         if (actuation_ax < -profile_max_braking_acceleration)
         {
@@ -42,7 +42,7 @@ void Master::manual_motion(float vx, float vy, float wz)
         state_control = 1;
         if (prev_state_control != 1)
             actuation_ax = 0;
-        logger.info("Accelerate after brake");
+        // logger.info("Accelerate after brake");
         actuation_ax += profile_max_braking_jerk * 0.5 * dt * dt;
         if (actuation_ax > profile_max_braking_acceleration)
         {
@@ -62,7 +62,7 @@ void Master::manual_motion(float vx, float vy, float wz)
         state_control = 2;
         if (prev_state_control != 2)
             actuation_ax = 0;
-        logger.info("Normal acceleration");
+        // logger.info("Normal acceleration");
         actuation_ax += profile_max_accelerate_jerk * 0.5 * dt * dt;
         if (actuation_ax > profile_max_acceleration)
         {
@@ -82,7 +82,7 @@ void Master::manual_motion(float vx, float vy, float wz)
         state_control = 3;
         if (prev_state_control != 3)
             actuation_ax = 0;
-        logger.info("Normal deceleration");
+        // logger.info("Normal deceleration");
         actuation_ax -= profile_max_decelerate_jerk * 0.5 * dt * dt;
         if (actuation_ax < -profile_max_decceleration)
         {
@@ -140,7 +140,9 @@ void Master::manual_motion(float vx, float vy, float wz)
         actuation_wz = wz_buffer;
     }
 
-    logger.info("%.2f %.2f || %.2f %.2f || %.2f %.2f || %.2f %.2f", vx, wz, actuation_ax, steering_rate, vx_buffer, wz_buffer, actuation_vx, actuation_wz);
+    target_velocity = fmaxf(0, vx_buffer);
+
+    // logger.info("%.2f %.2f || %.2f %.2f || %.2f %.2f || %.2f %.2f", vx, wz, actuation_ax, steering_rate, vx_buffer, wz_buffer, actuation_vx, actuation_wz);
 }
 
 void Master::follow_lane_2_cam(float vx, float vy, float wz)

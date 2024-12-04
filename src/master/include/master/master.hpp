@@ -83,6 +83,8 @@ public:
     float actuation_vy = 0;
     float actuation_wz = 0; // Ini posisi
 
+    float target_velocity = 0;
+
     ros2_interface::msg::PointArray lane_kiri;
     ros2_interface::msg::PointArray lane_tengah;
     ros2_interface::msg::PointArray lane_kanan;

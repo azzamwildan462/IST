@@ -8,6 +8,13 @@ anime({
     loop: true,
 });
 
+let velocity_actuation = 0;
+let velocity_feedback = 0;
+let steering_actuation = 0;
+let steering_feedback = 0;
+
+// ================================================================
+
 // Connect to the ROS bridge WebSocket server
 var ros = new ROSLIB.Ros({
     url: "ws://localhost:9090",
@@ -25,4 +32,92 @@ ros.on("close", function () {
     console.log("Connection to WebSocket server closed.");
 });
 
+var sub_master2ui = new ROSLIB.Topic({
+    ros: ros,
+    name: "/master/to_ui",
+    messageType: "std_msgs/Float32MultiArray",
+});
+
+sub_master2ui.subscribe(function (message) {
+    velocity_actuation = message.data[0];
+    velocity_feedback = message.data[1];
+    steering_actuation = message.data[2];
+    steering_feedback = message.data[3];
+});
+
+
 // ================================================================
+
+function set_velocity(selector1, selector2, id_text, value1, value2) {
+
+    if (value1 > 100) value1 = 100;
+    if (value2 > 100) value2 = 100;
+
+    const new_value1 = value1 / 100 * 75;
+    const new_value2 = value2 / 100 * 75;
+
+    const progressText = document.getElementById(id_text);
+    var circle = document.querySelector(selector1);
+    var circle2 = document.querySelector(selector2);
+    var length = circle.getTotalLength(); // Get the total length of the circle's path
+    var length2 = circle2.getTotalLength();
+
+    circle.style.strokeDasharray = length; // Set the stroke dasharray to the total length of the circle
+    circle.style.strokeDashoffset = length - (length * (new_value1 / 100)); // Initially hide the stroke
+
+    circle2.style.strokeDasharray = length2; // Set the stroke dasharray to the total length of the circle
+    circle2.style.strokeDashoffset = length2 - (length2 * (new_value2 / 100)); // Initially hide the stroke
+
+    value1_display = value1 * 0.1;
+    progressText.textContent = `${value1_display.toFixed(2)}`;
+}
+
+function set_steering(selector1, selector2, id_text, value1, value2) {
+
+    value1 = value1 * -1;
+    value2 = value2 * -1;
+
+
+    if (value1 > 100) value1 = 100;
+    if (value2 > 100) value2 = 100;
+
+    const new_value1 = value1 / 100 * 75;
+    const new_value2 = value2 / 100 * 75;
+
+    const progressText = document.getElementById(id_text);
+    var circle = document.querySelector(selector1);
+    var circle2 = document.querySelector(selector2);
+    var length = circle.getTotalLength(); // Get the total length of the circle's path
+    var length2 = circle2.getTotalLength();
+
+    circle.style.strokeDasharray = length; // Set the stroke dasharray to the total length of the circle
+    circle.style.strokeDashoffset = length - (length * (new_value1 / 100)); // Initially hide the stroke
+
+    circle2.style.strokeDasharray = length2; // Set the stroke dasharray to the total length of the circle
+    circle2.style.strokeDashoffset = length2 - (length2 * (new_value2 / 100)); // Initially hide the stroke
+
+    circle.style.transform = "rotate(-90deg)"; // Adjust the rotation as needed
+    circle.style.transformOrigin = "50% 50%"; // Ensure rotation is centered
+    circle2.style.transform = "rotate(-90deg)"; // Adjust the rotation as needed
+    circle2.style.transformOrigin = "50% 50%"; // Ensure rotation is centered
+
+    progressText.textContent = `${value1.toFixed(0)}%`;
+}
+
+// ================================================================
+
+const velocity_kmph = document.getElementById('velocity-kmph');
+const steering_rad = document.getElementById('steering-rad');
+
+setInterval(() => {
+    velocity_feedback += 0.1;
+    velocity_actuation_display = velocity_actuation * 10;
+    velocity_feedback_display = velocity_feedback * 10;
+    steering_actuation_display = (steering_actuation) * 100 / 3.14;
+    steering_feedback_display = (steering_feedback) * 100 / 3.14;
+
+    set_velocity('.velocity-circle1', '.velocity-circle2', 'velocity-text', velocity_actuation_display, velocity_feedback_display);
+    velocity_kmph.textContent = `${velocity_feedback.toFixed(2)} km/h`;
+    set_steering('.steering-circle1', '.steering-circle2', 'steering-text', steering_actuation_display, steering_feedback_display);
+    steering_rad.textContent = `${steering_feedback.toFixed(2)} rad`;
+}, 50);

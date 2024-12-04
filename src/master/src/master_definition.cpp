@@ -33,7 +33,7 @@ void Master::process_transmitter()
     pub_global_fsm->publish(msg_global_fsm);
 
     std_msgs::msg::Float32MultiArray msg_to_ui;
-    msg_to_ui.data.push_back(actuation_vx);
+    msg_to_ui.data.push_back(target_velocity);
     msg_to_ui.data.push_back(actuation_wz);
     msg_to_ui.data.push_back(fb_final_vel_dxdydo[0]);
     msg_to_ui.data.push_back(fb_steering_angle);

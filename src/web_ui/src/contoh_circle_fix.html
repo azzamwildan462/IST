@@ -7,17 +7,6 @@
     <title>6 Circular Progress Bars with Anime.js</title>
     <script src="https://cdn.jsdelivr.net/npm/animejs/lib/anime.min.js"></script>
     <style>
-        .chart-container {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            grid-gap: 20px;
-            margin-top: 30px;
-        }
-
-        .chart-box {
-            text-align: center;
-        }
-
         svg {
             width: 100px;
             height: 100px;
@@ -43,18 +32,46 @@
 
 <body>
 
-    <div class="chart-container">
-        <div class="chart-box">
-            <svg>
-                <circle cx="50" cy="50" r="40" stroke="#e0e0e0"></circle>
-                <circle class="progress-circle1" cx="50" cy="50" r="40" stroke="#4caf50"></circle>
-                <circle class="progress-circle2" cx="50" cy="50" r="30" stroke="#cf1f10"></circle>
-                <text x="52" y="52" id="progress-text">0%</text>
-            </svg>
-        </div>
+    <div>
+        <svg>
+            <circle cx="50" cy="50" r="40" stroke="#e0e0e0"></circle>
+            <circle class="widget0-circle1" cx="50" cy="50" r="40" stroke="#4caf50"></circle>
+            <circle class="widget0-circle2" cx="50" cy="50" r="30" stroke="#cf1f10"></circle>
+            <text x="52" y="52" id="widget0-text">0%</text>
+        </svg>
     </div>
 
     <script>
+        function set_value(selector1, selector2, value1, value2) {
+            const new_value1 = value1 / 100 * 75;
+            const new_value2 = value2 / 100 * 75;
+
+            const progressText = document.getElementById('widget0-text');
+            var circle = document.querySelector(selector1);
+            var circle2 = document.querySelector(selector2);
+            var length = circle.getTotalLength(); // Get the total length of the circle's path
+            var length2 = circle2.getTotalLength();
+
+            circle.style.strokeDasharray = length; // Set the stroke dasharray to the total length of the circle
+            circle.style.strokeDashoffset = length - (length * (new_value1 / 100)); // Initially hide the stroke
+
+            circle2.style.strokeDasharray = length2; // Set the stroke dasharray to the total length of the circle
+            circle2.style.strokeDashoffset = length2 - (length2 * (new_value2 / 100)); // Initially hide the stroke
+
+            progressText.textContent = `${value1}%`;
+        }
+
+        value1 = 0;
+        setInterval(() => {
+            set_value('.widget0-circle1', '.widget0-circle2', value1, 100);
+            value1 += 1;
+            if (value1 > 100) {
+                value1 = 0;
+            }
+        }, 20);
+    </script>
+
+    <!-- <script>
         // Function to animate the circular progress
         function animateProgress(selector1, selector2, progressValue1, progressValue2) {
             const progressText = document.getElementById('progress-text');
@@ -101,7 +118,7 @@
 
         // Create 6 progress bars with different values
         animateProgress('.progress-circle1', '.progress-circle2', 50, 100);
-    </script>
+    </script> -->
 
 </body>
 
