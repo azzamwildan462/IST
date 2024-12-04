@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>ROS 2 WebSocket Example</title>
+    <link rel="stylesheet" href="./bulma.min.css">
+    <script src="./roslib.min.js"></script>
+    <script src="./anime.min.js"></script>
+</head>
+
+<body>
+    <nav class="navbar" role="navigation" aria-label="main navigation">
+        <div class="navbar-brand">
+            <a class="navbar-item" href="https://bulma.io">
+                <svg width="640" height="160" viewBox="0 0 640 160" fill="none" xmlns="http://www.w3.org/2000/svg"
+                    class="navbar-svgs">
+                    <path stroke="#3498db" stroke-width="10" fill="none"
+                        d="M10,150 L100,150 L120,40 L140,150 L130,95 L110,95 L109,100 L135,100" fill="red"
+                        class="bd-svg-black" />
+                    <!-- A -->
+                    <path stroke="#3498db" stroke-width="10" fill="none" d="M140,150 L160,40 L180,150 L200,40 L400,40"
+                        fill="red" class="bd-svg-black" /> <!-- W -->
+                </svg>
+            </a>
+
+            <a role="button" class="navbar-burger" aria-label="menu" aria-expanded="false"
+                data-target="navbarBasicExample">
+                <span aria-hidden="true"></span>
+                <span aria-hidden="true"></span>
+                <span aria-hidden="true"></span>
+                <span aria-hidden="true"></span>
+            </a>
+        </div>
+
+        <div id="navbarBasicExample" class="navbar-menu">
+            <div class="navbar-start">
+                <a class="navbar-item" href="./index.html">
+                    Home
+                </a>
+                <a class="navbar-item" href="./diagnosa_error.html">
+                    Diagnosa Error
+                </a>
+                <a class="navbar-item" href="./kalibrasi_kamera_kiri.html">
+                    Kalibrasi Kamera Kiri
+                </a>
+                <a class="navbar-item" href="./kalibrasi_kamera_kanan.html">
+                    Kalibrasi Kamera Kanan
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <br>
+    <div class="grid">
+        <div class="cell">
+            <img id="frame_binary" src="http://localhost:8080/stream?topic=/cam_kanan/image_gray" alt="MJPEG Stream"
+                style="width: 100%; max-width: 800px;">
+            <img id="frame_kamera" src="http://localhost:8080/stream?topic=/cam_kanan/image_bgr" alt="MJPEG Stream"
+                style="width: 100%; max-width: 800px;">
+        </div>
+        <div class="cell">
+            <div class="columns">
+                <div class="column">low_h</div>
+                <div class="column is-four-fifths"><input id="low_h_slider" class="input" type="range" min="0" max="255"
+                        value="0" step="1" oninput="update_low_h(this.value)"></div>
+                <div class="column">
+                    <span id="low_h_value"></span>
+                </div>
+            </div>
+
+            <div class="columns">
+                <div class="column">high_h</div>
+                <div class="column is-four-fifths"><input id="high_h_slider" class="input" type="range" min="0"
+                        max="255" value="0" step="1" oninput="update_high_h(this.value)"></div>
+                <div class="column">
+                    <span id="high_h_value"></span>
+                </div>
+            </div>
+
+            <div class="columns">
+                <div class="column">low_l</div>
+                <div class="column is-four-fifths"><input id="low_l_slider" class="input" type="range" min="0" max="255"
+                        value="0" step="1" oninput="update_low_l(this.value)"></div>
+                <div class="column">
+                    <span id="low_l_value"></span>
+                </div>
+            </div>
+
+            <div class="columns">
+                <div class="column">high_l</div>
+                <div class="column is-four-fifths"><input id="high_l_slider" class="input" type="range" min="0"
+                        max="255" value="0" step="1" oninput="update_high_l(this.value)"></div>
+                <div class="column">
+                    <span id="high_l_value"></span>
+                </div>
+            </div>
+
+            <div class="columns">
+                <div class="column">low_s</div>
+                <div class="column is-four-fifths"><input id="low_s_slider" class="input" type="range" min="0" max="255"
+                        value="0" step="1" oninput="update_low_s(this.value)"></div>
+                <div class="column">
+                    <span id="low_s_value"></span>
+                </div>
+            </div>
+
+            <div class="columns">
+                <div class="column">high_s</div>
+                <div class="column is-four-fifths"><input id="high_s_slider" class="input" type="range" min="0"
+                        max="255" value="0" step="1" oninput="update_high_s(this.value)"></div>
+                <div class="column">
+                    <span id="high_s_value"></span>
+                </div>
+            </div>
+
+        </div>
+        <div class="cell">
+            <img id="frame_kamera" src="./hls.png" alt="MJPEG Stream" style="width: 100%; max-width: 800px;">
+        </div>
+    </div>
+
+    <script type="text/javascript" src="kamera_kanan.js">
+    </script>
+</body>
+
+</html>

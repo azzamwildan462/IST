@@ -30,9 +30,14 @@ add_executable(lane_detection src/lane_detection.cpp)
 ament_target_dependencies(lane_detection ${var_dependencies})
 target_link_libraries(lane_detection ${YAML_CPP_LIBRARIES})
 
+add_executable(single_lane_detection src/single_lane_detection.cpp)
+ament_target_dependencies(single_lane_detection ${var_dependencies})
+target_link_libraries(single_lane_detection ${YAML_CPP_LIBRARIES})
+
 install(TARGETS
   vision_capture
   lane_detection
+  single_lane_detection
   DESTINATION lib/${PROJECT_NAME}
 )
 

@@ -145,6 +145,8 @@ public:
     void save_config()
     {
         YAML::Node config;
+        config = YAML::LoadFile(config_path);
+
         config["Detection"]["low_h"] = low_h;
         config["Detection"]["low_l"] = low_l;
         config["Detection"]["low_s"] = low_s;
@@ -154,8 +156,10 @@ public:
 
         try
         {
-            std::ofstream fout(config_path);
+            std::ofstream fout;
+            fout.open(config_path, std::ios::out);
             fout << config;
+            fout.close();
         }
         catch (const std::exception &e)
         {

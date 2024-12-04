@@ -128,20 +128,53 @@ def generate_launch_description():
         prefix='nice -n -10 chrt -f 99'
     )
 
-    vision_capture = Node(
+    # vision_capture = Node(
+    #     package='vision',
+    #     executable='vision_capture',
+    #     name='vision_capture',
+    #     output='screen',
+    #     respawn=True,
+    #     prefix='nice -n -8'
+    # )
+
+    # lane_detection = Node(
+    #     package='vision',
+    #     executable='lane_detection',
+    #     name='lane_detection',
+    #     output='screen',
+    #     parameters=[{
+    #         "low_h": 27,
+    #         "high_h": 255,
+    #         "low_l": 153,
+    #         "high_l": 255,
+    #         "low_s": 0,
+    #         "high_s": 255,
+    #         "gray_threshold": 200,
+    #         "use_dynamic_config": True,
+    #         "config_path": os.path.join(path_config,"dynamic_conf.yaml")
+    #     }
+    #     ],
+    #     respawn=True,
+    #     prefix='nice -n -8'
+    # )
+    
+
+    vision_capture_kanan = Node(
         package='vision',
         executable='vision_capture',
-        name='vision_capture',
+        name='vision_capture_kanan',
         output='screen',
+        namespace='cam_kanan',
         respawn=True,
         prefix='nice -n -8'
     )
 
-    lane_detection = Node(
+    lane_detection_kanan = Node(
         package='vision',
-        executable='lane_detection',
-        name='lane_detection',
+        executable='single_lane_detection',
+        name='lane_detection_kanan',
         output='screen',
+        namespace='cam_kanan',
         parameters=[{
             "low_h": 27,
             "high_h": 255,
@@ -151,7 +184,48 @@ def generate_launch_description():
             "high_s": 255,
             "gray_threshold": 200,
             "use_dynamic_config": True,
-            "config_path": os.path.join(path_config,"dynamic_conf.yaml")
+            "config_path": os.path.join(path_config,"dynamic_conf.yaml"),
+            "point_to_velocity_ratio": 0.003,
+            "point_to_velocity_angle_threshold": 0.56,
+            "metode_perhitungan": 1
+        }
+        ],
+        respawn=True,
+        prefix='nice -n -8'
+    )
+
+    vision_capture_kiri = Node(
+        package='vision',
+        executable='vision_capture',
+        name='vision_capture_kiri',
+        output='screen',
+        namespace='cam_kiri',
+        parameters=[{
+            "camera_path": "/dev/v4l/by-id/usb-Huawei_HiCamera_12345678-video-index0"
+        }],
+        respawn=True,
+        prefix='nice -n -8'
+    )
+
+    lane_detection_kiri = Node(
+        package='vision',
+        executable='single_lane_detection',
+        name='lane_detection_kiri',
+        output='screen',
+        namespace='cam_kiri',
+        parameters=[{
+            "low_h": 27,
+            "high_h": 255,
+            "low_l": 153,
+            "high_l": 255,
+            "low_s": 0,
+            "high_s": 255,
+            "gray_threshold": 200,
+            "use_dynamic_config": True,
+            "config_path": os.path.join(path_config,"dynamic_conf.yaml"),
+            "point_to_velocity_ratio": 0.005,
+            "point_to_velocity_angle_threshold": 0.6,
+            "metode_perhitungan": 1
         }
         ],
         respawn=True,
@@ -324,8 +398,12 @@ def generate_launch_description():
 
     return LaunchDescription(
         [
-            vision_capture,
-            lane_detection,
+            vision_capture_kanan,
+            lane_detection_kanan,
+            vision_capture_kiri,
+            lane_detection_kiri,
+            # vision_capture,
+            # lane_detection,
             # pose_estimator,
             # obstacle_filter,
             # tf_base_link_to_body_link,
@@ -336,7 +414,7 @@ def generate_launch_description():
             rosbridge_server, 
             web_video_server,
             # beckhoff,
-            master,
+            # master,
             ui_server,
             # TimerAction(
             #     period=4.0,

@@ -1,7 +1,19 @@
 Detection:
-  low_h: 52
-  low_l: 205
-  low_s: 0
-  high_h: 255
-  high_l: 255
-  high_s: 255
+  cam_kanan:
+    low_h: 0
+    low_l: 158
+    low_s: 0
+    high_h: 255
+    high_l: 255
+    high_s: 255
+    setpoint_x: 320
+    setpoint_y: 140
+  cam_kiri:
+    low_h: 3
+    low_l: 112
+    low_s: 0
+    high_h: 255
+    high_l: 255
+    high_s: 255
+    setpoint_x: 100
+    setpoint_y: 240

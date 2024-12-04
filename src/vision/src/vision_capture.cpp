@@ -19,6 +19,7 @@ public:
     int output_width;
     int output_height;
     bool use_default_params;
+    std::string node_namespace = "";
 
     HelpLogger logger;
     cv::VideoCapture cap;
@@ -47,11 +48,16 @@ public:
         this->declare_parameter("use_default_params", true);
         this->get_parameter("use_default_params", use_default_params);
 
+        node_namespace = this->get_namespace();
+        node_namespace = node_namespace.substr(1, node_namespace.size() - 1); // /cam_kanan jadi cam_kanan
+
         if (!logger.init())
         {
             RCLCPP_ERROR(this->get_logger(), "Failed to initialize logger");
             rclcpp::shutdown();
         }
+
+        logger.info("Init camera on: %s", camera_path.c_str());
 
         if (!cap.open(camera_path))
         {
@@ -63,6 +69,8 @@ public:
         //----Publisher
         pub_image_bgr = this->create_publisher<sensor_msgs::msg::Image>("image_bgr", 1);
         pub_image_gray = this->create_publisher<sensor_msgs::msg::Image>("image_gray", 1);
+
+        logger.info("VisionCapture init success");
     }
 
     void init_camera_params()
@@ -117,13 +125,14 @@ public:
             }
 
             // Hardcode sementara, image dari file
-            cv::Mat frame2 = cv::imread("/home/wildan/proyek/robotika/IST/src/ros2_utils/configs/test_lane.webp");
+            // cv::Mat frame2 = cv::imread("/home/wildan/proyek/robotika/IST/src/vision/assets/test_lane.webp");
+            cv::Mat frame2 = cv::imread("/home/wildan/proyek/robotika/IST/src/vision/assets/" + node_namespace + ".jpeg");
 
-            cv::Mat flippedImg;
-            cv::flip(frame2, flippedImg, 1); // 1 specifies flipping around the Y-axis
+            // cv::Mat flippedImg;
+            // cv::flip(frame2, flippedImg, 1); // 1 specifies flipping around the Y-axis
 
             cv::Mat frame_bgr;
-            cv::resize(flippedImg, frame_bgr, cv::Size(output_width, output_height));
+            cv::resize(frame2, frame_bgr, cv::Size(output_width, output_height));
             auto msg_frame_bgr = cv_bridge::CvImage(std_msgs::msg::Header(), "bgr8", frame_bgr).toImageMsg();
             pub_image_bgr->publish(*msg_frame_bgr);
 

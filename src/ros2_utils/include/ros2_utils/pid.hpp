@@ -52,6 +52,11 @@ public:
         this->max_integral = max_integral;
     }
 
+    void set_dt(float dt)
+    {
+        this->dt = dt;
+    }
+
     float calculate(float error)
     {
         std::chrono::high_resolution_clock::time_point t_now = std::chrono::high_resolution_clock::now();
