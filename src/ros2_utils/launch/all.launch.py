@@ -93,6 +93,9 @@ def generate_launch_description():
         executable='master',
         name='master',
         output='screen',
+        parameters=[{
+            "use_ekf_odometry": False
+        }],
         respawn=True,
         prefix='nice -n -8'
     )
@@ -187,7 +190,9 @@ def generate_launch_description():
             "config_path": os.path.join(path_config,"dynamic_conf.yaml"),
             "point_to_velocity_ratio": 0.003,
             "point_to_velocity_angle_threshold": 0.56,
-            "metode_perhitungan": 1
+            "metode_perhitungan": 1,
+            "setpoint_x": 320,
+            "setpoint_y": 240
         }
         ],
         respawn=True,
@@ -225,7 +230,9 @@ def generate_launch_description():
             "config_path": os.path.join(path_config,"dynamic_conf.yaml"),
             "point_to_velocity_ratio": 0.005,
             "point_to_velocity_angle_threshold": 0.6,
-            "metode_perhitungan": 1
+            "metode_perhitungan": 1,
+            "setpoint_x": 320,
+            "setpoint_y": 240
         }
         ],
         respawn=True,
@@ -404,17 +411,17 @@ def generate_launch_description():
             lane_detection_kiri,
             # vision_capture,
             # lane_detection,
-            # pose_estimator,
-            # obstacle_filter,
-            # tf_base_link_to_body_link,
-            # tf_base_link_to_lidar1_link,
-            # tf_map_empty,
+            pose_estimator,
+            obstacle_filter,
+            tf_base_link_to_body_link,
+            tf_base_link_to_lidar1_link,
+            tf_map_empty,
             # livox_lidar_driver,
             # rviz2,
             rosbridge_server, 
             web_video_server,
             # beckhoff,
-            # master,
+            master,
             ui_server,
             # TimerAction(
             #     period=4.0,

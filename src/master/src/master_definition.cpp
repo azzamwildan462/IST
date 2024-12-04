@@ -12,7 +12,16 @@ void Master::process_local_fsm()
 {
     switch (local_fsm.value)
     {
-    case 0:
+    case FSM_LOCAL_FOLLOW_LANE:
+        follow_lane_2_cam(7, 0, 1.57);
+        break;
+
+    case FSM_LOCAL_MENUNGGU_STATION_1:
+        manual_motion(-profile_max_braking, 0, 0);
+        break;
+
+    case FSM_LOCAL_MENUNGGU_STATION_2:
+        manual_motion(-profile_max_braking, 0, 0);
         break;
     }
 }

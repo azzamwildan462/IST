@@ -19,6 +19,14 @@ Master::Master() : Node("master")
         "/lane_detection/point_tengah", 1, std::bind(&Master::callback_sub_lane_tengah, this, std::placeholders::_1));
     sub_lane_kanan = this->create_subscription<ros2_interface::msg::PointArray>(
         "/lane_detection/point_kanan", 1, std::bind(&Master::callback_sub_lane_kanan, this, std::placeholders::_1));
+    sub_lane_kiri_single_cam = this->create_subscription<ros2_interface::msg::PointArray>(
+        "/cam_kiri/point_garis", 1, std::bind(&Master::callback_sub_lane_kiri_single_cam, this, std::placeholders::_1));
+    sub_lane_kanan_single_cam = this->create_subscription<ros2_interface::msg::PointArray>(
+        "/cam_kanan/point_garis", 1, std::bind(&Master::callback_sub_lane_kanan_single_cam, this, std::placeholders::_1));
+    sub_hasil_perhitungan_kiri = this->create_subscription<std_msgs::msg::Float32MultiArray>(
+        "/cam_kiri/hasil_kalkulasi", 1, std::bind(&Master::callback_sub_hasil_perhitungan_kiri, this, std::placeholders::_1));
+    sub_hasil_perhitungan_kanan = this->create_subscription<std_msgs::msg::Float32MultiArray>(
+        "/cam_kanan/hasil_kalkulasi", 1, std::bind(&Master::callback_sub_hasil_perhitungan_kanan, this, std::placeholders::_1));
 
     if (use_ekf_odometry)
         sub_odometry = this->create_subscription<nav_msgs::msg::Odometry>(
@@ -54,6 +62,32 @@ void Master::callback_sub_lane_kanan(const ros2_interface::msg::PointArray::Shar
     lane_kanan = *msg;
 }
 
+void Master::callback_sub_lane_kiri_single_cam(const ros2_interface::msg::PointArray::SharedPtr msg)
+{
+    lane_kiri_single_cam = *msg;
+}
+
+void Master::callback_sub_lane_kanan_single_cam(const ros2_interface::msg::PointArray::SharedPtr msg)
+{
+    lane_kanan_single_cam = *msg;
+}
+
+void Master::callback_sub_hasil_perhitungan_kiri(const std_msgs::msg::Float32MultiArray::SharedPtr msg)
+{
+    cam_kiri_pid_output = msg->data[0];
+    cam_kiri_pid_setpoint = msg->data[1];
+    cam_kiri_pid_fb = msg->data[2];
+    cam_kiri_velocity_gain = msg->data[3];
+}
+
+void Master::callback_sub_hasil_perhitungan_kanan(const std_msgs::msg::Float32MultiArray::SharedPtr msg)
+{
+    cam_kanan_pid_output = msg->data[0];
+    cam_kanan_pid_setpoint = msg->data[1];
+    cam_kanan_pid_fb = msg->data[2];
+    cam_kanan_velocity_gain = msg->data[3];
+}
+
 void Master::callback_sub_odometry(const nav_msgs::msg::Odometry::SharedPtr msg)
 {
     tf2::Quaternion q;
@@ -79,22 +113,53 @@ void Master::callback_tim_50hz()
 
     process_marker();
 
-    follow_lane(10, 0, 1.57);
-
     switch (global_fsm.value)
     {
+    /**
+     * Pre-operation
+     * Keadaan ini memastikan semua sistem tidak ada error
+     */
     case FSM_GLOBAL_PREOP:
-        local_fsm.value = 0;
+        if (error_code_beckhoff + error_code_cam_kiri + error_code_cam_kanan + error_code_lidar == 0)
+        {
+            local_fsm.value = 0;
+            global_fsm.value = FSM_GLOBAL_SAFEOP;
+        }
+        manual_motion(0, 0, 0);
         break;
+
+    /**
+     * Safe operation
+     * Memastikan semua data bisa diterima
+     */
     case FSM_GLOBAL_SAFEOP:
-        local_fsm.value = 0;
+        if (error_code_beckhoff + error_code_cam_kiri + error_code_cam_kanan + error_code_lidar > 0)
+        {
+            global_fsm.value = FSM_GLOBAL_PREOP;
+        }
+
+        // Ini sementara saja
+        if (error_code_beckhoff + error_code_cam_kiri + error_code_cam_kanan + error_code_lidar == 0)
+        {
+            local_fsm.value = 0;
+            global_fsm.value = FSM_GLOBAL_OP;
+        }
+        manual_motion(0, 0, 0);
+
         break;
+
+    /**
+     * Global operation
+     * Sistem beroperasi secara otomatis
+     */
     case FSM_GLOBAL_OP:
+        if (error_code_beckhoff + error_code_cam_kiri + error_code_cam_kanan + error_code_lidar > 0)
+        {
+            global_fsm.value = FSM_GLOBAL_PREOP;
+        }
         process_local_fsm();
         break;
     }
-
-    process_local_fsm();
 
     process_transmitter();
 }

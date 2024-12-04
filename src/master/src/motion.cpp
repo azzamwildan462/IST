@@ -142,9 +142,45 @@ void Master::manual_motion(float vx, float vy, float wz)
 
     logger.info("%.2f %.2f || %.2f %.2f || %.2f %.2f || %.2f %.2f", vx, wz, actuation_ax, steering_rate, vx_buffer, wz_buffer, actuation_vx, actuation_wz);
 }
+
+void Master::follow_lane_2_cam(float vx, float vy, float wz)
+{
+    static float target_max_velocity = 0;
+
+    (void)vy;
+    (void)wz;
+
+    /**
+     * Panic state!
+     * Ketika tidak atau kurang mendeteksi garis
+     */
+    if (lane_kiri_single_cam.points.size() < 4 && lane_kanan_single_cam.points.size() < 4)
+    {
+        manual_motion(-profile_max_braking, 0, 0);
+        return;
+    }
+
+    float out_steer = cam_kiri_pid_output * 0.5 + cam_kanan_pid_output * 0.5;
+    float velocity_gain = cam_kiri_velocity_gain * 0.5 + cam_kanan_velocity_gain * 0.5;
+
+    target_max_velocity = target_max_velocity * 0.2 + fmaxf(vx, profile_max_velocity) * velocity_gain * 0.8;
+
+    /**
+     * Menghitung efek obstacle
+     * Semakin besar emergency, semakin cepat robot untuk berhenti
+     */
+    float obstacle_emergency = obstacle_influence(0.5);
+    if (obstacle_emergency > 0.2)
+    {
+        target_max_velocity = fmaxf(-20, target_max_velocity - obstacle_emergency);
+    }
+
+    manual_motion(target_max_velocity, 0, out_steer);
+}
+
 void Master::follow_lane(float vx, float vy, float wz)
 {
-    static const float pixel_to_world = 0.06;
+    static const float pixel_to_world = 0.053;
     static const float gain_kemiringan_terhadap_steering = 0.8;
     static const float steer2lane_sf = 0.99; // Smooth factor
     static float target_steering_angle = 0;

@@ -176,8 +176,8 @@ public:
         high_h = config["Detection"][node_namespace.c_str()]["high_h"].as<int>();
         high_l = config["Detection"][node_namespace.c_str()]["high_l"].as<int>();
         high_s = config["Detection"][node_namespace.c_str()]["high_s"].as<int>();
-        setpoint_x = config["Detection"][node_namespace.c_str()]["setpoint_x"].as<int>();
-        setpoint_y = config["Detection"][node_namespace.c_str()]["setpoint_y"].as<int>();
+        // setpoint_x = config["Detection"][node_namespace.c_str()]["setpoint_x"].as<int>();
+        // setpoint_y = config["Detection"][node_namespace.c_str()]["setpoint_y"].as<int>();
     }
 
     void save_config()
@@ -191,8 +191,8 @@ public:
         config["Detection"][node_namespace.c_str()]["high_h"] = high_h;
         config["Detection"][node_namespace.c_str()]["high_l"] = high_l;
         config["Detection"][node_namespace.c_str()]["high_s"] = high_s;
-        config["Detection"][node_namespace.c_str()]["setpoint_x"] = setpoint_x;
-        config["Detection"][node_namespace.c_str()]["setpoint_y"] = setpoint_y;
+        // config["Detection"][node_namespace.c_str()]["setpoint_x"] = setpoint_x;
+        // config["Detection"][node_namespace.c_str()]["setpoint_y"] = setpoint_y;
 
         try
         {

@@ -21,6 +21,10 @@
 #define FSM_GLOBAL_SAFEOP 2
 #define FSM_GLOBAL_OP 3
 
+#define FSM_LOCAL_FOLLOW_LANE 0
+#define FSM_LOCAL_MENUNGGU_STATION_1 1
+#define FSM_LOCAL_MENUNGGU_STATION_2 2
+
 class Master : public rclcpp::Node
 {
 public:
@@ -31,6 +35,10 @@ public:
     rclcpp::Subscription<ros2_interface::msg::PointArray>::SharedPtr sub_lane_kiri;
     rclcpp::Subscription<ros2_interface::msg::PointArray>::SharedPtr sub_lane_tengah;
     rclcpp::Subscription<ros2_interface::msg::PointArray>::SharedPtr sub_lane_kanan;
+    rclcpp::Subscription<ros2_interface::msg::PointArray>::SharedPtr sub_lane_kiri_single_cam;
+    rclcpp::Subscription<ros2_interface::msg::PointArray>::SharedPtr sub_lane_kanan_single_cam;
+    rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr sub_hasil_perhitungan_kiri;
+    rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr sub_hasil_perhitungan_kanan;
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr sub_odometry;
 
     // Configs
@@ -38,18 +46,34 @@ public:
     bool use_ekf_odometry = false;
     float profile_max_acceleration = 100;
     float profile_max_decceleration = 100;
-    float profile_max_velocity = 10;
+    float profile_max_velocity = 7;
     float profile_max_accelerate_jerk = 1000;
     float profile_max_decelerate_jerk = 1000;
     float profile_max_braking = 80;
     float profile_max_braking_acceleration = 2000;
     float profile_max_braking_jerk = 3000;
 
+    // Vars
+    // ===============================================================================================
     HelpLogger logger;
     HelpMarker marker;
     MachineState local_fsm;
     MachineState global_fsm;
     PID pid_vx;
+
+    int16_t error_code_beckhoff = 0;
+    int16_t error_code_cam_kiri = 0;
+    int16_t error_code_cam_kanan = 0;
+    int16_t error_code_lidar = 0;
+
+    float cam_kiri_pid_output = 0;
+    float cam_kiri_pid_setpoint = 0;
+    float cam_kiri_pid_fb = 0;
+    float cam_kiri_velocity_gain = 0;
+    float cam_kanan_pid_output = 0;
+    float cam_kanan_pid_setpoint = 0;
+    float cam_kanan_pid_fb = 0;
+    float cam_kanan_velocity_gain = 0;
 
     float actuation_ax = 0;
     float actuation_ay = 0;
@@ -62,6 +86,8 @@ public:
     ros2_interface::msg::PointArray lane_kiri;
     ros2_interface::msg::PointArray lane_tengah;
     ros2_interface::msg::PointArray lane_kanan;
+    ros2_interface::msg::PointArray lane_kiri_single_cam;
+    ros2_interface::msg::PointArray lane_kanan_single_cam;
 
     float fb_final_pose_xyo[3];
     float fb_final_vel_dxdydo[3];
@@ -79,6 +105,10 @@ public:
     void callback_sub_lane_tengah(const ros2_interface::msg::PointArray::SharedPtr msg);
     void callback_sub_lane_kanan(const ros2_interface::msg::PointArray::SharedPtr msg);
     void callback_sub_odometry(const nav_msgs::msg::Odometry::SharedPtr msg);
+    void callback_sub_hasil_perhitungan_kiri(const std_msgs::msg::Float32MultiArray::SharedPtr msg);
+    void callback_sub_hasil_perhitungan_kanan(const std_msgs::msg::Float32MultiArray::SharedPtr msg);
+    void callback_sub_lane_kiri_single_cam(const ros2_interface::msg::PointArray::SharedPtr msg);
+    void callback_sub_lane_kanan_single_cam(const ros2_interface::msg::PointArray::SharedPtr msg);
 
     // Process
     // ===============================================================================================
@@ -90,6 +120,7 @@ public:
     // ===============================================================================================
     void manual_motion(float vx, float vy, float wz);
     void follow_lane(float vx, float vy, float wz);
+    void follow_lane_2_cam(float vx, float vy, float wz);
     float obstacle_influence(float gain);
 
     // Misc
