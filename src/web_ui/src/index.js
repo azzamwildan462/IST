@@ -110,11 +110,10 @@ const velocity_kmph = document.getElementById('velocity-kmph');
 const steering_rad = document.getElementById('steering-rad');
 
 setInterval(() => {
-    velocity_feedback += 0.1;
-    velocity_actuation_display = velocity_actuation * 10;
-    velocity_feedback_display = velocity_feedback * 10;
-    steering_actuation_display = (steering_actuation) * 100 / 3.14;
-    steering_feedback_display = (steering_feedback) * 100 / 3.14;
+    let velocity_actuation_display = velocity_actuation * 10;
+    let velocity_feedback_display = velocity_feedback * 10;
+    let steering_actuation_display = (steering_actuation) * 100 / 3.14;
+    let steering_feedback_display = (steering_feedback) * 100 / 3.14;
 
     set_velocity('.velocity-circle1', '.velocity-circle2', 'velocity-text', velocity_actuation_display, velocity_feedback_display);
     velocity_kmph.textContent = `${velocity_feedback.toFixed(2)} km/h`;
