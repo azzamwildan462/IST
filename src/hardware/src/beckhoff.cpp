@@ -1,5 +1,7 @@
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/string.hpp"
+#include "std_msgs/msg/float32_multi_array.hpp"
+#include "std_msgs/msg/int16.hpp"
 #include "ros2_utils/help_logger.hpp"
 
 #include <soem/ethercat.h>
@@ -201,7 +203,11 @@ class Beckhoff : public rclcpp::Node
 {
 public:
     rclcpp::TimerBase::SharedPtr tim_50hz;
-    rclcpp::Publisher<std_msgs::msg::String>::SharedPtr pub_test;
+    rclcpp::Publisher<std_msgs::msg::Float32MultiArray>::SharedPtr pub_sensors;
+    rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr pub_error_code;
+    rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr sub_master_actuator;
+    rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_master_local_fsm;
+    rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_master_global_fsm;
 
     // Configs
     // =======================================================
@@ -213,6 +219,13 @@ public:
     uint16_t slave_canopen_id = 255;
     int expectedWKC = 0;
     uint8 IOmap[4096]; // I/O map for PDOs
+
+    float master_target_velocity = 0; // m/s
+    float master_taret_steering = 0;  // rad
+    int16_t master_local_fsm = 0;
+    int16_t master_global_fsm = 0;
+
+    int16_t error_code = 0;
 
     Beckhoff() : Node("beckhoff")
     {
@@ -238,20 +251,36 @@ public:
         tim_50hz = this->create_wall_timer(std::chrono::milliseconds(20), std::bind(&Beckhoff::callback_tim_50hz, this));
 
         //----Publisher
-        pub_test = this->create_publisher<std_msgs::msg::String>("beckhoff", 1);
+        pub_sensors = this->create_publisher<std_msgs::msg::Float32MultiArray>("/beckhoff/sensors", 1);
+        pub_error_code = this->create_publisher<std_msgs::msg::Int16>("/beckhoff/error_code", 1);
+
+        //----Subscriber
+        sub_master_actuator = this->create_subscription<std_msgs::msg::Float32MultiArray>(
+            "/master/actuator", 1, std::bind(&Beckhoff::callback_sub_master_actuator, this, std::placeholders::_1));
+        sub_master_local_fsm = this->create_subscription<std_msgs::msg::Int16>(
+            "/master/local_fsm", 1, std::bind(&Beckhoff::callback_sub_master_local_fsm, this, std::placeholders::_1));
+        sub_master_global_fsm = this->create_subscription<std_msgs::msg::Int16>(
+            "/master/global_fsm", 1, std::bind(&Beckhoff::callback_sub_master_global_fsm, this, std::placeholders::_1));
+    }
+
+    void callback_sub_master_local_fsm(const std_msgs::msg::Int16::SharedPtr msg)
+    {
+        master_local_fsm = msg->data;
+    }
+
+    void callback_sub_master_global_fsm(const std_msgs::msg::Int16::SharedPtr msg)
+    {
+        master_global_fsm = msg->data;
+    }
+
+    void callback_sub_master_actuator(const std_msgs::msg::Float32MultiArray::SharedPtr msg)
+    {
+        master_target_velocity = msg->data[0];
+        master_taret_steering = msg->data[1];
     }
 
     void callback_tim_50hz()
     {
-        static int count = 0;
-        std::string message = "Beckhoff! " + std::to_string(count);
-        // RCLCPP_INFO(this->get_logger(), "%s", message.c_str());
-
-        std_msgs::msg::String msg;
-        msg.data = message;
-        pub_test->publish(msg);
-
-        count++;
     }
 
     int8_t init_beckhoff()

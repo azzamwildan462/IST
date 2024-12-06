@@ -125,7 +125,7 @@ def generate_launch_description():
         output='screen',
         parameters=[{
             "if_name": "enxf8e43b2adb32",
-            "po2so_config": BECKHOFF_NORMAL
+            "po2so_config": BECKHOFF_SCAN_SLAVES
         }],
         respawn=True,
         prefix='nice -n -10 chrt -f 99'
@@ -407,8 +407,8 @@ def generate_launch_description():
         [
             vision_capture_kanan,
             lane_detection_kanan,
-            vision_capture_kiri,
-            lane_detection_kiri,
+            # vision_capture_kiri,
+            # lane_detection_kiri,
             # vision_capture,
             # lane_detection,
             pose_estimator,
@@ -418,8 +418,8 @@ def generate_launch_description():
             tf_map_empty,
             # livox_lidar_driver,
             # rviz2,
-            rosbridge_server, 
-            web_video_server,
+            # rosbridge_server, 
+            # web_video_server,
             # beckhoff,
             master,
             ui_server,

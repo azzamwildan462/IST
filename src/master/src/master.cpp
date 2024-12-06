@@ -11,7 +11,9 @@ Master::Master() : Node("master")
 
     pub_initialpose = this->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>("slam/initialpose", 10);
     pub_global_fsm = this->create_publisher<std_msgs::msg::Int16>("/master/global_fsm", 1);
+    pub_local_fsm = this->create_publisher<std_msgs::msg::Int16>("/master/local_fsm", 1);
     pub_to_ui = this->create_publisher<std_msgs::msg::Float32MultiArray>("/master/to_ui", 1);
+    pub_actuator = this->create_publisher<std_msgs::msg::Float32MultiArray>("/master/actuator", 1);
 
     sub_lane_kiri = this->create_subscription<ros2_interface::msg::PointArray>(
         "/lane_detection/point_kiri", 1, std::bind(&Master::callback_sub_lane_kiri, this, std::placeholders::_1));

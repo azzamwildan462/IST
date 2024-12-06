@@ -31,7 +31,9 @@ public:
     rclcpp::TimerBase::SharedPtr tim_50hz;
     rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr pub_initialpose;
     rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr pub_global_fsm;
+    rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr pub_local_fsm;
     rclcpp::Publisher<std_msgs::msg::Float32MultiArray>::SharedPtr pub_to_ui;
+    rclcpp::Publisher<std_msgs::msg::Float32MultiArray>::SharedPtr pub_actuator;
     rclcpp::Subscription<ros2_interface::msg::PointArray>::SharedPtr sub_lane_kiri;
     rclcpp::Subscription<ros2_interface::msg::PointArray>::SharedPtr sub_lane_tengah;
     rclcpp::Subscription<ros2_interface::msg::PointArray>::SharedPtr sub_lane_kanan;

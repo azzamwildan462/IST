@@ -12,6 +12,7 @@ let velocity_actuation = 0;
 let velocity_feedback = 0;
 let steering_actuation = 0;
 let steering_feedback = 0;
+let baterai_value = 45;
 
 // ================================================================
 
@@ -108,6 +109,7 @@ function set_steering(selector1, selector2, id_text, value1, value2) {
 
 const velocity_kmph = document.getElementById('velocity-kmph');
 const steering_rad = document.getElementById('steering-rad');
+const batera_dom = document.getElementById('baterai-dom');
 
 setInterval(() => {
     let velocity_actuation_display = velocity_actuation * 10;
@@ -119,4 +121,15 @@ setInterval(() => {
     velocity_kmph.textContent = `${velocity_feedback.toFixed(2)} km/h`;
     set_steering('.steering-circle1', '.steering-circle2', 'steering-text', steering_actuation_display, steering_feedback_display);
     steering_rad.textContent = `${steering_feedback.toFixed(2)} rad`;
+
+    if (baterai_value > 50) {
+        batera_dom.className = "progress is-success"
+    }
+    else if (baterai_value > 40) {
+        batera_dom.className = "progress is-warning"
+    }
+    else {
+        batera_dom.className = "progress is-danger"
+    }
+    batera_dom.value = baterai_value;
 }, 50);

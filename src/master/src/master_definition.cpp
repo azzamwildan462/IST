@@ -32,12 +32,21 @@ void Master::process_transmitter()
     msg_global_fsm.data = global_fsm.value;
     pub_global_fsm->publish(msg_global_fsm);
 
+    std_msgs::msg::Int16 msg_local_fsm;
+    msg_global_fsm.data = local_fsm.value;
+    pub_local_fsm->publish(msg_local_fsm);
+
     std_msgs::msg::Float32MultiArray msg_to_ui;
     msg_to_ui.data.push_back(target_velocity);
     msg_to_ui.data.push_back(actuation_wz);
     msg_to_ui.data.push_back(fb_final_vel_dxdydo[0]);
     msg_to_ui.data.push_back(fb_steering_angle);
     pub_to_ui->publish(msg_to_ui);
+
+    std_msgs::msg::Float32MultiArray msg_actuator;
+    msg_actuator.data.push_back(actuation_vx);
+    msg_actuator.data.push_back(actuation_wz);
+    pub_actuator->publish(msg_actuator);
 }
 
 //=================================================================================================
