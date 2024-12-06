@@ -2,9 +2,20 @@ import os
 
 from launch import LaunchDescription
 from launch_ros.actions import Node
-from launch.actions import EmitEvent, RegisterEventHandler, TimerAction
+from launch.actions import EmitEvent, RegisterEventHandler, TimerAction, DeclareLaunchArgument
 
 from ament_index_python.packages import get_package_share_directory
+
+# Hokuyo stuff's
+from launch.event_handlers import OnProcessStart
+from launch.events import matches_action
+from launch_ros.actions import LifecycleNode
+from launch_ros.event_handlers import OnStateTransition
+from launch_ros.events.lifecycle import ChangeState
+from lifecycle_msgs.msg import Transition
+from launch.conditions import IfCondition
+from launch.substitutions import LaunchConfiguration
+
 
 BECKHOFF_NORMAL = int(3)
 BECKHOFF_DELETE_EEPROM = int(2)
@@ -48,7 +59,7 @@ def generate_launch_description():
     )
 
     livox_lidar_driver = Node(
-        package='livox_ros_driver2',
+        package='livox_ros_driver2_local',
         executable='livox_ros_driver2_node',
         name='livox_lidar_publisher',
         namespace='lidar1',
@@ -69,6 +80,55 @@ def generate_launch_description():
                 "azimuth_yaw_end": 3.14,
             }
         ]
+    )
+
+    hokuyo_lidar_driver = LifecycleNode(
+        package="urg_node2",
+        executable="urg_node2_node",
+        name="urg_node2",
+        namespace='',
+        parameters=[
+            {
+                "ip_address": "192.168.0.10",
+                "frame_id": "lidar2_link",
+            },
+        ],
+        output="screen",
+        respawn=True,
+    )
+
+    # Unconfigure状態からInactive状態への遷移（auto_startがtrueのとき実施）
+    urg_node2_node_configure_event_handler = RegisterEventHandler(
+        event_handler=OnProcessStart(
+            target_action=hokuyo_lidar_driver,
+            on_start=[
+                EmitEvent(
+                    event=ChangeState(
+                        lifecycle_node_matcher=matches_action(hokuyo_lidar_driver),
+                        transition_id=Transition.TRANSITION_CONFIGURE,
+                    ),
+                ),
+            ],
+        ),
+        condition=IfCondition(LaunchConfiguration('auto_start')),
+    )
+
+    # Inactive状態からActive状態への遷移（auto_startがtrueのとき実施）
+    urg_node2_node_activate_event_handler = RegisterEventHandler(
+        event_handler=OnStateTransition(
+            target_lifecycle_node=hokuyo_lidar_driver,
+            start_state='configuring',
+            goal_state='inactive',
+            entities=[
+                EmitEvent(
+                    event=ChangeState(
+                        lifecycle_node_matcher=matches_action(hokuyo_lidar_driver),
+                        transition_id=Transition.TRANSITION_ACTIVATE,
+                    ),
+                ),
+            ],
+        ),
+        condition=IfCondition(LaunchConfiguration('auto_start')),
     )
 
     # =============================================================================
@@ -263,6 +323,17 @@ def generate_launch_description():
         respawn=True,
     )
 
+    tf_base_link_to_lidar2_link = Node(
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        name="tf_base_link_to_lidar2_link",
+        # fmt: off
+        arguments=["0.20","0.00","0.35","0.00","0.00","0.00","base_link","lidar2_link",
+            "--ros-args","--log-level","error",],
+        # fmt: on
+        respawn=True,
+    )
+
     tf_map_empty = Node(
         package="tf2_ros",
         executable="static_transform_publisher",
@@ -405,24 +476,29 @@ def generate_launch_description():
 
     return LaunchDescription(
         [
-            vision_capture_kanan,
-            lane_detection_kanan,
+            # vision_capture_kanan,
+            # lane_detection_kanan,
             # vision_capture_kiri,
             # lane_detection_kiri,
             # vision_capture,
             # lane_detection,
-            pose_estimator,
-            obstacle_filter,
+            # pose_estimator,
+            # obstacle_filter,
             tf_base_link_to_body_link,
             tf_base_link_to_lidar1_link,
+            tf_base_link_to_lidar2_link,
             tf_map_empty,
             # livox_lidar_driver,
-            # rviz2,
+            DeclareLaunchArgument('auto_start', default_value='true'),
+            hokuyo_lidar_driver,
+            urg_node2_node_configure_event_handler,
+            urg_node2_node_activate_event_handler,
+            rviz2,
             # rosbridge_server, 
             # web_video_server,
             # beckhoff,
-            master,
-            ui_server,
+            # master,
+            # ui_server,
             # TimerAction(
             #     period=4.0,
             #     actions=[

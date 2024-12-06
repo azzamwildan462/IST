@@ -29,7 +29,7 @@ Panels:
     Experimental: false
     Name: Time
     SyncMode: 0
-    SyncSource: PointCloud2
+    SyncSource: ""
 Visualization Manager:
   Class: ""
   Displays:
@@ -60,6 +60,8 @@ Visualization Manager:
           Value: true
         body_link:
           Value: true
+        laser:
+          Value: true
         lidar1_link:
           Value: true
         map:
@@ -72,20 +74,23 @@ Visualization Manager:
       Show Axes: true
       Show Names: false
       Tree:
+        base_link:
+          body_link:
+            {}
+          laser:
+            {}
+          lidar1_link:
+            {}
         map:
           odom:
-            base_link:
-              body_link:
-                {}
-              lidar1_link:
-                {}
+            {}
       Update Interval: 0
       Value: true
     - Class: rviz_default_plugins/MarkerArray
       Enabled: true
       Name: MarkerArray
       Namespaces:
-        body: true
+        {}
       Topic:
         Depth: 5
         Durability Policy: Volatile
@@ -185,7 +190,7 @@ Visualization Manager:
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
-    Fixed Frame: map
+    Fixed Frame: laser
     Frame Rate: 30
   Name: root
   Tools:
