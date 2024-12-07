@@ -14,6 +14,7 @@
 #include "ros2_interface/msg/point_array.hpp"
 #include "nav_msgs/msg/odometry.hpp"
 #include "std_msgs/msg/float32_multi_array.hpp"
+#include "std_msgs/msg/float32.hpp"
 #include "std_msgs/msg/int16.hpp"
 
 #define FSM_GLOBAL_INIT 0
@@ -34,6 +35,8 @@ public:
     rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr pub_local_fsm;
     rclcpp::Publisher<std_msgs::msg::Float32MultiArray>::SharedPtr pub_to_ui;
     rclcpp::Publisher<std_msgs::msg::Float32MultiArray>::SharedPtr pub_actuator;
+    rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr sub_beckhoff_sensor;
+    rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr sub_obs_find;
     rclcpp::Subscription<ros2_interface::msg::PointArray>::SharedPtr sub_lane_kiri;
     rclcpp::Subscription<ros2_interface::msg::PointArray>::SharedPtr sub_lane_tengah;
     rclcpp::Subscription<ros2_interface::msg::PointArray>::SharedPtr sub_lane_kanan;
@@ -54,6 +57,7 @@ public:
     float profile_max_braking = 80;
     float profile_max_braking_acceleration = 2000;
     float profile_max_braking_jerk = 3000;
+    float max_obs_find_value = 100;
 
     // Vars
     // ===============================================================================================
@@ -99,15 +103,27 @@ public:
 
     float dt = 0.02;
 
+    float obs_find = 0;
+
+    rclcpp::Time current_time;
+    rclcpp::Time last_time_beckhoff;
+    rclcpp::Time last_time_lidar;
+    rclcpp::Time last_time_cam_kiri;
+    rclcpp::Time last_time_cam_kanan;
+    rclcpp::Time last_time_pose_estimator;
+    rclcpp::Time last_time_obstacle_filter;
+
     Master();
     ~Master();
 
     // ROS
     // ===============================================================================================
     void callback_tim_50hz();
+    void callback_sub_beckhoff_sensor(const std_msgs::msg::Float32MultiArray::SharedPtr msg);
     void callback_sub_lane_kiri(const ros2_interface::msg::PointArray::SharedPtr msg);
     void callback_sub_lane_tengah(const ros2_interface::msg::PointArray::SharedPtr msg);
     void callback_sub_lane_kanan(const ros2_interface::msg::PointArray::SharedPtr msg);
+    void callback_sub_obs_find(const std_msgs::msg::Float32::SharedPtr msg);
     void callback_sub_odometry(const nav_msgs::msg::Odometry::SharedPtr msg);
     void callback_sub_hasil_perhitungan_kiri(const std_msgs::msg::Float32MultiArray::SharedPtr msg);
     void callback_sub_hasil_perhitungan_kanan(const std_msgs::msg::Float32MultiArray::SharedPtr msg);

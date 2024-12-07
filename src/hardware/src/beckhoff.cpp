@@ -227,6 +227,10 @@ public:
 
     int16_t error_code = 0;
 
+    float fb_steering_angle = 0.3;
+    uint16_t encoder_kiri = 0;
+    uint16_t encoder_kanan = 0;
+
     Beckhoff() : Node("beckhoff")
     {
         this->declare_parameter("if_name", "eth0");
@@ -281,6 +285,24 @@ public:
 
     void callback_tim_50hz()
     {
+        ec_send_processdata();
+        int wkc = ec_receive_processdata(EC_TIMEOUTRET);
+
+        if (wkc >= expectedWKC)
+        {
+            std_msgs::msg::Float32MultiArray msg_sensors;
+            msg_sensors.data.push_back(fb_steering_angle);
+            pub_sensors->publish(msg_sensors);
+            error_code = 0;
+        }
+        else
+        {
+            error_code = 1;
+        }
+
+        std_msgs::msg::Int16 msg_error_code;
+        msg_error_code.data = error_code;
+        pub_error_code->publish(msg_error_code);
     }
 
     int8_t init_beckhoff()

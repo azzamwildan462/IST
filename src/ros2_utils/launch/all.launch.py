@@ -91,6 +91,8 @@ def generate_launch_description():
             {
                 "ip_address": "192.168.0.10",
                 "frame_id": "lidar2_link",
+                "angle_min": -1.57,
+                "angle_max": 1.57,
             },
         ],
         output="screen",
@@ -174,6 +176,15 @@ def generate_launch_description():
         executable='obstacle_filter',
         name='obstacle_filter',
         output='screen',
+        parameters=[{
+            "lidar_frame_id": "lidar2_link",
+            "scan_yaw_start": -1.00, 
+            "scan_yaw_end": 1.00,
+            "scan_r_max": 2.00,
+            "publish_filtered_lidar": True,
+            "lidar_topic": "/scan", 
+            "use_pointcloud2": False, # Untuk hokuyo
+        }],
         respawn=True,
         prefix='nice -n -8'
     )
@@ -184,8 +195,8 @@ def generate_launch_description():
         name='beckhoff',
         output='screen',
         parameters=[{
-            "if_name": "enxf8e43b2adb32",
-            "po2so_config": BECKHOFF_SCAN_SLAVES
+            "if_name": "enx14ebb61965f4",
+            "po2so_config": BECKHOFF_NORMAL
         }],
         respawn=True,
         prefix='nice -n -10 chrt -f 99'
@@ -266,7 +277,7 @@ def generate_launch_description():
         output='screen',
         namespace='cam_kiri',
         parameters=[{
-            "camera_path": "/dev/v4l/by-id/usb-Huawei_HiCamera_12345678-video-index0"
+            "camera_path": "/dev/v4l/by-id/usb-046d_C922_Pro_Stream_Webcam_70F3B3DF-video-index0"
         }],
         respawn=True,
         prefix='nice -n -8'
@@ -476,29 +487,29 @@ def generate_launch_description():
 
     return LaunchDescription(
         [
-            # vision_capture_kanan,
-            # lane_detection_kanan,
-            # vision_capture_kiri,
-            # lane_detection_kiri,
-            # vision_capture,
-            # lane_detection,
-            # pose_estimator,
-            # obstacle_filter,
+            vision_capture_kanan,
+            lane_detection_kanan,
+            vision_capture_kiri,
+            lane_detection_kiri,
+            pose_estimator,
+            obstacle_filter,
             tf_base_link_to_body_link,
             tf_base_link_to_lidar1_link,
             tf_base_link_to_lidar2_link,
             tf_map_empty,
-            # livox_lidar_driver,
             DeclareLaunchArgument('auto_start', default_value='true'),
             hokuyo_lidar_driver,
             urg_node2_node_configure_event_handler,
             urg_node2_node_activate_event_handler,
-            rviz2,
-            # rosbridge_server, 
-            # web_video_server,
-            # beckhoff,
-            # master,
-            # ui_server,
+            rosbridge_server, 
+            web_video_server,
+            beckhoff,
+            master,
+            ui_server,
+            # vision_capture,
+            # lane_detection,
+            # livox_lidar_driver,
+            # rviz2,
             # TimerAction(
             #     period=4.0,
             #     actions=[

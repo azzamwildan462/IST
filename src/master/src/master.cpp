@@ -15,6 +15,8 @@ Master::Master() : Node("master")
     pub_to_ui = this->create_publisher<std_msgs::msg::Float32MultiArray>("/master/to_ui", 1);
     pub_actuator = this->create_publisher<std_msgs::msg::Float32MultiArray>("/master/actuator", 1);
 
+    sub_obs_find = this->create_subscription<std_msgs::msg::Float32>(
+        "/obstacle_filter/obs_find", 1, std::bind(&Master::callback_sub_obs_find, this, std::placeholders::_1));
     sub_lane_kiri = this->create_subscription<ros2_interface::msg::PointArray>(
         "/lane_detection/point_kiri", 1, std::bind(&Master::callback_sub_lane_kiri, this, std::placeholders::_1));
     sub_lane_tengah = this->create_subscription<ros2_interface::msg::PointArray>(
@@ -29,6 +31,8 @@ Master::Master() : Node("master")
         "/cam_kiri/hasil_kalkulasi", 1, std::bind(&Master::callback_sub_hasil_perhitungan_kiri, this, std::placeholders::_1));
     sub_hasil_perhitungan_kanan = this->create_subscription<std_msgs::msg::Float32MultiArray>(
         "/cam_kanan/hasil_kalkulasi", 1, std::bind(&Master::callback_sub_hasil_perhitungan_kanan, this, std::placeholders::_1));
+    sub_beckhoff_sensor = this->create_subscription<std_msgs::msg::Float32MultiArray>(
+        "/beckhoff/sensors", 1, std::bind(&Master::callback_sub_beckhoff_sensor, this, std::placeholders::_1));
 
     if (use_ekf_odometry)
         sub_odometry = this->create_subscription<nav_msgs::msg::Odometry>(
@@ -47,6 +51,18 @@ Master::Master() : Node("master")
 }
 Master::~Master()
 {
+}
+
+void Master::callback_sub_beckhoff_sensor(const std_msgs::msg::Float32MultiArray::SharedPtr msg)
+{
+    last_time_beckhoff = rclcpp::Clock(RCL_SYSTEM_TIME).now();
+    fb_steering_angle = msg->data[0];
+}
+
+void Master::callback_sub_obs_find(const std_msgs::msg::Float32::SharedPtr msg)
+{
+    last_time_obstacle_filter = rclcpp::Clock(RCL_SYSTEM_TIME).now();
+    obs_find = msg->data;
 }
 
 void Master::callback_sub_lane_kiri(const ros2_interface::msg::PointArray::SharedPtr msg)
@@ -76,6 +92,7 @@ void Master::callback_sub_lane_kanan_single_cam(const ros2_interface::msg::Point
 
 void Master::callback_sub_hasil_perhitungan_kiri(const std_msgs::msg::Float32MultiArray::SharedPtr msg)
 {
+    last_time_cam_kiri = rclcpp::Clock(RCL_SYSTEM_TIME).now();
     cam_kiri_pid_output = msg->data[0];
     cam_kiri_pid_setpoint = msg->data[1];
     cam_kiri_pid_fb = msg->data[2];
@@ -84,6 +101,7 @@ void Master::callback_sub_hasil_perhitungan_kiri(const std_msgs::msg::Float32Mul
 
 void Master::callback_sub_hasil_perhitungan_kanan(const std_msgs::msg::Float32MultiArray::SharedPtr msg)
 {
+    last_time_cam_kanan = rclcpp::Clock(RCL_SYSTEM_TIME).now();
     cam_kanan_pid_output = msg->data[0];
     cam_kanan_pid_setpoint = msg->data[1];
     cam_kanan_pid_fb = msg->data[2];
@@ -92,6 +110,7 @@ void Master::callback_sub_hasil_perhitungan_kanan(const std_msgs::msg::Float32Mu
 
 void Master::callback_sub_odometry(const nav_msgs::msg::Odometry::SharedPtr msg)
 {
+    last_time_pose_estimator = rclcpp::Clock(RCL_SYSTEM_TIME).now();
     tf2::Quaternion q;
     double roll, pitch, yaw;
     tf2::fromMsg(msg->pose.pose.orientation, q);
@@ -112,6 +131,8 @@ void Master::callback_tim_50hz()
     {
         rclcpp::shutdown();
     }
+
+    current_time = rclcpp::Clock(RCL_SYSTEM_TIME).now();
 
     process_marker();
 
@@ -140,14 +161,22 @@ void Master::callback_tim_50hz()
             global_fsm.value = FSM_GLOBAL_PREOP;
         }
 
-        // Ini sementara saja
-        if (error_code_beckhoff + error_code_cam_kiri + error_code_cam_kanan + error_code_lidar == 0)
         {
-            local_fsm.value = 0;
-            global_fsm.value = FSM_GLOBAL_OP;
-        }
-        manual_motion(0, 0, 0);
+            rclcpp::Duration dt_pose_estimator = current_time - last_time_pose_estimator;
+            rclcpp::Duration dt_cam_kiri = current_time - last_time_cam_kiri;
+            rclcpp::Duration dt_cam_kanan = current_time - last_time_cam_kanan;
+            rclcpp::Duration dt_obstacle_filter = current_time - last_time_obstacle_filter;
+            rclcpp::Duration dt_beckhoff = current_time - last_time_beckhoff;
 
+            // Jika sudah berhasil menerima semua data yang diperlukan
+            if (dt_pose_estimator.seconds() < 1 && dt_cam_kiri.seconds() < 1 && dt_cam_kanan.seconds() < 1 && dt_obstacle_filter.seconds() < 1 && dt_beckhoff.seconds() < 1)
+            {
+                local_fsm.value = 0;
+                global_fsm.value = FSM_GLOBAL_OP;
+            }
+        }
+
+        manual_motion(0, 0, 0);
         break;
 
     /**

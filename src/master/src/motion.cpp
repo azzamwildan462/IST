@@ -171,10 +171,12 @@ void Master::follow_lane_2_cam(float vx, float vy, float wz)
      * Menghitung efek obstacle
      * Semakin besar emergency, semakin cepat robot untuk berhenti
      */
-    float obstacle_emergency = obstacle_influence(0.5);
+    float obstacle_emergency = obstacle_influence(2);
     if (obstacle_emergency > 0.2)
     {
-        target_max_velocity = fmaxf(-20, target_max_velocity - obstacle_emergency);
+        // logger.info("Emergency brake ada obstacle %.2f", obstacle_emergency);
+        manual_motion(-profile_max_braking * obstacle_emergency, 0, 0);
+        return;
     }
 
     manual_motion(target_max_velocity, 0, out_steer);
@@ -265,7 +267,19 @@ void Master::follow_lane(float vx, float vy, float wz)
 
 float Master::obstacle_influence(float gain)
 {
-    (void)gain;
+    static float ret_buffer = 0;
 
-    return 0.0;
+    /**
+     * Jika ada obstacle, maka efek obs_find semakin besar
+     * Hal itu membuat robot untuk berhenti lebih cepat
+     *
+     * Jika obstacle menghilang, maka efek obs_find semakin kecil
+     * Hal itu membuat robot untuk jalan lebih lama
+     */
+    if (obs_find > ret_buffer)
+        ret_buffer = ret_buffer * 0.1 + obs_find / max_obs_find_value * gain * 0.9;
+    else
+        ret_buffer = ret_buffer * 0.85 + obs_find / max_obs_find_value * gain * 0.15;
+
+    return ret_buffer;
 }
