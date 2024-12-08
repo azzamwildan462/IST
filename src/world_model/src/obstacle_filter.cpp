@@ -13,6 +13,7 @@
 #include <pcl/filters/extract_indices.h>
 #include "std_msgs/msg/float32.hpp"
 #include "sensor_msgs/msg/laser_scan.hpp"
+#include "ros2_utils/global_definitions.hpp"
 
 using namespace std::chrono_literals;
 

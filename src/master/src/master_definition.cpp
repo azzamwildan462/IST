@@ -12,8 +12,19 @@ void Master::process_local_fsm()
 {
     switch (local_fsm.value)
     {
+    case FSM_LOCAL_PRE_FOLLOW_LANE:
+        manual_motion(0, 0, 0);
+        time_start_follow_lane = current_time;
+        local_fsm.value = FSM_LOCAL_FOLLOW_LANE;
+        break;
+
     case FSM_LOCAL_FOLLOW_LANE:
         follow_lane_2_cam(7, 0, 1.57);
+
+        if ((current_time - time_start_follow_lane).seconds() > 10 && aruco_kanan_detected)
+        {
+            local_fsm.value = FSM_LOCAL_MENUNGGU_STATION_1;
+        }
         break;
 
     case FSM_LOCAL_MENUNGGU_STATION_1:

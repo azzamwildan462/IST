@@ -12,6 +12,7 @@
 #include "std_msgs/msg/float32_multi_array.hpp"
 #include <opencv2/aruco.hpp>
 #include "std_msgs/msg/bool.hpp"
+#include "ros2_utils/global_definitions.hpp"
 
 class SingleDetection : public rclcpp::Node
 {
@@ -44,6 +45,7 @@ public:
     std::string config_path;
     bool use_dynamic_config = false;
     bool use_frame_bgr = true;
+    bool right_to_left_scan = false;
     int metode_perhitungan = 2;
     int erode_size = 3;
     int dilate_size = 3;
@@ -55,8 +57,7 @@ public:
     float min_aruco_range = 100; // Jarak ke setpoint
     int aruco_in_counter_threshold = 50;
     int aruco_out_counter_threshold = 50;
-    std::string camera_namespace = "/cam_kanan";
-    bool detect_marker = false;
+    std::string camera_namespace = "cam_kanan";
 
     // Vars
     // =======================================================
@@ -143,6 +144,9 @@ public:
         this->declare_parameter("camera_namespace", "/cam_kanan");
         this->get_parameter("camera_namespace", camera_namespace);
 
+        this->declare_parameter("right_to_left_scan", false);
+        this->get_parameter("right_to_left_scan", right_to_left_scan);
+
         node_namespace = this->get_namespace();
         node_namespace = node_namespace.substr(1, node_namespace.size() - 1); // /cam_kanan jadi cam_kanan
 
@@ -172,12 +176,12 @@ public:
         if (use_frame_bgr)
         {
             sub_image_bgr = this->create_subscription<sensor_msgs::msg::Image>(
-                camera_namespace + "/image_bgr", 1, std::bind(&SingleDetection::callback_sub_image_bgr, this, std::placeholders::_1));
+                "/" + camera_namespace + "/image_bgr", 1, std::bind(&SingleDetection::callback_sub_image_bgr, this, std::placeholders::_1));
         }
         else
         {
             sub_image_gray = this->create_subscription<sensor_msgs::msg::Image>(
-                camera_namespace + "/image_gray", 1, std::bind(&SingleDetection::callback_sub_image_gray, this, std::placeholders::_1));
+                "/" + camera_namespace + "/image_gray", 1, std::bind(&SingleDetection::callback_sub_image_gray, this, std::placeholders::_1));
         }
 
         pub_point_garis = this->create_publisher<ros2_interface::msg::PointArray>("point_garis", 1);
@@ -364,8 +368,8 @@ public:
             return;
         }
 
-        static uint64_t aruco_detection_in = 0;
-        static uint64_t aruco_detection_out = 0;
+        static int aruco_detection_in = 0;
+        static int aruco_detection_out = 0;
 
         // Variables to hold detection results
         std::vector<int> markerIds;
@@ -381,7 +385,7 @@ public:
         {
             int nearest_marker_id = -1;
             float nearest_marker_distance = FLT_MAX;
-            for (int i = 0; i < markerIds.size(); i++)
+            for (size_t i = 0; i < markerIds.size(); i++)
             {
                 cv::Point2f center_marker = (markerCorners[i][0] + markerCorners[i][1] + markerCorners[i][2] + markerCorners[i][3]) * 0.25;
                 float distance = sqrt(pow(setpoint_x - center_marker.x, 2) + pow(setpoint_y - center_marker.y, 2));
@@ -394,8 +398,12 @@ public:
 
             if (nearest_marker_distance < min_aruco_range)
             {
-                aruco_detection_in++;
+                aruco_detection_in += 2;
                 aruco_detection_out = 0;
+
+                // Anti winding system
+                if (aruco_detection_in > 100)
+                    aruco_detection_in = 100;
             }
 
             cv::aruco::drawDetectedMarkers(frame_bgr_copy, markerCorners, markerIds);
@@ -407,13 +415,23 @@ public:
         }
         else
         {
-            aruco_detection_in = 0;
+            aruco_detection_in--;
             aruco_detection_out++;
+
+            // Anti winding system
+            if (aruco_detection_in < 0)
+                aruco_detection_in = 0;
+
+            if (aruco_detection_out > 100)
+                aruco_detection_out = 100;
         }
 
         //================================================================================================
 
-        cv::circle(frame_bgr_copy, cv::Point(setpoint_x, setpoint_y), 25, cv::Scalar(255, 255, 0), -1);
+        if (aruco_detection_in > aruco_in_counter_threshold)
+            cv::circle(frame_bgr_copy, cv::Point(setpoint_x, setpoint_y), 25, cv::Scalar(0, 255, 255), -1);
+        else if (aruco_detection_out > aruco_out_counter_threshold)
+            cv::circle(frame_bgr_copy, cv::Point(setpoint_x, setpoint_y), 25, cv::Scalar(255, 255, 0), -1);
 
         //================================================================================================
 
@@ -457,12 +475,82 @@ public:
             return;
         }
 
+        static int aruco_detection_in = 0;
+        static int aruco_detection_out = 0;
+
         // Variables to hold detection results
         std::vector<int> markerIds;
         std::vector<std::vector<cv::Point2f>> markerCorners;
 
         // Detect the ArUco markers
         cv::aruco::detectMarkers(frame_gray_copy, aruco_dictionary, markerCorners, markerIds);
+
+        //================================================================================================
+
+        // Find the nearest aruco from setpoint
+        if (markerIds.size() > 0)
+        {
+            int nearest_marker_id = -1;
+            float nearest_marker_distance = FLT_MAX;
+            for (size_t i = 0; i < markerIds.size(); i++)
+            {
+                cv::Point2f center_marker = (markerCorners[i][0] + markerCorners[i][1] + markerCorners[i][2] + markerCorners[i][3]) * 0.25;
+                float distance = sqrt(pow(setpoint_x - center_marker.x, 2) + pow(setpoint_y - center_marker.y, 2));
+                if (distance < nearest_marker_distance)
+                {
+                    nearest_marker_distance = distance;
+                    nearest_marker_id = markerIds[i];
+                }
+            }
+
+            if (nearest_marker_distance < min_aruco_range)
+            {
+                aruco_detection_in += 2;
+                aruco_detection_out = 0;
+
+                // Anti winding system
+                if (aruco_detection_in > 100)
+                    aruco_detection_in = 100;
+            }
+
+            cv::aruco::drawDetectedMarkers(frame_gray_copy, markerCorners, markerIds);
+
+            if (nearest_marker_id > -1)
+            {
+                cv::putText(frame_gray_copy, std::to_string(nearest_marker_distance), cv::Point(10, 10), cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(255), 1);
+            }
+        }
+        else
+        {
+            aruco_detection_in--;
+            aruco_detection_out++;
+
+            // Anti winding system
+            if (aruco_detection_in < 0)
+                aruco_detection_in = 0;
+
+            if (aruco_detection_out > 100)
+                aruco_detection_out = 100;
+        }
+
+        //================================================================================================
+
+        if (aruco_detection_in > aruco_in_counter_threshold)
+            cv::circle(frame_gray_copy, cv::Point(setpoint_x, setpoint_y), 25, cv::Scalar(255), -1);
+        else if (aruco_detection_out > aruco_out_counter_threshold)
+            cv::circle(frame_gray_copy, cv::Point(setpoint_x, setpoint_y), 25, cv::Scalar(0), -1);
+
+        //================================================================================================
+
+        std_msgs::msg::Bool msg_aruco_detected;
+        if (aruco_detection_in > aruco_in_counter_threshold)
+            msg_aruco_detected.data = true;
+        else if (aruco_detection_out > aruco_out_counter_threshold)
+            msg_aruco_detected.data = false;
+        pub_aruco_detected->publish(msg_aruco_detected);
+
+        auto msg_frame_display = cv_bridge::CvImage(std_msgs::msg::Header(), "mono8", frame_gray_copy).toImageMsg();
+        pub_frame_display->publish(*msg_frame_display);
     }
 
     void process_frame_bgr()
@@ -538,59 +626,120 @@ public:
         std::vector<cv::Point> point_garis;
         for (int i = image_hls_threshold.rows - 1; i >= 0; i--)
         {
-            for (int j = 0; j < image_hls_threshold.cols; j++)
+            if (right_to_left_scan == false)
             {
-                if (image_hls_threshold.at<uchar>(i, j) == 255)
+                for (int j = 0; j < image_hls_threshold.cols; j++)
                 {
-                    // Mencatat point garis
-                    point_garis.push_back(cv::Point(j, i));
-
-                    // Ketika sudah menemukan 1 point, maka diangap sebagai point initial (point0)
-                    if (point_garis.size() == 1)
+                    if (image_hls_threshold.at<uchar>(i, j) == 255)
                     {
-                        jarak_point0_ke_setpoint = sqrt(pow(setpoint_x - point_garis[0].x, 2) + pow(setpoint_y - point_garis[0].y, 2));
-                    }
+                        // Mencatat point garis
+                        point_garis.push_back(cv::Point(j, i));
 
-                    // Mencari point terdekat dengan setpoint (based on angular scan) (Jarak point mendekati sama dengan jarak ke setpoint)
-                    float jarak_point0_ke_point_i = sqrt(pow(point_garis[0].x - j, 2) + pow(point_garis[0].y - i, 2));
-                    float error_jarak = fabs(jarak_point0_ke_point_i - jarak_point0_ke_setpoint);
-
-                    if (error_jarak < error_jarak_terdekat)
-                    {
-                        error_jarak_terdekat = error_jarak;
-                        point_terdekat_setpoint_x = j;
-                        point_terdekat_setpoint_y = i;
-                    }
-
-                    // Menghitung target velocity
-                    if (point_garis.size() > 1)
-                    {
-                        float sudut_point0_ke_point_i = atan2(i - point_garis[point_garis.size() - 2].y, j - point_garis[point_garis.size() - 2].x);
-                        mean_buffer_sudut_point0_ke_point_i += sudut_point0_ke_point_i;
-                        mean_buffer_sudut_point0_ke_point_i_count++;
-                        float mean_sudut_point0_ke_point_i = mean_buffer_sudut_point0_ke_point_i / mean_buffer_sudut_point0_ke_point_i_count;
-                        float sudut_error = mean_sudut_point0_ke_point_i - sudut_point0_ke_point_i;
-                        while (sudut_error > M_PI)
-                            sudut_error -= 2 * M_PI;
-                        while (sudut_error < -M_PI)
-                            sudut_error += 2 * M_PI;
-
-                        if (fabs(sudut_error) < point_to_velocity_angle_threshold)
+                        // Ketika sudah menemukan 1 point, maka diangap sebagai point initial (point0)
+                        if (point_garis.size() == 1)
                         {
-                            target_velocity_gain_buffer += point_to_velocity_ratio;
-                            cv::circle(frame_bgr_copy, cv::Point(j, i), 1, cv::Scalar(0, 255, 255), 3);
+                            jarak_point0_ke_setpoint = sqrt(pow(setpoint_x - point_garis[0].x, 2) + pow(setpoint_y - point_garis[0].y, 2));
+                        }
+
+                        // Mencari point terdekat dengan setpoint (based on angular scan) (Jarak point mendekati sama dengan jarak ke setpoint)
+                        float jarak_point0_ke_point_i = sqrt(pow(point_garis[0].x - j, 2) + pow(point_garis[0].y - i, 2));
+                        float error_jarak = fabs(jarak_point0_ke_point_i - jarak_point0_ke_setpoint);
+
+                        if (error_jarak < error_jarak_terdekat)
+                        {
+                            error_jarak_terdekat = error_jarak;
+                            point_terdekat_setpoint_x = j;
+                            point_terdekat_setpoint_y = i;
+                        }
+
+                        // Menghitung target velocity
+                        if (point_garis.size() > 1)
+                        {
+                            float sudut_point0_ke_point_i = atan2(i - point_garis[point_garis.size() - 2].y, j - point_garis[point_garis.size() - 2].x);
+                            mean_buffer_sudut_point0_ke_point_i += sudut_point0_ke_point_i;
+                            mean_buffer_sudut_point0_ke_point_i_count++;
+                            float mean_sudut_point0_ke_point_i = mean_buffer_sudut_point0_ke_point_i / mean_buffer_sudut_point0_ke_point_i_count;
+                            float sudut_error = mean_sudut_point0_ke_point_i - sudut_point0_ke_point_i;
+                            while (sudut_error > M_PI)
+                                sudut_error -= 2 * M_PI;
+                            while (sudut_error < -M_PI)
+                                sudut_error += 2 * M_PI;
+
+                            if (fabs(sudut_error) < point_to_velocity_angle_threshold)
+                            {
+                                target_velocity_gain_buffer += point_to_velocity_ratio;
+                                cv::circle(frame_bgr_copy, cv::Point(j, i), 1, cv::Scalar(0, 255, 255), 3);
+                            }
+                            else
+                            {
+                                cv::circle(frame_bgr_copy, cv::Point(j, i), 1, cv::Scalar(0, 0, 255), 3);
+                            }
                         }
                         else
                         {
                             cv::circle(frame_bgr_copy, cv::Point(j, i), 1, cv::Scalar(0, 0, 255), 3);
                         }
-                    }
-                    else
-                    {
-                        cv::circle(frame_bgr_copy, cv::Point(j, i), 1, cv::Scalar(0, 0, 255), 3);
-                    }
 
-                    break;
+                        break;
+                    }
+                }
+            }
+            else
+            {
+                for (int j = image_hls_threshold.cols - 1; j >= 0; j--)
+                {
+                    if (image_hls_threshold.at<uchar>(i, j) == 255)
+                    {
+                        // Mencatat point garis
+                        point_garis.push_back(cv::Point(j, i));
+
+                        // Ketika sudah menemukan 1 point, maka diangap sebagai point initial (point0)
+                        if (point_garis.size() == 1)
+                        {
+                            jarak_point0_ke_setpoint = sqrt(pow(setpoint_x - point_garis[0].x, 2) + pow(setpoint_y - point_garis[0].y, 2));
+                        }
+
+                        // Mencari point terdekat dengan setpoint (based on angular scan) (Jarak point mendekati sama dengan jarak ke setpoint)
+                        float jarak_point0_ke_point_i = sqrt(pow(point_garis[0].x - j, 2) + pow(point_garis[0].y - i, 2));
+                        float error_jarak = fabs(jarak_point0_ke_point_i - jarak_point0_ke_setpoint);
+
+                        if (error_jarak < error_jarak_terdekat)
+                        {
+                            error_jarak_terdekat = error_jarak;
+                            point_terdekat_setpoint_x = j;
+                            point_terdekat_setpoint_y = i;
+                        }
+
+                        // Menghitung target velocity
+                        if (point_garis.size() > 1)
+                        {
+                            float sudut_point0_ke_point_i = atan2(i - point_garis[point_garis.size() - 2].y, j - point_garis[point_garis.size() - 2].x);
+                            mean_buffer_sudut_point0_ke_point_i += sudut_point0_ke_point_i;
+                            mean_buffer_sudut_point0_ke_point_i_count++;
+                            float mean_sudut_point0_ke_point_i = mean_buffer_sudut_point0_ke_point_i / mean_buffer_sudut_point0_ke_point_i_count;
+                            float sudut_error = mean_sudut_point0_ke_point_i - sudut_point0_ke_point_i;
+                            while (sudut_error > M_PI)
+                                sudut_error -= 2 * M_PI;
+                            while (sudut_error < -M_PI)
+                                sudut_error += 2 * M_PI;
+
+                            if (fabs(sudut_error) < point_to_velocity_angle_threshold)
+                            {
+                                target_velocity_gain_buffer += point_to_velocity_ratio;
+                                cv::circle(frame_bgr_copy, cv::Point(j, i), 1, cv::Scalar(0, 255, 255), 3);
+                            }
+                            else
+                            {
+                                cv::circle(frame_bgr_copy, cv::Point(j, i), 1, cv::Scalar(0, 0, 255), 3);
+                            }
+                        }
+                        else
+                        {
+                            cv::circle(frame_bgr_copy, cv::Point(j, i), 1, cv::Scalar(0, 0, 255), 3);
+                        }
+
+                        break;
+                    }
                 }
             }
         }

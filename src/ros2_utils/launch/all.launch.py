@@ -250,13 +250,6 @@ def generate_launch_description():
         output='screen',
         namespace='cam_kanan',
         parameters=[{
-            "low_h": 27,
-            "high_h": 255,
-            "low_l": 153,
-            "high_l": 255,
-            "low_s": 0,
-            "high_s": 255,
-            "gray_threshold": 200,
             "use_dynamic_config": True,
             "config_path": os.path.join(path_config,"dynamic_conf.yaml"),
             "point_to_velocity_ratio": 0.003,
@@ -264,7 +257,8 @@ def generate_launch_description():
             "metode_perhitungan": 1,
             "setpoint_x": 320,
             "setpoint_y": 240,
-            "camera_namespace": "/cam_kanan",
+            "camera_namespace": "cam_kanan",
+            "right_to_left_scan": False,
         }
         ],
         respawn=True,
@@ -283,11 +277,12 @@ def generate_launch_description():
             "setpoint_x": 320,
             "setpoint_y": 240,
             "detect_aruco": True,
+            "use_frame_bgr": True,
             "aruco_dictionary_type": "DICT_4X4_50",
-            "min_aruco_range": 0.1,
-            "aruco_in_counter_threshold": 50,
-            "aruco_out_counter_threshold": 50,
-            "camera_namespace": "/cam_kanan",
+            "min_aruco_range": 100.0,
+            "aruco_in_counter_threshold": 30,
+            "aruco_out_counter_threshold": 20,
+            "camera_namespace": "cam_kanan",
         }
         ],
         respawn=True,
@@ -314,13 +309,6 @@ def generate_launch_description():
         output='screen',
         namespace='cam_kiri',
         parameters=[{
-            "low_h": 27,
-            "high_h": 255,
-            "low_l": 153,
-            "high_l": 255,
-            "low_s": 0,
-            "high_s": 255,
-            "gray_threshold": 200,
             "use_dynamic_config": True,
             "config_path": os.path.join(path_config,"dynamic_conf.yaml"),
             "point_to_velocity_ratio": 0.005,
@@ -328,7 +316,31 @@ def generate_launch_description():
             "metode_perhitungan": 1,
             "setpoint_x": 320,
             "setpoint_y": 240,
-            "camera_namespace": "/cam_kiri",
+            "camera_namespace": "cam_kiri",
+            "right_to_left_scan": True,
+        }
+        ],
+        respawn=True,
+        prefix='nice -n -8'
+    )
+
+    aruco_detection_kiri = Node(
+        package='vision',
+        executable='single_detection',
+        name='aruco_detection_kiri',
+        output='screen',
+        namespace='aruco_kiri',
+        parameters=[{
+            "use_dynamic_config": True,
+            "config_path": os.path.join(path_config,"dynamic_conf.yaml"),
+            "setpoint_x": 320,
+            "setpoint_y": 240,
+            "detect_aruco": True,
+            "aruco_dictionary_type": "DICT_4X4_50",
+            "min_aruco_range": 100.0,
+            "aruco_in_counter_threshold": 30,
+            "aruco_out_counter_threshold": 20,
+            "camera_namespace": "cam_kiri",
         }
         ],
         respawn=True,
@@ -530,7 +542,7 @@ def generate_launch_description():
             rosbridge_server, 
             web_video_server,
             # beckhoff,
-            # master,
+            master,
             ui_server,
 
 

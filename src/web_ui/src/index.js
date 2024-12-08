@@ -13,6 +13,8 @@ let velocity_feedback = 0;
 let steering_actuation = 0;
 let steering_feedback = 0;
 let baterai_value = 45;
+let global_fsm_value = 0;
+let master_fsm_value = 0;
 
 // ================================================================
 
@@ -44,6 +46,26 @@ sub_master2ui.subscribe(function (message) {
     velocity_feedback = message.data[1];
     steering_actuation = message.data[2];
     steering_feedback = message.data[3];
+});
+
+var sub_master_global_fsm = new ROSLIB.Topic({
+    ros: ros,
+    name: "/master/global_fsm",
+    messageType: "std_msgs/Int16",
+});
+
+sub_master_global_fsm.subscribe(function (message) {
+    global_fsm_value = message.data;
+});
+
+var sub_master_local_fsm = new ROSLIB.Topic({
+    ros: ros,
+    name: "/master/local_fsm",
+    messageType: "std_msgs/Int16",
+});
+
+sub_master_local_fsm.subscribe(function (message) {
+    master_fsm_value = message.data;
 });
 
 
@@ -105,11 +127,42 @@ function set_steering(selector1, selector2, id_text, value1, value2) {
     progressText.textContent = `${value1.toFixed(0)}%`;
 }
 
+function control_display_fsm() {
+    if (global_fsm_value == 0) {
+        global_fsm.innerHTML = ": INIT"
+    }
+    else if (global_fsm_value == 1) {
+        global_fsm.innerHTML = ": Pre-Operation"
+    }
+    else if (global_fsm_value == 2) {
+        global_fsm.innerHTML = ": Safe-Operation"
+    }
+    else if (global_fsm_value == 3) {
+        global_fsm.innerHTML = ": Operation"
+    }
+
+
+    if (master_fsm_value == 0) {
+        master_fsm.innerHTML = ": Pre-Follow lane"
+    }
+    else if (master_fsm_value == 1) {
+        master_fsm.innerHTML = ": Follow Lane"
+    }
+    else if (master_fsm_value == 2) {
+        master_fsm.innerHTML = ": Menunggu di Station 1"
+    }
+    else if (master_fsm_value == 3) {
+        master_fsm.innerHTML = ": Menunggu di Station 2"
+    }
+}
+
 // ================================================================
 
 const velocity_kmph = document.getElementById('velocity-kmph');
 const steering_rad = document.getElementById('steering-rad');
 const batera_dom = document.getElementById('baterai-dom');
+const global_fsm = document.getElementById('global-fsm');
+const master_fsm = document.getElementById('master-fsm');
 
 setInterval(() => {
     let velocity_actuation_display = velocity_actuation * 10;
@@ -132,4 +185,7 @@ setInterval(() => {
         batera_dom.className = "progress is-danger"
     }
     batera_dom.value = baterai_value;
+
+    control_display_fsm();
+
 }, 50);

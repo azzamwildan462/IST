@@ -3,6 +3,7 @@
 #include "std_msgs/msg/float32_multi_array.hpp"
 #include "std_msgs/msg/int16.hpp"
 #include "ros2_utils/help_logger.hpp"
+#include "ros2_utils/global_definitions.hpp"
 
 #include <soem/ethercat.h>
 

@@ -34,6 +34,9 @@ frame_kamera.src = "http://" + window.location.hostname + ":8080/stream?topic=/c
 const frame_binary = document.getElementById("frame_binary");
 frame_binary.src = "http://" + window.location.hostname + ":8080/stream?topic=/cam_kiri/frame_binary"
 
+const frame_aruco = document.getElementById("frame_aruco");
+frame_aruco.src = "http://" + window.location.hostname + ":8080/stream?topic=/aruco_kiri/frame_display"
+
 const low_h_slider = document.getElementById("low_h_slider");
 low_h_slider.value = 0;
 const low_h_value = document.getElementById("low_h_value");

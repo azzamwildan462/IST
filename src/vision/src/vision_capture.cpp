@@ -2,6 +2,7 @@
 #include "cv_bridge/cv_bridge.h"
 #include "opencv2/opencv.hpp"
 #include "ros2_utils/help_logger.hpp"
+#include "ros2_utils/global_definitions.hpp"
 
 class VisionCapture : public rclcpp::Node
 {
@@ -126,14 +127,14 @@ public:
 
             // Hardcode sementara, image dari file
             // cv::Mat frame2 = cv::imread("/home/wildan/proyek/robotika/IST/src/vision/assets/test_lane.webp");
-            cv::Mat frame2 = cv::imread("/home/wildan/proyek/robotika/IST/src/vision/assets/" + node_namespace + ".jpeg");
+            // cv::Mat frame2 = cv::imread("/home/wildan/proyek/robotika/IST/src/vision/assets/" + node_namespace + ".jpeg");
             // cv::Mat frame2 = cv::imread("/home/wildan/proyek/robotika/IST/src/vision/assets/aruco_kanan.jpeg");
 
             // cv::Mat flippedImg;
             // cv::flip(frame2, flippedImg, 1); // 1 specifies flipping around the Y-axis
 
             cv::Mat frame_bgr;
-            cv::resize(frame2, frame_bgr, cv::Size(output_width, output_height));
+            cv::resize(frame, frame_bgr, cv::Size(output_width, output_height));
             auto msg_frame_bgr = cv_bridge::CvImage(std_msgs::msg::Header(), "bgr8", frame_bgr).toImageMsg();
             pub_image_bgr->publish(*msg_frame_bgr);
 

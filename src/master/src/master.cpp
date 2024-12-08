@@ -17,22 +17,26 @@ Master::Master() : Node("master")
 
     sub_obs_find = this->create_subscription<std_msgs::msg::Float32>(
         "/obstacle_filter/obs_find", 1, std::bind(&Master::callback_sub_obs_find, this, std::placeholders::_1));
+    sub_beckhoff_sensor = this->create_subscription<std_msgs::msg::Float32MultiArray>(
+        "/beckhoff/sensors", 1, std::bind(&Master::callback_sub_beckhoff_sensor, this, std::placeholders::_1));
     sub_lane_kiri = this->create_subscription<ros2_interface::msg::PointArray>(
         "/lane_detection/point_kiri", 1, std::bind(&Master::callback_sub_lane_kiri, this, std::placeholders::_1));
-    sub_lane_tengah = this->create_subscription<ros2_interface::msg::PointArray>(
-        "/lane_detection/point_tengah", 1, std::bind(&Master::callback_sub_lane_tengah, this, std::placeholders::_1));
     sub_lane_kanan = this->create_subscription<ros2_interface::msg::PointArray>(
         "/lane_detection/point_kanan", 1, std::bind(&Master::callback_sub_lane_kanan, this, std::placeholders::_1));
+    sub_lane_tengah = this->create_subscription<ros2_interface::msg::PointArray>(
+        "/lane_detection/point_tengah", 1, std::bind(&Master::callback_sub_lane_tengah, this, std::placeholders::_1));
     sub_lane_kiri_single_cam = this->create_subscription<ros2_interface::msg::PointArray>(
         "/cam_kiri/point_garis", 1, std::bind(&Master::callback_sub_lane_kiri_single_cam, this, std::placeholders::_1));
     sub_lane_kanan_single_cam = this->create_subscription<ros2_interface::msg::PointArray>(
         "/cam_kanan/point_garis", 1, std::bind(&Master::callback_sub_lane_kanan_single_cam, this, std::placeholders::_1));
+    sub_aruco_kiri_detected = this->create_subscription<std_msgs::msg::Bool>(
+        "/cam_kiri/aruco_detected", 1, std::bind(&Master::callback_sub_aruco_kiri_detected, this, std::placeholders::_1));
+    sub_aruco_kanan_detected = this->create_subscription<std_msgs::msg::Bool>(
+        "/cam_kanan/aruco_detected", 1, std::bind(&Master::callback_sub_aruco_kanan_detected, this, std::placeholders::_1));
     sub_hasil_perhitungan_kiri = this->create_subscription<std_msgs::msg::Float32MultiArray>(
         "/cam_kiri/hasil_kalkulasi", 1, std::bind(&Master::callback_sub_hasil_perhitungan_kiri, this, std::placeholders::_1));
     sub_hasil_perhitungan_kanan = this->create_subscription<std_msgs::msg::Float32MultiArray>(
         "/cam_kanan/hasil_kalkulasi", 1, std::bind(&Master::callback_sub_hasil_perhitungan_kanan, this, std::placeholders::_1));
-    sub_beckhoff_sensor = this->create_subscription<std_msgs::msg::Float32MultiArray>(
-        "/beckhoff/sensors", 1, std::bind(&Master::callback_sub_beckhoff_sensor, this, std::placeholders::_1));
 
     if (use_ekf_odometry)
         sub_odometry = this->create_subscription<nav_msgs::msg::Odometry>(
@@ -125,6 +129,18 @@ void Master::callback_sub_odometry(const nav_msgs::msg::Odometry::SharedPtr msg)
     fb_final_vel_dxdydo[2] = msg->twist.twist.angular.z;
 }
 
+void Master::callback_sub_aruco_kiri_detected(const std_msgs::msg::Bool::SharedPtr msg)
+{
+    last_time_aruco_kiri = rclcpp::Clock(RCL_SYSTEM_TIME).now();
+    aruco_kiri_detected = msg->data;
+}
+
+void Master::callback_sub_aruco_kanan_detected(const std_msgs::msg::Bool::SharedPtr msg)
+{
+    last_time_aruco_kanan = rclcpp::Clock(RCL_SYSTEM_TIME).now();
+    aruco_kanan_detected = msg->data;
+}
+
 void Master::callback_tim_50hz()
 {
     if (!marker.init(this->shared_from_this()))
@@ -143,7 +159,7 @@ void Master::callback_tim_50hz()
      * Keadaan ini memastikan semua sistem tidak ada error
      */
     case FSM_GLOBAL_PREOP:
-        if (error_code_beckhoff + error_code_cam_kiri + error_code_cam_kanan + error_code_lidar == 0)
+        if (error_code_beckhoff + error_code_cam_kiri + error_code_cam_kanan + error_code_lidar + error_code_pose_estimator + error_code_obstacle_filter + error_code_aruco_kiri + error_code_aruco_kanan == 0)
         {
             local_fsm.value = 0;
             global_fsm.value = FSM_GLOBAL_SAFEOP;
@@ -156,7 +172,7 @@ void Master::callback_tim_50hz()
      * Memastikan semua data bisa diterima
      */
     case FSM_GLOBAL_SAFEOP:
-        if (error_code_beckhoff + error_code_cam_kiri + error_code_cam_kanan + error_code_lidar > 0)
+        if (error_code_beckhoff + error_code_cam_kiri + error_code_cam_kanan + error_code_lidar + error_code_pose_estimator + error_code_obstacle_filter + error_code_aruco_kiri + error_code_aruco_kanan > 0)
         {
             global_fsm.value = FSM_GLOBAL_PREOP;
         }
@@ -167,12 +183,23 @@ void Master::callback_tim_50hz()
             rclcpp::Duration dt_cam_kanan = current_time - last_time_cam_kanan;
             rclcpp::Duration dt_obstacle_filter = current_time - last_time_obstacle_filter;
             rclcpp::Duration dt_beckhoff = current_time - last_time_beckhoff;
+            rclcpp::Duration dt_lidar = current_time - last_time_lidar;
+            rclcpp::Duration dt_aruco_kiri = current_time - last_time_aruco_kiri;
+            rclcpp::Duration dt_aruco_kanan = current_time - last_time_aruco_kanan;
 
             // Jika sudah berhasil menerima semua data yang diperlukan
-            if (dt_pose_estimator.seconds() < 1 && dt_cam_kiri.seconds() < 1 && dt_cam_kanan.seconds() < 1 && dt_obstacle_filter.seconds() < 1 && dt_beckhoff.seconds() < 1)
+            if (dt_pose_estimator.seconds() < 1 &&
+                dt_cam_kiri.seconds() < 1 &&
+                dt_cam_kanan.seconds() < 1 &&
+                dt_obstacle_filter.seconds() < 1 &&
+                dt_beckhoff.seconds() < 1 &&
+                dt_lidar.seconds() < 1 &&
+                dt_aruco_kiri.seconds() < 1 &&
+                dt_aruco_kanan.seconds() < 1)
             {
                 local_fsm.value = 0;
                 global_fsm.value = FSM_GLOBAL_OP;
+                time_start_operation = current_time;
             }
         }
 
@@ -184,7 +211,7 @@ void Master::callback_tim_50hz()
      * Sistem beroperasi secara otomatis
      */
     case FSM_GLOBAL_OP:
-        if (error_code_beckhoff + error_code_cam_kiri + error_code_cam_kanan + error_code_lidar > 0)
+        if (error_code_beckhoff + error_code_cam_kiri + error_code_cam_kanan + error_code_lidar + error_code_pose_estimator + error_code_obstacle_filter + error_code_aruco_kiri + error_code_aruco_kanan > 0)
         {
             global_fsm.value = FSM_GLOBAL_PREOP;
         }

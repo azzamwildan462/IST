@@ -6,6 +6,7 @@
 #include "tf2_ros/buffer.h"
 #include "tf2_ros/transform_listener.h"
 #include "nav_msgs/msg/odometry.hpp"
+#include "ros2_utils/global_definitions.hpp"
 
 class PoseEstimator : public rclcpp::Node
 {

@@ -1,7 +1,7 @@
 Detection:
   cam_kanan:
     low_h: 0
-    low_l: 158
+    low_l: 183
     low_s: 0
     high_h: 255
     high_l: 255

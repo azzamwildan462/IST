@@ -1,0 +1,16 @@
+#ifndef GLOBAL_DEFINITIONS_HPP
+#define GLOBAL_DEFINITIONS_HPP
+
+/* Error code */
+#define BECKHOFF_NO_ERROR 0
+#define BECKHOFF_ETHERCAT_COMM_ERROR 1
+
+#define LIDAR_NO_ERROR 0
+#define LIDAR_NO_DATA 1
+
+#define CAM_KIRI_NO_ERROR 0
+#define CAM_KIRI_NO_DATA 1
+
+/* Another Definitions */
+
+#endif // GLOBAL_DEFINITIONS_HPP
