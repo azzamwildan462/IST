@@ -248,7 +248,7 @@ def generate_launch_description():
         executable='single_detection',
         name='lane_detection_kanan',
         output='screen',
-        namespace='cam_kanan',
+        namespace='lane_kanan',
         parameters=[{
             "use_dynamic_config": True,
             "config_path": os.path.join(path_config,"dynamic_conf.yaml"),
@@ -307,7 +307,7 @@ def generate_launch_description():
         executable='single_detection',
         name='lane_detection_kiri',
         output='screen',
-        namespace='cam_kiri',
+        namespace='lane_kiri',
         parameters=[{
             "use_dynamic_config": True,
             "config_path": os.path.join(path_config,"dynamic_conf.yaml"),

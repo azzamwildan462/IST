@@ -1,10 +1,10 @@
-#include "rclcpp/rclcpp.hpp"
 #include "master/master.hpp"
+#include "rclcpp/rclcpp.hpp"
 
-Master::Master() : Node("master")
+Master::Master()
+    : Node("master")
 {
-    if (!logger.init())
-    {
+    if (!logger.init()) {
         RCLCPP_ERROR(this->get_logger(), "Failed to initialize logger");
         rclcpp::shutdown();
     }
@@ -37,6 +37,22 @@ Master::Master() : Node("master")
         "/cam_kiri/hasil_kalkulasi", 1, std::bind(&Master::callback_sub_hasil_perhitungan_kiri, this, std::placeholders::_1));
     sub_hasil_perhitungan_kanan = this->create_subscription<std_msgs::msg::Float32MultiArray>(
         "/cam_kanan/hasil_kalkulasi", 1, std::bind(&Master::callback_sub_hasil_perhitungan_kanan, this, std::placeholders::_1));
+    sub_error_code_beckhoff = this->create_subscription<std_msgs::msg::Int16>(
+        "/beckhoff/error_code", 1, std::bind(&Master::callback_sub_error_code_beckhoff, this, std::placeholders::_1));
+    sub_error_code_lidar = this->create_subscription<std_msgs::msg::Int16>(
+        "/lidar/error_code", 1, std::bind(&Master::callback_sub_error_code_lidar, this, std::placeholders::_1));
+    sub_error_code_cam_kiri = this->create_subscription<std_msgs::msg::Int16>(
+        "/cam_kiri/error_code", 1, std::bind(&Master::callback_sub_error_code_cam_kiri, this, std::placeholders::_1));
+    sub_error_code_cam_kanan = this->create_subscription<std_msgs::msg::Int16>(
+        "/cam_kanan/error_code", 1, std::bind(&Master::callback_sub_error_code_cam_kanan, this, std::placeholders::_1));
+    sub_error_code_pose_estimator = this->create_subscription<std_msgs::msg::Int16>(
+        "/slam/error_code", 1, std::bind(&Master::callback_sub_error_code_pose_estimator, this, std::placeholders::_1));
+    sub_error_code_obstacle_filter = this->create_subscription<std_msgs::msg::Int16>(
+        "/obstacle_filter/error_code", 1, std::bind(&Master::callback_sub_error_code_obstacle_filter, this, std::placeholders::_1));
+    sub_error_code_aruco_kiri = this->create_subscription<std_msgs::msg::Int16>(
+        "/cam_kiri/error_code", 1, std::bind(&Master::callback_sub_error_code_aruco_kiri, this, std::placeholders::_1));
+    sub_error_code_aruco_kanan = this->create_subscription<std_msgs::msg::Int16>(
+        "/cam_kanan/error_code", 1, std::bind(&Master::callback_sub_error_code_aruco_kanan, this, std::placeholders::_1));
 
     if (use_ekf_odometry)
         sub_odometry = this->create_subscription<nav_msgs::msg::Odometry>(
@@ -141,10 +157,49 @@ void Master::callback_sub_aruco_kanan_detected(const std_msgs::msg::Bool::Shared
     aruco_kanan_detected = msg->data;
 }
 
+void Master::callback_sub_error_code_beckhoff(const std_msgs::msg::Int16::SharedPtr msg)
+{
+    error_code_beckhoff = msg->data;
+}
+
+void Master::callback_sub_error_code_lidar(const std_msgs::msg::Int16::SharedPtr msg)
+{
+    error_code_lidar = msg->data;
+}
+
+void Master::callback_sub_error_code_cam_kiri(const std_msgs::msg::Int16::SharedPtr msg)
+{
+    error_code_cam_kiri = msg->data;
+}
+
+void Master::callback_sub_error_code_cam_kanan(const std_msgs::msg::Int16::SharedPtr msg)
+{
+    error_code_cam_kanan = msg->data;
+}
+
+void Master::callback_sub_error_code_pose_estimator(const std_msgs::msg::Int16::SharedPtr msg)
+{
+    error_code_pose_estimator = msg->data;
+}
+
+void Master::callback_sub_error_code_obstacle_filter(const std_msgs::msg::Int16::SharedPtr msg)
+{
+    error_code_obstacle_filter = msg->data;
+}
+
+void Master::callback_sub_error_code_aruco_kiri(const std_msgs::msg::Int16::SharedPtr msg)
+{
+    error_code_aruco_kiri = msg->data;
+}
+
+void Master::callback_sub_error_code_aruco_kanan(const std_msgs::msg::Int16::SharedPtr msg)
+{
+    error_code_aruco_kanan = msg->data;
+}
+
 void Master::callback_tim_50hz()
 {
-    if (!marker.init(this->shared_from_this()))
-    {
+    if (!marker.init(this->shared_from_this())) {
         rclcpp::shutdown();
     }
 
@@ -152,15 +207,13 @@ void Master::callback_tim_50hz()
 
     process_marker();
 
-    switch (global_fsm.value)
-    {
+    switch (global_fsm.value) {
     /**
      * Pre-operation
      * Keadaan ini memastikan semua sistem tidak ada error
      */
     case FSM_GLOBAL_PREOP:
-        if (error_code_beckhoff + error_code_cam_kiri + error_code_cam_kanan + error_code_lidar + error_code_pose_estimator + error_code_obstacle_filter + error_code_aruco_kiri + error_code_aruco_kanan == 0)
-        {
+        if (error_code_beckhoff + error_code_cam_kiri + error_code_cam_kanan + error_code_lidar + error_code_pose_estimator + error_code_obstacle_filter + error_code_aruco_kiri + error_code_aruco_kanan == 0) {
             local_fsm.value = 0;
             global_fsm.value = FSM_GLOBAL_SAFEOP;
         }
@@ -172,8 +225,7 @@ void Master::callback_tim_50hz()
      * Memastikan semua data bisa diterima
      */
     case FSM_GLOBAL_SAFEOP:
-        if (error_code_beckhoff + error_code_cam_kiri + error_code_cam_kanan + error_code_lidar + error_code_pose_estimator + error_code_obstacle_filter + error_code_aruco_kiri + error_code_aruco_kanan > 0)
-        {
+        if (error_code_beckhoff + error_code_cam_kiri + error_code_cam_kanan + error_code_lidar + error_code_pose_estimator + error_code_obstacle_filter + error_code_aruco_kiri + error_code_aruco_kanan > 0) {
             global_fsm.value = FSM_GLOBAL_PREOP;
         }
 
@@ -188,15 +240,7 @@ void Master::callback_tim_50hz()
             rclcpp::Duration dt_aruco_kanan = current_time - last_time_aruco_kanan;
 
             // Jika sudah berhasil menerima semua data yang diperlukan
-            if (dt_pose_estimator.seconds() < 1 &&
-                dt_cam_kiri.seconds() < 1 &&
-                dt_cam_kanan.seconds() < 1 &&
-                dt_obstacle_filter.seconds() < 1 &&
-                dt_beckhoff.seconds() < 1 &&
-                dt_lidar.seconds() < 1 &&
-                dt_aruco_kiri.seconds() < 1 &&
-                dt_aruco_kanan.seconds() < 1)
-            {
+            if (dt_pose_estimator.seconds() < 1 && dt_cam_kiri.seconds() < 1 && dt_cam_kanan.seconds() < 1 && dt_obstacle_filter.seconds() < 1 && dt_beckhoff.seconds() < 1 && dt_lidar.seconds() < 1 && dt_aruco_kiri.seconds() < 1 && dt_aruco_kanan.seconds() < 1) {
                 local_fsm.value = 0;
                 global_fsm.value = FSM_GLOBAL_OP;
                 time_start_operation = current_time;
@@ -211,8 +255,7 @@ void Master::callback_tim_50hz()
      * Sistem beroperasi secara otomatis
      */
     case FSM_GLOBAL_OP:
-        if (error_code_beckhoff + error_code_cam_kiri + error_code_cam_kanan + error_code_lidar + error_code_pose_estimator + error_code_obstacle_filter + error_code_aruco_kiri + error_code_aruco_kanan > 0)
-        {
+        if (error_code_beckhoff + error_code_cam_kiri + error_code_cam_kanan + error_code_lidar + error_code_pose_estimator + error_code_obstacle_filter + error_code_aruco_kiri + error_code_aruco_kanan > 0) {
             global_fsm.value = FSM_GLOBAL_PREOP;
         }
         process_local_fsm();
@@ -224,7 +267,7 @@ void Master::callback_tim_50hz()
 
 // ===============================================================================================
 
-int main(int argc, char **argv)
+int main(int argc, char** argv)
 {
     rclcpp::init(argc, argv);
 

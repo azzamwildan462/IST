@@ -1,23 +1,23 @@
 #ifndef MASTER_HPP
 #define MASTER_HPP
 
-#include "rclcpp/rclcpp.hpp"
 #include "geometry_msgs/msg/point.hpp"
+#include "geometry_msgs/msg/pose_with_covariance_stamped.hpp"
 #include "geometry_msgs/msg/quaternion.hpp"
+#include "nav_msgs/msg/odometry.hpp"
+#include "rclcpp/rclcpp.hpp"
+#include "ros2_interface/msg/point_array.hpp"
+#include "ros2_utils/global_definitions.hpp"
 #include "ros2_utils/help_logger.hpp"
 #include "ros2_utils/help_marker.hpp"
-#include "ros2_utils/simple_fsm.hpp"
 #include "ros2_utils/pid.hpp"
-#include "ros2_utils/global_definitions.hpp"
+#include "ros2_utils/simple_fsm.hpp"
+#include "std_msgs/msg/bool.hpp"
+#include "std_msgs/msg/float32.hpp"
+#include "std_msgs/msg/float32_multi_array.hpp"
+#include "std_msgs/msg/int16.hpp"
 #include "tf2/LinearMath/Quaternion.h"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
-#include "geometry_msgs/msg/pose_with_covariance_stamped.hpp"
-#include "ros2_interface/msg/point_array.hpp"
-#include "nav_msgs/msg/odometry.hpp"
-#include "std_msgs/msg/float32_multi_array.hpp"
-#include "std_msgs/msg/float32.hpp"
-#include "std_msgs/msg/int16.hpp"
-#include "std_msgs/msg/bool.hpp"
 
 #define FSM_GLOBAL_INIT 0
 #define FSM_GLOBAL_PREOP 1
@@ -29,8 +29,7 @@
 #define FSM_LOCAL_MENUNGGU_STATION_1 2
 #define FSM_LOCAL_MENUNGGU_STATION_2 3
 
-class Master : public rclcpp::Node
-{
+class Master : public rclcpp::Node {
 public:
     rclcpp::TimerBase::SharedPtr tim_50hz;
     rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr pub_initialpose;
@@ -50,6 +49,14 @@ public:
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr sub_odometry;
     rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr sub_aruco_kanan_detected;
     rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr sub_aruco_kiri_detected;
+    rclcpp::Subcription<std_msgs::msg::Int16>::SharedPtr sub_error_code_beckhoff;
+    rclcpp::Subcription<std_msgs::msg::Int16>::SharedPtr sub_error_code_lidar;
+    rclcpp::Subcription<std_msgs::msg::Int16>::SharedPtr sub_error_code_cam_kiri;
+    rclcpp::Subcription<std_msgs::msg::Int16>::SharedPtr sub_error_code_cam_kanan;
+    rclcpp::Subcription<std_msgs::msg::Int16>::SharedPtr sub_error_code_pose_estimator;
+    rclcpp::Subcription<std_msgs::msg::Int16>::SharedPtr sub_error_code_obstacle_filter;
+    rclcpp::Subcription<std_msgs::msg::Int16>::SharedPtr sub_error_code_aruco_kiri;
+    rclcpp::Subcription<std_msgs::msg::Int16>::SharedPtr sub_error_code_aruco_kanan;
 
     // Configs
     // ===============================================================================================
@@ -147,6 +154,14 @@ public:
     void callback_sub_lane_kanan_single_cam(const ros2_interface::msg::PointArray::SharedPtr msg);
     void callback_sub_aruco_kiri_detected(const std_msgs::msg::Bool::SharedPtr msg);
     void callback_sub_aruco_kanan_detected(const std_msgs::msg::Bool::SharedPtr msg);
+    void callback_sub_error_code_beckhoff(const std_msgs::msg::Int16::SharedPtr msg);
+    void callback_sub_error_code_lidar(const std_msgs::msg::Int16::SharedPtr msg);
+    void callback_sub_error_code_cam_kiri(const std_msgs::msg::Int16::SharedPtr msg);
+    void callback_sub_error_code_cam_kanan(const std_msgs::msg::Int16::SharedPtr msg);
+    void callback_sub_error_code_pose_estimator(const std_msgs::msg::Int16::SharedPtr msg);
+    void callback_sub_error_code_obstacle_filter(const std_msgs::msg::Int16::SharedPtr msg);
+    void callback_sub_error_code_aruco_kiri(const std_msgs::msg::Int16::SharedPtr msg);
+    void callback_sub_error_code_aruco_kanan(const std_msgs::msg::Int16::SharedPtr msg);
 
     // Process
     // ===============================================================================================

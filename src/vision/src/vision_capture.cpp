@@ -1,15 +1,16 @@
-#include "rclcpp/rclcpp.hpp"
 #include "cv_bridge/cv_bridge.h"
 #include "opencv2/opencv.hpp"
-#include "ros2_utils/help_logger.hpp"
+#include "rclcpp/rclcpp.hpp"
 #include "ros2_utils/global_definitions.hpp"
+#include "ros2_utils/help_logger.hpp"
+#include "std_msgs/msg/int16.hpp"
 
-class VisionCapture : public rclcpp::Node
-{
+class VisionCapture : public rclcpp::Node {
 public:
     //----Publisher
     rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr pub_image_bgr;
     rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr pub_image_gray;
+    rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr pub_error_code;
 
     // Configs
     // =======================================================
@@ -26,7 +27,8 @@ public:
     cv::VideoCapture cap;
     int error_code = 0;
 
-    VisionCapture() : Node("vision_capture")
+    VisionCapture()
+        : Node("vision_capture")
     {
         this->declare_parameter("camera_path", "/dev/video0");
         this->get_parameter("camera_path", camera_path);
@@ -52,16 +54,14 @@ public:
         node_namespace = this->get_namespace();
         node_namespace = node_namespace.substr(1, node_namespace.size() - 1); // /cam_kanan jadi cam_kanan
 
-        if (!logger.init())
-        {
+        if (!logger.init()) {
             RCLCPP_ERROR(this->get_logger(), "Failed to initialize logger");
             rclcpp::shutdown();
         }
 
         logger.info("Init camera on: %s", camera_path.c_str());
 
-        if (!cap.open(camera_path))
-        {
+        if (!cap.open(camera_path)) {
             RCLCPP_ERROR(this->get_logger(), "Failed to open camera, Retry in 3 seconds");
             rclcpp::sleep_for(std::chrono::seconds(3));
             rclcpp::shutdown();
@@ -70,6 +70,7 @@ public:
         //----Publisher
         pub_image_bgr = this->create_publisher<sensor_msgs::msg::Image>("image_bgr", 1);
         pub_image_gray = this->create_publisher<sensor_msgs::msg::Image>("image_gray", 1);
+        pub_error_code = this->create_publisher<std_msgs::msg::Int16>("error_code", 1);
 
         logger.info("VisionCapture init success");
     }
@@ -90,23 +91,19 @@ public:
         int _height = cap.get(cv::CAP_PROP_FRAME_HEIGHT);
         int _fps = cap.get(cv::CAP_PROP_FPS);
 
-        if (camera_fourcc != _fourcc)
-        {
+        if (camera_fourcc != _fourcc) {
             logger.warn("Failed to set camera fourcc");
             error_code = 1;
         }
-        if (camera_width != _width)
-        {
+        if (camera_width != _width) {
             logger.warn("Failed to set camera width");
             error_code = 2;
         }
-        if (camera_height != _height)
-        {
+        if (camera_height != _height) {
             logger.warn("Failed to set camera height");
             error_code = 3;
         }
-        if (camera_fps != _fps)
-        {
+        if (camera_fps != _fps) {
             logger.warn("Failed to set camera fps");
             error_code = 4;
         }
@@ -114,13 +111,11 @@ public:
 
     void callback_routine()
     {
-        while (rclcpp::ok())
-        {
+        while (rclcpp::ok()) {
             cv::Mat frame;
             cap >> frame;
 
-            if (frame.empty())
-            {
+            if (frame.empty()) {
                 logger.error("Failed to capture frame");
                 error_code = 11;
             }
@@ -142,11 +137,15 @@ public:
             cv::cvtColor(frame_bgr, frame_gray, cv::COLOR_BGR2GRAY);
             auto msg_frame_gray = cv_bridge::CvImage(std_msgs::msg::Header(), "mono8", frame_gray).toImageMsg();
             pub_image_gray->publish(*msg_frame_gray);
+
+            std_msgs::msg::Int16 msg_error_code;
+            msg_error_code.data = error_code;
+            pub_error_code->publish(msg_error_code);
         }
     }
 };
 
-int main(int argc, char **argv)
+int main(int argc, char** argv)
 {
     rclcpp::init(argc, argv);
 
