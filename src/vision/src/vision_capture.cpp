@@ -127,6 +127,7 @@ public:
             // Hardcode sementara, image dari file
             // cv::Mat frame2 = cv::imread("/home/wildan/proyek/robotika/IST/src/vision/assets/test_lane.webp");
             cv::Mat frame2 = cv::imread("/home/wildan/proyek/robotika/IST/src/vision/assets/" + node_namespace + ".jpeg");
+            // cv::Mat frame2 = cv::imread("/home/wildan/proyek/robotika/IST/src/vision/assets/aruco_kanan.jpeg");
 
             // cv::Mat flippedImg;
             // cv::flip(frame2, flippedImg, 1); // 1 specifies flipping around the Y-axis

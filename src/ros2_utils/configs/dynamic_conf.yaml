@@ -17,3 +17,10 @@ Detection:
     high_s: 255
     setpoint_x: 320
     setpoint_y: 240
+  aruco_kanan:
+    low_h: 27
+    low_l: 153
+    low_s: 0
+    high_h: 255
+    high_l: 255
+    high_s: 255

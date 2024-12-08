@@ -10,8 +10,10 @@
 #include "ros2_interface/msg/point_array.hpp"
 #include "ros2_interface/srv/params.hpp"
 #include "std_msgs/msg/float32_multi_array.hpp"
+#include <opencv2/aruco.hpp>
+#include "std_msgs/msg/bool.hpp"
 
-class SingleLaneDetection : public rclcpp::Node
+class SingleDetection : public rclcpp::Node
 {
 public:
     rclcpp::TimerBase::SharedPtr tim_50hz;
@@ -21,6 +23,7 @@ public:
     rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr pub_frame_display;
     rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr pub_frame_binary;
     rclcpp::Publisher<std_msgs::msg::Float32MultiArray>::SharedPtr pub_hasil_kalkulasi;
+    rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr pub_aruco_detected;
 
     rclcpp::Service<ros2_interface::srv::Params>::SharedPtr srv_params;
 
@@ -47,6 +50,13 @@ public:
     std::string node_namespace = "";
     float point_to_velocity_ratio = 0.05;
     float point_to_velocity_angle_threshold = 0.02;
+    bool detect_aruco = false;
+    std::string aruco_dictionary_type = "DICT_4x4_50";
+    float min_aruco_range = 100; // Jarak ke setpoint
+    int aruco_in_counter_threshold = 50;
+    int aruco_out_counter_threshold = 50;
+    std::string camera_namespace = "/cam_kanan";
+    bool detect_marker = false;
 
     // Vars
     // =======================================================
@@ -60,8 +70,9 @@ public:
     cv::Mat frame_bgr;
     bool is_frame_gray_available = false;
     bool is_frame_bgr_available = false;
+    cv::Ptr<cv::aruco::Dictionary> aruco_dictionary;
 
-    SingleLaneDetection() : Node("single_lane_detection")
+    SingleDetection() : Node("single_detection")
     {
         this->declare_parameter("config_path", "");
         this->get_parameter("config_path", config_path);
@@ -114,6 +125,24 @@ public:
         this->declare_parameter("point_to_velocity_angle_threshold", 0.02);
         this->get_parameter("point_to_velocity_angle_threshold", point_to_velocity_angle_threshold);
 
+        this->declare_parameter("detect_aruco", false);
+        this->get_parameter("detect_aruco", detect_aruco);
+
+        this->declare_parameter("aruco_dictionary_type", "DICT_4x4_50");
+        this->get_parameter("aruco_dictionary_type", aruco_dictionary_type);
+
+        this->declare_parameter("min_aruco_range", 100.0);
+        this->get_parameter("min_aruco_range", min_aruco_range);
+
+        this->declare_parameter("aruco_in_counter_threshold", 50);
+        this->get_parameter("aruco_in_counter_threshold", aruco_in_counter_threshold);
+
+        this->declare_parameter("aruco_out_counter_threshold", 50);
+        this->get_parameter("aruco_out_counter_threshold", aruco_out_counter_threshold);
+
+        this->declare_parameter("camera_namespace", "/cam_kanan");
+        this->get_parameter("camera_namespace", camera_namespace);
+
         node_namespace = this->get_namespace();
         node_namespace = node_namespace.substr(1, node_namespace.size() - 1); // /cam_kanan jadi cam_kanan
 
@@ -129,32 +158,44 @@ public:
             load_config();
         }
 
+        if (detect_aruco)
+        {
+            logger.info("Aruco detection on %s", aruco_dictionary_type.c_str());
+            if (aruco_dictionary_type == "DICT_4X4_50")
+                aruco_dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_4X4_50);
+            else if (aruco_dictionary_type == "DICT_4X4_100")
+                aruco_dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_4X4_100);
+            else if (aruco_dictionary_type == "DICT_4X4_250")
+                aruco_dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_4X4_250);
+        }
+
         if (use_frame_bgr)
         {
             sub_image_bgr = this->create_subscription<sensor_msgs::msg::Image>(
-                "image_bgr", 1, std::bind(&SingleLaneDetection::callback_sub_image_bgr, this, std::placeholders::_1));
+                camera_namespace + "/image_bgr", 1, std::bind(&SingleDetection::callback_sub_image_bgr, this, std::placeholders::_1));
         }
         else
         {
             sub_image_gray = this->create_subscription<sensor_msgs::msg::Image>(
-                "image_gray", 1, std::bind(&SingleLaneDetection::callback_sub_image_gray, this, std::placeholders::_1));
+                camera_namespace + "/image_gray", 1, std::bind(&SingleDetection::callback_sub_image_gray, this, std::placeholders::_1));
         }
 
         pub_point_garis = this->create_publisher<ros2_interface::msg::PointArray>("point_garis", 1);
         pub_hasil_kalkulasi = this->create_publisher<std_msgs::msg::Float32MultiArray>("hasil_kalkulasi", 1);
+        pub_aruco_detected = this->create_publisher<std_msgs::msg::Bool>("aruco_detected", 1);
 
         pub_frame_display = this->create_publisher<sensor_msgs::msg::Image>("frame_display", 1);
         pub_frame_binary = this->create_publisher<sensor_msgs::msg::Image>("frame_binary", 1);
 
         srv_params = this->create_service<ros2_interface::srv::Params>(
-            "params", std::bind(&SingleLaneDetection::callback_srv_params, this, std::placeholders::_1, std::placeholders::_2));
+            "params", std::bind(&SingleDetection::callback_srv_params, this, std::placeholders::_1, std::placeholders::_2));
 
         //----Timer
-        tim_50hz = this->create_wall_timer(std::chrono::milliseconds(20), std::bind(&SingleLaneDetection::callback_tim_50hz, this));
+        tim_50hz = this->create_wall_timer(std::chrono::milliseconds(20), std::bind(&SingleDetection::callback_tim_50hz, this));
 
         pid_point_emergency.init(0.5, 0.0001, 0.01, 0.02, 0.00, 10, 0.00, 0.001);
 
-        logger.info("SingleLaneDetection init success");
+        logger.info("SingleDetection init success");
     }
 
     void load_config()
@@ -170,14 +211,20 @@ public:
             logger.error("Failed to load config file: %s", e.what());
         }
 
-        low_h = config["Detection"][node_namespace.c_str()]["low_h"].as<int>();
-        low_l = config["Detection"][node_namespace.c_str()]["low_l"].as<int>();
-        low_s = config["Detection"][node_namespace.c_str()]["low_s"].as<int>();
-        high_h = config["Detection"][node_namespace.c_str()]["high_h"].as<int>();
-        high_l = config["Detection"][node_namespace.c_str()]["high_l"].as<int>();
-        high_s = config["Detection"][node_namespace.c_str()]["high_s"].as<int>();
-        // setpoint_x = config["Detection"][node_namespace.c_str()]["setpoint_x"].as<int>();
-        // setpoint_y = config["Detection"][node_namespace.c_str()]["setpoint_y"].as<int>();
+        try
+        {
+            low_h = config["Detection"][node_namespace.c_str()]["low_h"].as<int>();
+            low_l = config["Detection"][node_namespace.c_str()]["low_l"].as<int>();
+            low_s = config["Detection"][node_namespace.c_str()]["low_s"].as<int>();
+            high_h = config["Detection"][node_namespace.c_str()]["high_h"].as<int>();
+            high_l = config["Detection"][node_namespace.c_str()]["high_l"].as<int>();
+            high_s = config["Detection"][node_namespace.c_str()]["high_s"].as<int>();
+        }
+        catch (const std::exception &e)
+        {
+            logger.warn("Failed to load config file, Recreate the config file");
+            save_config();
+        }
     }
 
     void save_config()
@@ -191,8 +238,6 @@ public:
         config["Detection"][node_namespace.c_str()]["high_h"] = high_h;
         config["Detection"][node_namespace.c_str()]["high_l"] = high_l;
         config["Detection"][node_namespace.c_str()]["high_s"] = high_s;
-        // config["Detection"][node_namespace.c_str()]["setpoint_x"] = setpoint_x;
-        // config["Detection"][node_namespace.c_str()]["setpoint_y"] = setpoint_y;
 
         try
         {
@@ -287,6 +332,137 @@ public:
             error_code = 3;
             logger.error("Failed to convert image: %s", e.what());
         }
+    }
+
+    void aruco_detection_bgr()
+    {
+        if (!is_frame_bgr_available)
+        {
+            error_code = 5;
+            return;
+        }
+
+        cv::Mat frame_bgr_copy;
+        std::lock_guard<std::mutex> lock(mutex_frame_bgr);
+        if (!frame_bgr.empty())
+        {
+            try
+            {
+                frame_bgr_copy = frame_bgr.clone();
+                is_frame_bgr_available = false;
+            }
+            catch (const cv::Exception &e)
+            {
+                error_code = 4;
+                logger.error("Failed to clone image: %s", e.what());
+            }
+        }
+
+        if (frame_bgr_copy.empty())
+        {
+            error_code = 5;
+            return;
+        }
+
+        static uint64_t aruco_detection_in = 0;
+        static uint64_t aruco_detection_out = 0;
+
+        // Variables to hold detection results
+        std::vector<int> markerIds;
+        std::vector<std::vector<cv::Point2f>> markerCorners;
+
+        // Detect the ArUco markers
+        cv::aruco::detectMarkers(frame_bgr_copy, aruco_dictionary, markerCorners, markerIds);
+
+        //================================================================================================
+
+        // Find the nearest aruco from setpoint
+        if (markerIds.size() > 0)
+        {
+            int nearest_marker_id = -1;
+            float nearest_marker_distance = FLT_MAX;
+            for (int i = 0; i < markerIds.size(); i++)
+            {
+                cv::Point2f center_marker = (markerCorners[i][0] + markerCorners[i][1] + markerCorners[i][2] + markerCorners[i][3]) * 0.25;
+                float distance = sqrt(pow(setpoint_x - center_marker.x, 2) + pow(setpoint_y - center_marker.y, 2));
+                if (distance < nearest_marker_distance)
+                {
+                    nearest_marker_distance = distance;
+                    nearest_marker_id = markerIds[i];
+                }
+            }
+
+            if (nearest_marker_distance < min_aruco_range)
+            {
+                aruco_detection_in++;
+                aruco_detection_out = 0;
+            }
+
+            cv::aruco::drawDetectedMarkers(frame_bgr_copy, markerCorners, markerIds);
+
+            if (nearest_marker_id > -1)
+            {
+                cv::putText(frame_bgr_copy, std::to_string(nearest_marker_distance), cv::Point(10, 10), cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(255, 255, 255), 1);
+            }
+        }
+        else
+        {
+            aruco_detection_in = 0;
+            aruco_detection_out++;
+        }
+
+        //================================================================================================
+
+        cv::circle(frame_bgr_copy, cv::Point(setpoint_x, setpoint_y), 25, cv::Scalar(255, 255, 0), -1);
+
+        //================================================================================================
+
+        std_msgs::msg::Bool msg_aruco_detected;
+        if (aruco_detection_in > aruco_in_counter_threshold)
+            msg_aruco_detected.data = true;
+        else if (aruco_detection_out > aruco_out_counter_threshold)
+            msg_aruco_detected.data = false;
+        pub_aruco_detected->publish(msg_aruco_detected);
+
+        auto msg_frame_display = cv_bridge::CvImage(std_msgs::msg::Header(), "bgr8", frame_bgr_copy).toImageMsg();
+        pub_frame_display->publish(*msg_frame_display);
+    }
+
+    void aruco_detection_gray()
+    {
+        if (!is_frame_gray_available)
+        {
+            error_code = 5;
+            return;
+        }
+
+        cv::Mat frame_gray_copy;
+        mutex_frame_gray.lock();
+        try
+        {
+            frame_gray_copy = frame_gray.clone();
+            is_frame_gray_available = false;
+        }
+        catch (const cv::Exception &e)
+        {
+            error_code = 4;
+            logger.error("Failed to clone image: %s", e.what());
+            mutex_frame_gray.unlock();
+        }
+        mutex_frame_gray.unlock();
+
+        if (frame_gray_copy.empty())
+        {
+            error_code = 5;
+            return;
+        }
+
+        // Variables to hold detection results
+        std::vector<int> markerIds;
+        std::vector<std::vector<cv::Point2f>> markerCorners;
+
+        // Detect the ArUco markers
+        cv::aruco::detectMarkers(frame_gray_copy, aruco_dictionary, markerCorners, markerIds);
     }
 
     void process_frame_bgr()
@@ -576,9 +752,17 @@ public:
 
     void callback_tim_50hz()
     {
-        if (use_frame_bgr)
+        if (use_frame_bgr && !detect_aruco)
         {
             process_frame_bgr();
+        }
+        else if (use_frame_bgr && detect_aruco)
+        {
+            aruco_detection_bgr();
+        }
+        else if (!use_frame_bgr && detect_aruco)
+        {
+            aruco_detection_gray();
         }
         else
         {
@@ -591,10 +775,10 @@ int main(int argc, char **argv)
 {
     rclcpp::init(argc, argv);
 
-    auto node_single_lane_detection = std::make_shared<SingleLaneDetection>();
+    auto node_single_detection = std::make_shared<SingleDetection>();
 
     rclcpp::executors::MultiThreadedExecutor executor;
-    executor.add_node(node_single_lane_detection);
+    executor.add_node(node_single_detection);
     executor.spin();
 
     return 0;

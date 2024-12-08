@@ -245,7 +245,7 @@ def generate_launch_description():
 
     lane_detection_kanan = Node(
         package='vision',
-        executable='single_lane_detection',
+        executable='single_detection',
         name='lane_detection_kanan',
         output='screen',
         namespace='cam_kanan',
@@ -263,7 +263,31 @@ def generate_launch_description():
             "point_to_velocity_angle_threshold": 0.56,
             "metode_perhitungan": 1,
             "setpoint_x": 320,
-            "setpoint_y": 240
+            "setpoint_y": 240,
+            "camera_namespace": "/cam_kanan",
+        }
+        ],
+        respawn=True,
+        prefix='nice -n -8'
+    )
+
+    aruco_detection_kanan = Node(
+        package='vision',
+        executable='single_detection',
+        name='aruco_detection_kanan',
+        output='screen',
+        namespace='aruco_kanan',
+        parameters=[{
+            "use_dynamic_config": True,
+            "config_path": os.path.join(path_config,"dynamic_conf.yaml"),
+            "setpoint_x": 320,
+            "setpoint_y": 240,
+            "detect_aruco": True,
+            "aruco_dictionary_type": "DICT_4X4_50",
+            "min_aruco_range": 0.1,
+            "aruco_in_counter_threshold": 50,
+            "aruco_out_counter_threshold": 50,
+            "camera_namespace": "/cam_kanan",
         }
         ],
         respawn=True,
@@ -285,7 +309,7 @@ def generate_launch_description():
 
     lane_detection_kiri = Node(
         package='vision',
-        executable='single_lane_detection',
+        executable='single_detection',
         name='lane_detection_kiri',
         output='screen',
         namespace='cam_kiri',
@@ -303,7 +327,8 @@ def generate_launch_description():
             "point_to_velocity_angle_threshold": 0.6,
             "metode_perhitungan": 1,
             "setpoint_x": 320,
-            "setpoint_y": 240
+            "setpoint_y": 240,
+            "camera_namespace": "/cam_kiri",
         }
         ],
         respawn=True,
@@ -489,23 +514,27 @@ def generate_launch_description():
         [
             vision_capture_kanan,
             lane_detection_kanan,
-            vision_capture_kiri,
-            lane_detection_kiri,
-            pose_estimator,
-            obstacle_filter,
-            tf_base_link_to_body_link,
-            tf_base_link_to_lidar1_link,
-            tf_base_link_to_lidar2_link,
-            tf_map_empty,
-            DeclareLaunchArgument('auto_start', default_value='true'),
-            hokuyo_lidar_driver,
-            urg_node2_node_configure_event_handler,
-            urg_node2_node_activate_event_handler,
+            aruco_detection_kanan,
+            # vision_capture_kiri,
+            # lane_detection_kiri,
+            # pose_estimator,
+            # obstacle_filter,
+            # tf_base_link_to_body_link,
+            # tf_base_link_to_lidar1_link,
+            # tf_base_link_to_lidar2_link,
+            # tf_map_empty,
+            # DeclareLaunchArgument('auto_start', default_value='true'),
+            # hokuyo_lidar_driver,
+            # urg_node2_node_configure_event_handler,
+            # urg_node2_node_activate_event_handler,
             rosbridge_server, 
             web_video_server,
-            beckhoff,
-            master,
+            # beckhoff,
+            # master,
             ui_server,
+
+
+
             # vision_capture,
             # lane_detection,
             # livox_lidar_driver,

@@ -10,7 +10,7 @@ anime({
 
 // Connect to the ROS bridge WebSocket server
 var ros = new ROSLIB.Ros({
-    url: "ws://localhost:9090",
+    url: "ws://" + window.location.hostname + ":9090",
 });
 
 ros.on("connection", function () {
@@ -33,6 +33,9 @@ frame_kamera.src = "http://" + window.location.hostname + ":8080/stream?topic=/c
 
 const frame_binary = document.getElementById("frame_binary");
 frame_binary.src = "http://" + window.location.hostname + ":8080/stream?topic=/cam_kanan/frame_binary"
+
+const frame_aruco = document.getElementById("frame_aruco");
+frame_aruco.src = "http://" + window.location.hostname + ":8080/stream?topic=/aruco_kanan/frame_display"
 
 const low_h_slider = document.getElementById("low_h_slider");
 low_h_slider.value = 0;

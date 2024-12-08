@@ -10,7 +10,7 @@ anime({
 
 // Connect to the ROS bridge WebSocket server
 var ros = new ROSLIB.Ros({
-    url: "ws://localhost:9090",
+    url: "ws://" + window.location.hostname + ":9090",
 });
 
 ros.on("connection", function () {
