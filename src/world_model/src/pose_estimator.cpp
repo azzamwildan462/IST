@@ -1,18 +1,19 @@
+#include "nav_msgs/msg/odometry.hpp"
 #include "rclcpp/rclcpp.hpp"
+#include "ros2_utils/global_definitions.hpp"
+#include "std_msgs/msg/int16.hpp"
 #include "std_msgs/msg/string.hpp"
 #include "tf2/LinearMath/Quaternion.h"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
-#include "tf2_ros/transform_broadcaster.h"
 #include "tf2_ros/buffer.h"
+#include "tf2_ros/transform_broadcaster.h"
 #include "tf2_ros/transform_listener.h"
-#include "nav_msgs/msg/odometry.hpp"
-#include "ros2_utils/global_definitions.hpp"
 
-class PoseEstimator : public rclcpp::Node
-{
+class PoseEstimator : public rclcpp::Node {
 public:
     rclcpp::TimerBase::SharedPtr tim_50hz;
     rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr pub_odom;
+    rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr pub_error_code;
 
     //----TransformBroadcaster
     std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster;
@@ -21,16 +22,22 @@ public:
     // =======================================================
     float encoder_to_meter = 1;
 
-    uint16_t encoder[2] = {0, 0};
-    uint16_t prev_encoder[2] = {0, 0};
+    uint16_t encoder[2] = { 0, 0 };
+    uint16_t prev_encoder[2] = { 0, 0 };
     float gyro = 0;
     float prev_gyro = 0;
 
-    float final_pose_xyo[3] = {0, 0, 0};
-    float final_vel_dxdydo[3] = {0, 0, 0};
+    float final_pose_xyo[3] = { 0, 0, 0 };
+    float final_vel_dxdydo[3] = { 0, 0, 0 };
 
-    PoseEstimator() : Node("master")
+    // Vars
+    // =======================================================
+    int16_t error_code = 0;
+
+    PoseEstimator()
+        : Node("master")
     {
+        RCLCPP_INFO(this->get_logger(), "PoseEstimator init");
         this->declare_parameter("encoder_to_meter", 0.231);
         this->get_parameter("encoder_to_meter", encoder_to_meter);
 
@@ -41,6 +48,7 @@ public:
 
         //----Publisher
         pub_odom = this->create_publisher<nav_msgs::msg::Odometry>("odom", 10);
+        pub_error_code = this->create_publisher<std_msgs::msg::Int16>("error_code", 10);
     }
 
     void callback_tim_50hz()
@@ -51,8 +59,10 @@ public:
         time_now = this->now();
         double dt = (time_now - time_old).seconds();
 
-        if (dt < FLT_EPSILON)
+        if (dt < FLT_EPSILON) {
+            error_code = 1;
             return;
+        }
 
         int16_t d_left_encoder = encoder[0] - prev_encoder[0];
         int16_t d_right_encoder = encoder[1] - prev_encoder[1];
@@ -114,10 +124,14 @@ public:
         tf.transform.rotation.z = q.z();
         tf.transform.rotation.w = q.w();
         tf_broadcaster->sendTransform(tf);
+
+        std_msgs::msg::Int16 msg_error_code;
+        msg_error_code.data = error_code;
+        pub_error_code->publish(msg_error_code);
     }
 };
 
-int main(int argc, char **argv)
+int main(int argc, char** argv)
 {
     rclcpp::init(argc, argv);
 

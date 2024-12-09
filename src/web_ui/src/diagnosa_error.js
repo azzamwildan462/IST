@@ -17,23 +17,26 @@ const nodes = [
         sectionId: 'beckhoff-section',
         tableId: 'beckhoff-error-body',
         errorCodes: {
+            99: 'Node is not running',
             0: 'No error',
             1: 'EtherCAT communication error',
             // Add more Beckhoff error codes and descriptions
         },
         errorSolutions: {
+            99: 'Start the node',
             0: 'No action needed',
             1: 'Reset PLC',
             // Add more Beckhoff error codes and solutions
         }
     },
     {
-        id: 'camera',
+        id: 'cam_kanan',
         topic: '/cam_kanan/error_code',
         messageType: 'std_msgs/Int16',
-        sectionId: 'camera-section',
-        tableId: 'camera-error-body',
+        sectionId: 'cam_kanan-section',
+        tableId: 'cam_kanan-error-body',
         errorCodes: {
+            99: 'Node is not running',
             0: 'No error',
             1: 'Failed to set camera fourcc',
             2: 'Failed to set camera width',
@@ -43,6 +46,7 @@ const nodes = [
             // Add more Camera error codes and descriptions
         },
         errorSolutions: {
+            99: 'Start the node',
             0: 'No action needed',
             1: 'Check camera settings',
             2: 'Check camera settings',
@@ -53,12 +57,40 @@ const nodes = [
         }
     },
     {
-        id: 'detection',
-        topic: '/aruco_kanan/error_code',
+        id: 'cam_kiri',
+        topic: '/cam_kiri/error_code',
         messageType: 'std_msgs/Int16',
-        sectionId: 'detection-section',
-        tableId: 'detection-error-body',
+        sectionId: 'cam_kiri-section',
+        tableId: 'cam_kiri-error-body',
         errorCodes: {
+            99: 'Node is not running',
+            0: 'No error',
+            1: 'Failed to set camera fourcc',
+            2: 'Failed to set camera width',
+            3: 'Failed to set camera height',
+            4: 'Failed to set camera fps',
+            11: 'Failed to capture image',
+            // Add more Camera error codes and descriptions
+        },
+        errorSolutions: {
+            99: 'Start the node',
+            0: 'No action needed',
+            1: 'Check camera settings',
+            2: 'Check camera settings',
+            3: 'Check camera settings',
+            4: 'Check camera settings',
+            11: 'Check camera connection',
+            // Add more Camera error codes and solutions
+        }
+    },
+    {
+        id: 'lane-kanan-detection',
+        topic: '/lane_kanan/error_code',
+        messageType: 'std_msgs/Int16',
+        sectionId: 'lane_kanan-detection-section',
+        tableId: 'lane_kanan-detection-error-body',
+        errorCodes: {
+            99: 'Node is not running',
             0: 'No error',
             1: 'Failed to load config',
             2: 'Failed to save config',
@@ -68,6 +100,88 @@ const nodes = [
             // Add more Detection error codes and descriptions
         },
         errorSolutions: {
+            99: 'Start the node',
+            0: 'No action needed',
+            1: 'Check config file',
+            2: 'Check config file',
+            3: 'Check image conversion',
+            4: 'Check image cloning',
+            5: 'Check data source',
+            // Add more Detection error codes and solutions
+        }
+    },
+    {
+        id: 'lane-kiri-detection',
+        topic: '/lane_kiri/error_code',
+        messageType: 'std_msgs/Int16',
+        sectionId: 'lane_kiri-detection-section',
+        tableId: 'lane_kiri-detection-error-body',
+        errorCodes: {
+            99: 'Node is not running',
+            0: 'No error',
+            1: 'Failed to load config',
+            2: 'Failed to save config',
+            3: 'Failed to convert image',
+            4: 'Failed to clone image',
+            5: 'No data',
+            // Add more Detection error codes and descriptions
+        },
+        errorSolutions: {
+            99: 'Start the node',
+            0: 'No action needed',
+            1: 'Check config file',
+            2: 'Check config file',
+            3: 'Check image conversion',
+            4: 'Check image cloning',
+            5: 'Check data source',
+            // Add more Detection error codes and solutions
+        }
+    },
+    {
+        id: 'aruco-kanan-detection',
+        topic: '/aruco_kanan/error_code',
+        messageType: 'std_msgs/Int16',
+        sectionId: 'aruco_kanan-detection-section',
+        tableId: 'aruco_kanan-detection-error-body',
+        errorCodes: {
+            99: 'Node is not running',
+            0: 'No error',
+            1: 'Failed to load config',
+            2: 'Failed to save config',
+            3: 'Failed to convert image',
+            4: 'Failed to clone image',
+            5: 'No data',
+            // Add more Detection error codes and descriptions
+        },
+        errorSolutions: {
+            99: 'Start the node',
+            0: 'No action needed',
+            1: 'Check config file',
+            2: 'Check config file',
+            3: 'Check image conversion',
+            4: 'Check image cloning',
+            5: 'Check data source',
+            // Add more Detection error codes and solutions
+        }
+    },
+    {
+        id: 'aruco-kiri-detection',
+        topic: '/aruco_kiri/error_code',
+        messageType: 'std_msgs/Int16',
+        sectionId: 'aruco_kiri-detection-section',
+        tableId: 'aruco_kiri-detection-error-body',
+        errorCodes: {
+            99: 'Node is not running',
+            0: 'No error',
+            1: 'Failed to load config',
+            2: 'Failed to save config',
+            3: 'Failed to convert image',
+            4: 'Failed to clone image',
+            5: 'No data',
+            // Add more Detection error codes and descriptions
+        },
+        errorSolutions: {
+            99: 'Start the node',
             0: 'No action needed',
             1: 'Check config file',
             2: 'Check config file',
@@ -84,21 +198,21 @@ const nodes = [
         sectionId: 'lidar-section',
         tableId: 'lidar-error-body',
         errorCodes: {
+            99: 'Node is not running',
             0: 'No error',
-            1: 'Failed to connect to Lidar',
-            2: 'Failed to start Lidar',
-            3: 'Failed to stop Lidar',
-            4: 'Failed to read Lidar',
-            5: 'Failed to write Lidar',
+            1: 'Connection error',
+            2: 'Not connected',
+            3: 'Measurement error',
+            4: 'No data',
             // Add more Lidar error codes and descriptions
         },
         errorSolutions: {
+            99: 'Start the node',
             0: 'No action needed',
-            1: 'Check Lidar connection',
-            2: 'Check Lidar connection',
-            3: 'Check Lidar connection',
-            4: 'Check Lidar connection',
-            5: 'Check Lidar connection',
+            1: 'Check connection',
+            2: 'Check connection',
+            3: 'Check measurement',
+            4: 'Check data source',
             // Add more Lidar error codes and solutions
         }
     },
@@ -109,21 +223,15 @@ const nodes = [
         sectionId: 'pose-estimator-section',
         tableId: 'pose-estimator-error-body',
         errorCodes: {
+            99: 'Node is not running',
             0: 'No error',
-            1: 'Failed to load map',
-            2: 'Failed to save map',
-            3: 'Failed to localize',
-            4: 'Failed to set pose',
-            5: 'Failed to get pose',
+            1: 'Time step too small',
             // Add more Pose Estimator error codes and descriptions
         },
         errorSolutions: {
+            99: 'Start the node',
             0: 'No action needed',
-            1: 'Check map file',
-            2: 'Check map file',
-            3: 'Check localization',
-            4: 'Check pose setting',
-            5: 'Check pose retrieval',
+            1: 'Increase time step',
             // Add more Pose Estimator error codes and solutions
         }
     },
@@ -134,17 +242,17 @@ const nodes = [
         sectionId: 'obstacle-filter-section',
         tableId: 'obstacle-filter-error-body',
         errorCodes: {
+            99: 'Node is not running',
             0: 'No error',
-            1: 'Failed to set filter',
-            2: 'Failed to apply filter',
-            3: 'Failed to get filtered data',
+            1: 'TF not initialized',
+            2: 'Lidar no data',
             // Add more Obstacle Filter error codes and descriptions
         },
         errorSolutions: {
+            99: 'Start the node',
             0: 'No action needed',
-            1: 'Check filter settings',
-            2: 'Check filter application',
-            3: 'Check filtered data retrieval',
+            1: 'Initialize TF',
+            2: 'Check Lidar data',
             // Add more Obstacle Filter error codes and solutions
         }
     }
@@ -179,10 +287,8 @@ function initializeNodes() {
             messageType: node.messageType
         });
 
-        topic.subscribe(() => {
-            subscribeToTopic(node);
-            document.getElementById(node.sectionId).style.display = 'block';
-        });
+        document.getElementById(node.sectionId).style.display = 'block';
+        subscribeToTopic(node);
     });
 }
 
@@ -193,6 +299,8 @@ function subscribeToTopic(node) {
         name: node.topic,
         messageType: node.messageType
     });
+
+    updateErrorTable(node.tableId, 99, node.errorCodes, node.errorSolutions);
 
     listener.subscribe((message) => {
         try {
@@ -260,6 +368,6 @@ setTimeout(() => {
     // updateErrorTable('beckhoff-error-body', 0, nodes[0].errorCodes, nodes[0].errorSolutions);
     // document.getElementById('beckhoff-section').style.display = 'block';
 
-    // updateErrorTable('camera-error-body', 1, nodes[1].errorCodes, nodes[1].errorSolutions);
-    // document.getElementById('camera-section').style.display = 'block';
+    // updateErrorTable('cam_kanan-error-body', 1, nodes[1].errorCodes, nodes[1].errorSolutions);
+    // document.getElementById('cam_kanan-section').style.display = 'block';
 }, 1000);

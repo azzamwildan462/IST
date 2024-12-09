@@ -809,8 +809,6 @@ public:
             process_frame_gray();
         }
 
-        RCLCPP_INFO(this->get_logger(), "Error code: %d", error_code);
-
         std_msgs::msg::Int16 msg_error_code;
         msg_error_code.data = error_code;
         pub_error_code->publish(msg_error_code);

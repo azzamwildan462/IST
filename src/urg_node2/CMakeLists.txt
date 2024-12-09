@@ -24,6 +24,7 @@ find_package(lifecycle_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(diagnostic_updater REQUIRED)
 find_package(laser_proc REQUIRED)
+find_package(ros2_utils REQUIRED)
 
 set(URG_LIBRARY_DIR urg_library/current)
 set(URG_LIBRARY_C_INCLUDE_DIR ${URG_LIBRARY_DIR}/include/c)
@@ -43,7 +44,7 @@ add_library(urg_c SHARED
 )
 
 add_library(urg_node2 SHARED src/urg_node2.cpp)
-ament_target_dependencies(urg_node2 rclcpp rclcpp_components rclcpp_lifecycle lifecycle_msgs sensor_msgs diagnostic_updater laser_proc)
+ament_target_dependencies(urg_node2 rclcpp rclcpp_components rclcpp_lifecycle lifecycle_msgs sensor_msgs diagnostic_updater laser_proc ros2_utils)
 rclcpp_components_register_node(urg_node2
   PLUGIN "urg_node2::UrgNode2"
   EXECUTABLE urg_node2_node)
@@ -62,7 +63,7 @@ install(DIRECTORY launch config
 if(BUILD_TESTING)
   find_package(ament_cmake_gtest)
   ament_add_gtest(urg_node2_test src/urg_node2.cpp test/urg_node2_test.cpp TIMEOUT 200)
-  ament_target_dependencies(urg_node2_test rclcpp rclcpp_components rclcpp_lifecycle lifecycle_msgs sensor_msgs diagnostic_updater laser_proc)
+  ament_target_dependencies(urg_node2_test rclcpp rclcpp_components rclcpp_lifecycle lifecycle_msgs sensor_msgs diagnostic_updater laser_proc ros2_utils)
   target_link_libraries(urg_node2_test urg_c)
 endif()
 

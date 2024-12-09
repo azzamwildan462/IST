@@ -49,14 +49,14 @@ public:
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr sub_odometry;
     rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr sub_aruco_kanan_detected;
     rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr sub_aruco_kiri_detected;
-    rclcpp::Subcription<std_msgs::msg::Int16>::SharedPtr sub_error_code_beckhoff;
-    rclcpp::Subcription<std_msgs::msg::Int16>::SharedPtr sub_error_code_lidar;
-    rclcpp::Subcription<std_msgs::msg::Int16>::SharedPtr sub_error_code_cam_kiri;
-    rclcpp::Subcription<std_msgs::msg::Int16>::SharedPtr sub_error_code_cam_kanan;
-    rclcpp::Subcription<std_msgs::msg::Int16>::SharedPtr sub_error_code_pose_estimator;
-    rclcpp::Subcription<std_msgs::msg::Int16>::SharedPtr sub_error_code_obstacle_filter;
-    rclcpp::Subcription<std_msgs::msg::Int16>::SharedPtr sub_error_code_aruco_kiri;
-    rclcpp::Subcription<std_msgs::msg::Int16>::SharedPtr sub_error_code_aruco_kanan;
+    rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_error_code_beckhoff;
+    rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_error_code_lidar;
+    rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_error_code_cam_kiri;
+    rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_error_code_cam_kanan;
+    rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_error_code_pose_estimator;
+    rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_error_code_obstacle_filter;
+    rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_error_code_aruco_kiri;
+    rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_error_code_aruco_kanan;
 
     // Configs
     // ===============================================================================================
