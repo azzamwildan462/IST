@@ -18,6 +18,7 @@
 #include "std_msgs/msg/int16.hpp"
 #include "tf2/LinearMath/Quaternion.h"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
+#include "sensor_msgs/msg/joy.hpp"
 
 #define FSM_GLOBAL_INIT 0
 #define FSM_GLOBAL_PREOP 1
@@ -29,7 +30,8 @@
 #define FSM_LOCAL_MENUNGGU_STATION_1 2
 #define FSM_LOCAL_MENUNGGU_STATION_2 3
 
-class Master : public rclcpp::Node {
+class Master : public rclcpp::Node
+{
 public:
     rclcpp::TimerBase::SharedPtr tim_50hz;
     rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr pub_initialpose;
@@ -57,12 +59,13 @@ public:
     rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_error_code_obstacle_filter;
     rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_error_code_aruco_kiri;
     rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_error_code_aruco_kanan;
+    rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr sub_joy;
 
     // Configs
     // ===============================================================================================
     bool use_ekf_odometry = false;
-    float profile_max_acceleration = 100;
-    float profile_max_decceleration = 100;
+    float profile_max_acceleration = 50;
+    float profile_max_decceleration = 50;
     float profile_max_velocity = 7;
     float profile_max_accelerate_jerk = 1000;
     float profile_max_decelerate_jerk = 1000;
@@ -70,6 +73,7 @@ public:
     float profile_max_braking_acceleration = 2000;
     float profile_max_braking_jerk = 3000;
     float max_obs_find_value = 100;
+    float profile_max_steering_rad = 12.56; // Ini adalah putaran steering nya bukan arah roda depannya
 
     // Vars
     // ===============================================================================================
@@ -107,6 +111,10 @@ public:
 
     float target_velocity = 0;
 
+    float target_velocity_joy_x = 0;
+    float target_velocity_joy_y = 0;
+    float target_velocity_joy_wz = 0;
+
     ros2_interface::msg::PointArray lane_kiri;
     ros2_interface::msg::PointArray lane_tengah;
     ros2_interface::msg::PointArray lane_kanan;
@@ -142,6 +150,7 @@ public:
     // ROS
     // ===============================================================================================
     void callback_tim_50hz();
+    void callback_sub_joy(const sensor_msgs::msg::Joy::SharedPtr msg);
     void callback_sub_beckhoff_sensor(const std_msgs::msg::Float32MultiArray::SharedPtr msg);
     void callback_sub_lane_kiri(const ros2_interface::msg::PointArray::SharedPtr msg);
     void callback_sub_lane_tengah(const ros2_interface::msg::PointArray::SharedPtr msg);

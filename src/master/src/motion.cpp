@@ -100,10 +100,10 @@ void Master::manual_motion(float vx, float vy, float wz)
      * Menghitung kecepatan steer berdasarkan kecepatan mobil
      * Semakin cepat mobil, semakin lambat perputaran steer
      */
-    static const float min_velocity = 5.0 / 3.6;               // 5 km/h
-    static const float max_velocity = 15.0 / 3.6;              // 15 km/h
-    static const float min_steering_rate = 2.5 * M_PI / 180.0; // 2.5 deg/s
-    static const float max_steering_rate = 7.5 * M_PI / 180.0; // 7.5 deg/s
+    static const float min_velocity = 2.0 / 3.6;              // 2 km/h
+    static const float max_velocity = 7.0 / 3.6;              // 7 km/h
+    static const float min_steering_rate = 7 * M_PI / 180.0;  // 7 deg/s
+    static const float max_steering_rate = 36 * M_PI / 180.0; // 21 deg/s
     static const float gradient_steering_rate = (min_steering_rate - max_steering_rate) / (max_velocity - min_velocity);
 
     float steering_rate = fmaxf(min_steering_rate,

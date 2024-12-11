@@ -43,8 +43,8 @@ var sub_master2ui = new ROSLIB.Topic({
 
 sub_master2ui.subscribe(function (message) {
     velocity_actuation = message.data[0];
-    velocity_feedback = message.data[1];
-    steering_actuation = message.data[2];
+    steering_actuation = message.data[1];
+    velocity_feedback = message.data[2];
     steering_feedback = message.data[3];
 });
 
@@ -167,8 +167,8 @@ const master_fsm = document.getElementById('master-fsm');
 setInterval(() => {
     let velocity_actuation_display = velocity_actuation * 10;
     let velocity_feedback_display = velocity_feedback * 10;
-    let steering_actuation_display = (steering_actuation) * 100 / 3.14;
-    let steering_feedback_display = (steering_feedback) * 100 / 3.14;
+    let steering_actuation_display = (steering_actuation) * 135 / 25.12;
+    let steering_feedback_display = (steering_feedback) * 135 / 25.12;
 
     set_velocity('.velocity-circle1', '.velocity-circle2', 'velocity-text', velocity_actuation_display, velocity_feedback_display);
     velocity_kmph.textContent = `${velocity_feedback.toFixed(2)} km/h`;

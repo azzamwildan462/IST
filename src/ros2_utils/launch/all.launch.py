@@ -58,6 +58,12 @@ def generate_launch_description():
         # fmt: on
     )
 
+    joy_node = Node(
+        package="joy",
+        executable="joy_node",
+        name="joy_node",
+    )
+
     livox_lidar_driver = Node(
         package='livox_ros_driver2_local',
         executable='livox_ros_driver2_node',
@@ -544,6 +550,8 @@ def generate_launch_description():
             # beckhoff,
             master,
             ui_server,
+
+            joy_node,
 
 
 
