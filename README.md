@@ -12,5 +12,5 @@ sudo apt install ros-humble-joy
 Command penting:
 ```
 sudo su (Run program menggunakan root)
-ps -eo pid,comm,pri,ni,cls (Untuk melihat niceness, priority, Scheduling)
+ps -eo pid,comm,pri,ni,cls (Untuk melihat priority, niceness, Scheduling)
 ```

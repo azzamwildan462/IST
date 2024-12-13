@@ -205,7 +205,7 @@ def generate_launch_description():
             "po2so_config": BECKHOFF_NORMAL
         }],
         respawn=True,
-        prefix='nice -n -10 chrt -f 99'
+        prefix='nice -n -20 chrt -f 99'
     )
 
     # vision_capture = Node(
@@ -530,9 +530,9 @@ def generate_launch_description():
 
     return LaunchDescription(
         [
-            vision_capture_kanan,
-            lane_detection_kanan,
-            aruco_detection_kanan,
+            # vision_capture_kanan,
+            # lane_detection_kanan,
+            # aruco_detection_kanan,
             # vision_capture_kiri,
             # lane_detection_kiri,
             # pose_estimator,
@@ -545,20 +545,20 @@ def generate_launch_description():
             # hokuyo_lidar_driver,
             # urg_node2_node_configure_event_handler,
             # urg_node2_node_activate_event_handler,
-            rosbridge_server, 
-            web_video_server,
-            # beckhoff,
-            master,
-            ui_server,
+            # rosbridge_server, 
+            # web_video_server,
+            beckhoff,
+            # master,
+            # ui_server,
 
-            joy_node,
+            # joy_node,
 
 
 
+            # rviz2,
             # vision_capture,
             # lane_detection,
             # livox_lidar_driver,
-            # rviz2,
             # TimerAction(
             #     period=4.0,
             #     actions=[

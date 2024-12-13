@@ -9,13 +9,52 @@
 
 #define EC_TIMEOUTMON 5000
 
-#define EL1809_ID 0x07113052
-#define EL3104_ID 0x0c203052
-#define EL3204_ID 0x0c843052
-#define EL5152_ID 0x14203052
-#define EL6751_ID 0x1a5f3052
-#define EL2008_ID 0x07d83052
-#define EL6021_ID 0x17853052
+#define EL6751_ID 0x1a5f3052 // CANopen
+#define EL2889_ID 0x0b493052 // Digital output
+#define EL3068_ID 0x0bfc3052 // Analog input
+#define EL4004_ID 0x0fa43052 // Analog output
+
+#define ANALOG_OUT_SCALER 3276.8f
+#define ANALOG_INPUT_SCALER 0.0003051757812f
+
+PACKED_BEGIN
+typedef struct
+{
+    uint16_t data;
+} digital_out_t;
+PACKED_END
+
+PACKED_BEGIN
+typedef struct
+{
+    uint16_t header_1;
+    int16_t data_1;
+    uint16_t header_2;
+    int16_t data_2;
+    uint16_t header_3;
+    int16_t data_3;
+    uint16_t header_4;
+    int16_t data_4;
+    uint16_t header_5;
+    int16_t data_5;
+    uint16_t header_6;
+    int16_t data_6;
+    uint16_t header_7;
+    int16_t data_7;
+    uint16_t header_8;
+    int16_t data_8;
+} analog_input_t;
+PACKED_END
+
+PACKED_BEGIN
+typedef struct
+{
+    int16_t data_1;
+    int16_t data_2;
+    int16_t data_3;
+    int16_t data_4;
+} analog_output_t;
+PACKED_END
 
 HelpLogger logger;
 
@@ -24,7 +63,9 @@ HelpLogger logger;
  */
 int scan_CANopen_Slaves(uint16_t slave)
 {
-    uint8_t _f002_1[2] = {0x01, 0x00};
+    // uint8_t _f002_1[2] = {0x01, 0x00};
+    // ec_SDOwrite(slave, 0xf002, 0x01, FALSE, sizeof(_f002_1), &_f002_1, EC_TIMEOUTRXM);
+    uint8_t _f002_1[2] = {0x01, 0x04};
     ec_SDOwrite(slave, 0xf002, 0x01, FALSE, sizeof(_f002_1), &_f002_1, EC_TIMEOUTRXM);
 
     logger.info("Wait...");
@@ -206,6 +247,7 @@ public:
     rclcpp::TimerBase::SharedPtr tim_50hz;
     rclcpp::Publisher<std_msgs::msg::Float32MultiArray>::SharedPtr pub_sensors;
     rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr pub_error_code;
+    rclcpp::Publisher<std_msgs::msg::Float32MultiArray>::SharedPtr pub_analog_input;
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr sub_master_actuator;
     rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_master_local_fsm;
     rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_master_global_fsm;
@@ -214,6 +256,12 @@ public:
     // =======================================================
     std::string if_name;
     int po2so_config = 0;
+
+    // DAta raw beckhoff
+    // =======================================================
+    digital_out_t *digital_out;
+    analog_input_t *analog_input;
+    analog_output_t *analog_output;
 
     // Vars
     // =======================================================
@@ -231,6 +279,8 @@ public:
     float fb_steering_angle = 0.3;
     uint16_t encoder_kiri = 0;
     uint16_t encoder_kanan = 0;
+
+    uint32_t counter_beckhoff_disconnect = 0;
 
     Beckhoff() : Node("beckhoff")
     {
@@ -253,11 +303,12 @@ public:
         }
 
         //----Timer
-        tim_50hz = this->create_wall_timer(std::chrono::milliseconds(20), std::bind(&Beckhoff::callback_tim_50hz, this));
+        tim_50hz = this->create_wall_timer(std::chrono::milliseconds(10), std::bind(&Beckhoff::callback_tim_50hz, this));
 
         //----Publisher
         pub_sensors = this->create_publisher<std_msgs::msg::Float32MultiArray>("/beckhoff/sensors", 1);
         pub_error_code = this->create_publisher<std_msgs::msg::Int16>("/beckhoff/error_code", 1);
+        pub_analog_input = this->create_publisher<std_msgs::msg::Float32MultiArray>("/beckhoff/analog_input", 1);
 
         //----Subscriber
         sub_master_actuator = this->create_subscription<std_msgs::msg::Float32MultiArray>(
@@ -291,19 +342,73 @@ public:
 
         if (wkc >= expectedWKC)
         {
-            std_msgs::msg::Float32MultiArray msg_sensors;
-            msg_sensors.data.push_back(fb_steering_angle);
-            pub_sensors->publish(msg_sensors);
+            counter_beckhoff_disconnect = 0;
+            test_digital_output();
+            test_analog_output();
+            test_analog_input();
+
             error_code = 0;
+
+            transmit_all();
         }
         else
         {
+            counter_beckhoff_disconnect++;
             error_code = 1;
+        }
+
+        if (counter_beckhoff_disconnect > 100)
+        {
+            logger.error("Computer LAN Wiring error");
+            rclcpp::shutdown();
         }
 
         std_msgs::msg::Int16 msg_error_code;
         msg_error_code.data = error_code;
         pub_error_code->publish(msg_error_code);
+    }
+
+    void transmit_all()
+    {
+        std_msgs::msg::Float32MultiArray msg_sensors;
+        msg_sensors.data.push_back(fb_steering_angle);
+        pub_sensors->publish(msg_sensors);
+
+        std_msgs::msg::Float32MultiArray msg_analog_input;
+        msg_analog_input.data.push_back((float)analog_input->data_1 * ANALOG_INPUT_SCALER);
+        msg_analog_input.data.push_back((float)analog_input->data_2 * ANALOG_INPUT_SCALER);
+        msg_analog_input.data.push_back((float)analog_input->data_3 * ANALOG_INPUT_SCALER);
+        msg_analog_input.data.push_back((float)analog_input->data_4 * ANALOG_INPUT_SCALER);
+        msg_analog_input.data.push_back((float)analog_input->data_5 * ANALOG_INPUT_SCALER);
+        msg_analog_input.data.push_back((float)analog_input->data_6 * ANALOG_INPUT_SCALER);
+        msg_analog_input.data.push_back((float)analog_input->data_7 * ANALOG_INPUT_SCALER);
+        msg_analog_input.data.push_back((float)analog_input->data_8 * ANALOG_INPUT_SCALER);
+        pub_analog_input->publish(msg_analog_input);
+    }
+
+    void test_digital_output()
+    {
+        static uint8_t status_blink = 1;
+        static uint16_t cntr = 0;
+
+        if (cntr++ > 100)
+        {
+            cntr = 0;
+            digital_out->data = status_blink;
+            status_blink = !status_blink;
+        }
+    }
+
+    void test_analog_output()
+    {
+        float voltase_target = 5.6;
+        analog_output->data_1 = (int16_t)(voltase_target * ANALOG_OUT_SCALER);
+    }
+
+    void test_analog_input()
+    {
+        float adc_1 = (float)analog_input->data_1 * ANALOG_INPUT_SCALER;
+        (void)adc_1;
     }
 
     int8_t init_beckhoff()
@@ -387,6 +492,27 @@ public:
 
                     ec_send_processdata();
                     ec_receive_processdata(EC_TIMEOUTRET);
+
+                    for (uint8_t slave = 1; slave <= ec_slavecount; slave++)
+                    {
+                        switch (ec_slave[slave].eep_id)
+                        {
+                        case EL2889_ID:
+                            digital_out = (digital_out_t *)ec_slave[slave].outputs;
+                            logger.info("EL2889 Configured");
+                            break;
+
+                        case EL3068_ID:
+                            analog_input = (analog_input_t *)ec_slave[slave].inputs;
+                            logger.info("EL3068 Configured");
+                            break;
+
+                        case EL4004_ID:
+                            analog_output = (analog_output_t *)ec_slave[slave].outputs;
+                            logger.info("EL4004 Configured");
+                            break;
+                        }
+                    }
                 }
 
                 return 0;
