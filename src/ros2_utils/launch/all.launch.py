@@ -201,7 +201,7 @@ def generate_launch_description():
         name='beckhoff',
         output='screen',
         parameters=[{
-            "if_name": "enx14ebb61965f4",
+            "if_name": "enx14ebb62fd665",
             "po2so_config": BECKHOFF_NORMAL
         }],
         respawn=True,

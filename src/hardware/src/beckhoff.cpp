@@ -163,8 +163,8 @@ int scan_CANopen_Slaves(uint16_t slave)
     }
 
     // Save ke EEPROM
-    uint32_t _1010 = 0x65766173;
-    ec_SDOwrite(slave, 0x1010, 0x01, TRUE, sizeof(_1010), &_1010, EC_TIMEOUTRXM);
+    uint32_t _f921 = 0x65766173;
+    ec_SDOwrite(slave, 0xf921, 0x01, TRUE, sizeof(_f921), &_f921, EC_TIMEOUTRXM);
 
     while (ec_iserror())
     {
@@ -388,27 +388,71 @@ public:
 
     void test_digital_output()
     {
-        static uint8_t status_blink = 1;
+        static uint16_t status_blink = 0b1010101010101010;
         static uint16_t cntr = 0;
 
         if (cntr++ > 100)
         {
             cntr = 0;
             digital_out->data = status_blink;
-            status_blink = !status_blink;
+            status_blink = ~status_blink;
         }
     }
 
     void test_analog_output()
     {
-        float voltase_target = 5.6;
+        float voltase_target = 1.23;
         analog_output->data_1 = (int16_t)(voltase_target * ANALOG_OUT_SCALER);
+        voltase_target = 2.34;
+        analog_output->data_2 = (int16_t)(voltase_target * ANALOG_OUT_SCALER);
+        voltase_target = 3.45;
+        analog_output->data_3 = (int16_t)(voltase_target * ANALOG_OUT_SCALER);
+        voltase_target = 4.56;
+        analog_output->data_4 = (int16_t)(voltase_target * ANALOG_OUT_SCALER);
     }
 
     void test_analog_input()
     {
         float adc_1 = (float)analog_input->data_1 * ANALOG_INPUT_SCALER;
         (void)adc_1;
+    }
+
+    uint8_t set_watchdog(uint16_t slave, uint16_t watchdog_time)
+    {
+        uint16_t multiplier;
+        int wc = ec_FPRD(ec_slave[slave].configadr, 0x400, 4, &multiplier, EC_TIMEOUTRXM);
+
+        if (wc > 0)
+        {
+            printf("Watchdog time multiplier: %d\n", multiplier);
+            double sf = (1.0 / 25.0) * (double)(multiplier + 2) / 1000.0;
+            uint16_t wv = (uint16_t)((double)watchdog_time / sf);
+
+            wc = ec_FPWR(ec_slave[slave].configadr, 0x420, 4, &wv, EC_TIMEOUTRXM);
+
+            if (wc > 0)
+            {
+                printf("Watchdog time set to %d ms\n", watchdog_time);
+            }
+            else
+            {
+                printf("Failed to set watchdog time\n");
+                return 0;
+            }
+        }
+        else
+        {
+            printf("Failed to read watchdog time multiplier\n");
+            return 0;
+        }
+
+        while (EcatError)
+        {
+            logger.warn("%s", ec_elist2string());
+            return 0;
+        }
+
+        return 1;
     }
 
     int8_t init_beckhoff()
@@ -454,6 +498,12 @@ public:
                 else if (3 == po2so_config)
                 {
                     ec_slave[slave_canopen_id].PO2SOconfig = &init_CAN_Startup;
+                }
+                // ============= CONFIGURE WATCHDOG =============
+                for (uint8_t slave = 1; slave <= ec_slavecount; slave++)
+                {
+                    logger.info("Setting watchdog for slave %d", slave);
+                    set_watchdog(slave, 100);
                 }
                 // ===================================================
 
