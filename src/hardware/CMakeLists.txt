@@ -18,13 +18,19 @@ include_directories(
 )
 
 add_executable(beckhoff src/beckhoff.cpp)
+add_executable(CANbus_HAL src/CANbus_HAL.cpp)
+
 ament_target_dependencies(beckhoff rclcpp std_msgs ros2_utils)
+ament_target_dependencies(CANbus_HAL rclcpp std_msgs ros2_utils)
+
 target_link_libraries(beckhoff /home/wildan/proyek/iris/SOEM/install/lib/libsoem.a)
 
 install(TARGETS
   beckhoff
+  CANbus_HAL
   DESTINATION lib/${PROJECT_NAME}
 )
+
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   # the following line skips the linter which checks for copyrights

@@ -12,7 +12,7 @@ let velocity_actuation = 0;
 let velocity_feedback = 0;
 let steering_actuation = 0;
 let steering_feedback = 0;
-let baterai_value = 45;
+let battery_value = 45;
 let global_fsm_value = 0;
 let master_fsm_value = 0;
 
@@ -66,6 +66,16 @@ var sub_master_local_fsm = new ROSLIB.Topic({
 
 sub_master_local_fsm.subscribe(function (message) {
     master_fsm_value = message.data;
+});
+
+var sub_battery = new ROSLIB.Topic({
+    ros: ros,
+    name: "/can/battery",
+    messageType: "std_msgs/Int16",
+});
+
+sub_battery.subscribe(function (message) {
+    battery_value = message.data;
 });
 
 
@@ -175,16 +185,16 @@ setInterval(() => {
     set_steering('.steering-circle1', '.steering-circle2', 'steering-text', steering_actuation_display, steering_feedback_display);
     steering_rad.textContent = `${steering_feedback.toFixed(2)} rad`;
 
-    if (baterai_value > 50) {
+    if (battery_value > 50) {
         batera_dom.className = "progress is-success"
     }
-    else if (baterai_value > 40) {
+    else if (battery_value > 40) {
         batera_dom.className = "progress is-warning"
     }
     else {
         batera_dom.className = "progress is-danger"
     }
-    batera_dom.value = baterai_value;
+    batera_dom.value = battery_value;
 
     control_display_fsm();
 

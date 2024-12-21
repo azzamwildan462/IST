@@ -2,33 +2,41 @@
 #include "rclcpp/rclcpp.hpp"
 #include "ros2_utils/global_definitions.hpp"
 #include "std_msgs/msg/int16.hpp"
+#include "std_msgs/msg/int32.hpp"
 #include "std_msgs/msg/string.hpp"
+#include "std_msgs/msg/float32.hpp"
 #include "tf2/LinearMath/Quaternion.h"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 #include "tf2_ros/buffer.h"
 #include "tf2_ros/transform_broadcaster.h"
 #include "tf2_ros/transform_listener.h"
 
-class PoseEstimator : public rclcpp::Node {
+class PoseEstimator : public rclcpp::Node
+{
 public:
     rclcpp::TimerBase::SharedPtr tim_50hz;
     rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr pub_odom;
     rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr pub_error_code;
+    rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr pub_encoder_meter;
+    rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr sub_encoder;
 
     //----TransformBroadcaster
     std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster;
 
     // Configs (static)
     // =======================================================
-    float encoder_to_meter = 1;
+    float encoder_to_meter = 1.0;
 
-    uint16_t encoder[2] = { 0, 0 };
-    uint16_t prev_encoder[2] = { 0, 0 };
+    uint16_t encoder[2] = {0, 0};
+    uint16_t prev_encoder[2] = {0, 0};
     float gyro = 0;
     float prev_gyro = 0;
 
-    float final_pose_xyo[3] = { 0, 0, 0 };
-    float final_vel_dxdydo[3] = { 0, 0, 0 };
+    float final_pose_xyo[3] = {0, 0, 0};
+    float final_vel_dxdydo[3] = {0, 0, 0};
+
+    int32_t sensor_left_encoder = 0;
+    int32_t sensor_right_encoder = 0;
 
     // Vars
     // =======================================================
@@ -38,7 +46,7 @@ public:
         : Node("master")
     {
         RCLCPP_INFO(this->get_logger(), "PoseEstimator init");
-        this->declare_parameter("encoder_to_meter", 0.231);
+        this->declare_parameter("encoder_to_meter", 1.0);
         this->get_parameter("encoder_to_meter", encoder_to_meter);
 
         tf_broadcaster = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
@@ -49,6 +57,20 @@ public:
         //----Publisher
         pub_odom = this->create_publisher<nav_msgs::msg::Odometry>("odom", 10);
         pub_error_code = this->create_publisher<std_msgs::msg::Int16>("error_code", 10);
+        pub_encoder_meter = this->create_publisher<std_msgs::msg::Float32>("encoder_meter", 1);
+
+        sub_encoder = this->create_subscription<std_msgs::msg::Int32>(
+            "/can/encoder", 1, std::bind(&PoseEstimator::callback_sub_encoder, this, std::placeholders::_1));
+    }
+
+    void callback_sub_encoder(const std_msgs::msg::Int32::SharedPtr msg)
+    {
+        sensor_left_encoder = msg->data * 0.5;
+        sensor_right_encoder = msg->data * 0.5;
+
+        std_msgs::msg::Float32 msg_encoder_meter;
+        msg_encoder_meter.data = msg->data * encoder_to_meter;
+        pub_encoder_meter->publish(msg_encoder_meter);
     }
 
     void callback_tim_50hz()
@@ -59,19 +81,23 @@ public:
         time_now = this->now();
         double dt = (time_now - time_old).seconds();
 
-        if (dt < FLT_EPSILON) {
+        if (dt < FLT_EPSILON)
+        {
             error_code = 1;
             return;
         }
 
-        int16_t d_left_encoder = encoder[0] - prev_encoder[0];
-        int16_t d_right_encoder = encoder[1] - prev_encoder[1];
+        /* Not used */
+        // int16_t d_left_encoder = encoder[0] - prev_encoder[0];
+        // int16_t d_right_encoder = encoder[1] - prev_encoder[1];
+        //======================================================
+
         float d_gyro = gyro - prev_gyro;
         memcpy(prev_encoder, encoder, sizeof(prev_encoder));
         prev_gyro = gyro;
 
-        final_vel_dxdydo[0] = (d_left_encoder + d_right_encoder) / 2.0 * cosf(final_pose_xyo[2]) * encoder_to_meter / dt;
-        final_vel_dxdydo[1] = (d_left_encoder + d_right_encoder) / 2.0 * sinf(final_pose_xyo[2]) * encoder_to_meter / dt;
+        final_vel_dxdydo[0] = (sensor_left_encoder + sensor_right_encoder) / 2.0 * cosf(final_pose_xyo[2]) * encoder_to_meter / dt;
+        final_vel_dxdydo[1] = (sensor_left_encoder + sensor_right_encoder) / 2.0 * sinf(final_pose_xyo[2]) * encoder_to_meter / dt;
         final_vel_dxdydo[2] = d_gyro;
 
         final_pose_xyo[0] += final_vel_dxdydo[0] * dt;
@@ -131,13 +157,13 @@ public:
     }
 };
 
-int main(int argc, char** argv)
+int main(int argc, char **argv)
 {
     rclcpp::init(argc, argv);
 
     auto node_pose_estimator = std::make_shared<PoseEstimator>();
 
-    rclcpp::executors::SingleThreadedExecutor executor;
+    rclcpp::executors::MultiThreadedExecutor executor;
     executor.add_node(node_pose_estimator);
     executor.spin();
 

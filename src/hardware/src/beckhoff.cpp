@@ -281,6 +281,7 @@ public:
     uint16_t encoder_kanan = 0;
 
     uint32_t counter_beckhoff_disconnect = 0;
+    uint8_t transmission = 0;
 
     Beckhoff() : Node("beckhoff")
     {
@@ -331,8 +332,27 @@ public:
 
     void callback_sub_master_actuator(const std_msgs::msg::Float32MultiArray::SharedPtr msg)
     {
+        static uint16_t counter_zero_velocity = 0;
         master_target_velocity = msg->data[0];
         master_taret_steering = msg->data[1];
+
+        if (master_target_velocity <= 0.1)
+        {
+            counter_zero_velocity++;
+        }
+        else
+        {
+            counter_zero_velocity = 0;
+        }
+
+        if (counter_zero_velocity > 50)
+        {
+            transmission = 1;
+        }
+        else
+        {
+            transmission = 3;
+        }
     }
 
     void callback_tim_50hz()
@@ -343,9 +363,12 @@ public:
         if (wkc >= expectedWKC)
         {
             counter_beckhoff_disconnect = 0;
+            // test_analog_output();
             test_digital_output();
-            test_analog_output();
             test_analog_input();
+
+            float velocity_target_voltage = fmaxf(0.0, master_target_velocity / 7.0 * 5.0);
+            analog_output->data_1 = (int16_t)(velocity_target_voltage * ANALOG_OUT_SCALER);
 
             error_code = 0;
 
@@ -424,7 +447,7 @@ public:
 
         if (wc > 0)
         {
-            printf("Watchdog time multiplier: %d\n", multiplier);
+            logger.info("Watchdog time multiplier: %d", multiplier);
             double sf = (1.0 / 25.0) * (double)(multiplier + 2) / 1000.0;
             uint16_t wv = (uint16_t)((double)watchdog_time / sf);
 
@@ -432,17 +455,17 @@ public:
 
             if (wc > 0)
             {
-                printf("Watchdog time set to %d ms\n", watchdog_time);
+                logger.info("Watchdog time set to %d ms", watchdog_time);
             }
             else
             {
-                printf("Failed to set watchdog time\n");
+                logger.error("Failed to set watchdog time\n");
                 return 0;
             }
         }
         else
         {
-            printf("Failed to read watchdog time multiplier\n");
+            logger.error("Failed to read watchdog time multiplier\n");
             return 0;
         }
 
@@ -466,22 +489,22 @@ public:
 
                 logger.info("%d slaves found and configured.", ec_slavecount);
 
-                for (uint8_t slave = 1; slave <= ec_slavecount; slave++)
-                {
-                    switch (ec_slave[slave].eep_id)
-                    {
-                    case EL6751_ID:
-                        slave_canopen_id = slave;
-                        logger.info("Slave Canopen ID: %d", slave_canopen_id);
-                        break;
-                    }
-                }
+                // for (uint8_t slave = 1; slave <= ec_slavecount; slave++)
+                // {
+                //     switch (ec_slave[slave].eep_id)
+                //     {
+                //     case EL6751_ID:
+                //         slave_canopen_id = slave;
+                //         logger.info("Slave Canopen ID: %d", slave_canopen_id);
+                //         break;
+                //     }
+                // }
 
-                if (slave_canopen_id == 255)
-                {
-                    logger.warn("No slave found with Canopen ID");
-                    return 4;
-                }
+                // if (slave_canopen_id == 255)
+                // {
+                //     logger.warn("No slave found with Canopen ID");
+                //     return 4;
+                // }
 
                 expectedWKC = (ec_group[0].outputsWKC * 2) + ec_group[0].inputsWKC;
                 logger.info("Calculated workcounter %d", expectedWKC);

@@ -135,7 +135,8 @@ void Master::manual_motion(float vx, float vy, float wz)
     }
     else
     {
-        actuation_vx = pid_vx.calculate(vx_buffer - fb_final_vel_dxdydo[0]);
+        // actuation_vx = pid_vx.calculate(vx_buffer - fb_final_vel_dxdydo[0]);
+        actuation_vx = vx_buffer; // Sementara untuk testing
         actuation_ay = 0;
         actuation_wz = wz_buffer;
     }

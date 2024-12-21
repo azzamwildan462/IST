@@ -20,6 +20,7 @@ from launch.substitutions import LaunchConfiguration
 BECKHOFF_NORMAL = int(3)
 BECKHOFF_DELETE_EEPROM = int(2)
 BECKHOFF_SCAN_SLAVES = int(1)
+BECKHOFF_NO_CONFIG = int(0)
 
 path_config_buffer = os.getenv('AMENT_PREFIX_PATH', '')
 path_config_buffer_split = path_config_buffer.split(":")
@@ -173,6 +174,9 @@ def generate_launch_description():
         executable='pose_estimator',
         name='pose_estimator',
         output='screen',
+        parameters=[{
+            "encoder_to_meter" : 0.0000006,
+        }],
         respawn=True,
         prefix='nice -n -9'
     )
@@ -201,12 +205,34 @@ def generate_launch_description():
         name='beckhoff',
         output='screen',
         parameters=[{
-            "if_name": "enx14ebb62fd665",
-            "po2so_config": BECKHOFF_NORMAL
+            "if_name": "enx207bd2083fbc",
+            "po2so_config": BECKHOFF_NO_CONFIG
         }],
         respawn=True,
         prefix='nice -n -20 chrt -f 99'
     )
+
+    CANbus_HAL = Node(
+        package='hardware',
+        executable='CANbus_HAL',
+        name='CANbus_HAL',
+        output='screen',
+        parameters=[{
+            "if_name": "can0",
+        }],
+        respawn=True,
+        prefix='nice -n -20 chrt -f 99'
+    )
+
+# CAnbus
+    # CANbus = Node(
+    #     package='hardware',
+    #     executable='CANbus',
+    #     name='CANbus',
+    #     output='screen',
+    #     parameters=[{}],
+    #     respawn=True,
+    # )
 
     # vision_capture = Node(
     #     package='vision',
@@ -535,7 +561,7 @@ def generate_launch_description():
             # aruco_detection_kanan,
             # vision_capture_kiri,
             # lane_detection_kiri,
-            # pose_estimator,
+            pose_estimator,
             # obstacle_filter,
             # tf_base_link_to_body_link,
             # tf_base_link_to_lidar1_link,
@@ -547,11 +573,13 @@ def generate_launch_description():
             # urg_node2_node_activate_event_handler,
             # rosbridge_server, 
             # web_video_server,
-            beckhoff,
-            # master,
+            # beckhoff,
+            CANbus_HAL,
+            # CANbus,
+            master,
             # ui_server,
 
-            # joy_node,
+            joy_node,
 
 
 
