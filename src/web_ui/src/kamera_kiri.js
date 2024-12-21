@@ -29,10 +29,10 @@ ros.on("close", function () {
 
 // DOM 
 const frame_kamera = document.getElementById("frame_kamera");
-frame_kamera.src = "http://" + window.location.hostname + ":8080/stream?topic=/cam_kiri/frame_display"
+frame_kamera.src = "http://" + window.location.hostname + ":8080/stream?topic=/lane_kiri/frame_display"
 
 const frame_binary = document.getElementById("frame_binary");
-frame_binary.src = "http://" + window.location.hostname + ":8080/stream?topic=/cam_kiri/frame_binary"
+frame_binary.src = "http://" + window.location.hostname + ":8080/stream?topic=/lane_kiri/frame_binary"
 
 const frame_aruco = document.getElementById("frame_aruco");
 frame_aruco.src = "http://" + window.location.hostname + ":8080/stream?topic=/aruco_kiri/frame_display"
@@ -118,7 +118,7 @@ req_params = new ROSLIB.ServiceRequest({
 
 ser_params = new ROSLIB.Service({
     ros: ros,
-    name: "/cam_kiri/params",
+    name: "/lane_kiri/params",
     serviceType: "ros2_interface/srv/Params",
 });
 

@@ -25,8 +25,22 @@ Detection:
     high_l: 255
     high_s: 255
   lane_kanan:
+    low_h: 21
+    low_l: 107
+    low_s: 0
+    high_h: 255
+    high_l: 255
+    high_s: 255
+  aruco_kiri:
     low_h: 27
     low_l: 153
+    low_s: 0
+    high_h: 255
+    high_l: 255
+    high_s: 255
+  lane_kiri:
+    low_h: 0
+    low_l: 150
     low_s: 0
     high_h: 255
     high_l: 255

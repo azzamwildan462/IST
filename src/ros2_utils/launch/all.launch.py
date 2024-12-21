@@ -140,6 +140,61 @@ def generate_launch_description():
         condition=IfCondition(LaunchConfiguration('auto_start')),
     )
 
+    rs2_cam_kiri = Node(
+        package="realsense2_camera",
+        executable="realsense2_camera_node",
+        name="rs2_cam_kiri",
+        namespace="cam_kiri",
+        parameters=[
+            {
+                "camera_name": "cam_kiri",
+                "camera_namespace": "cam_kiri",
+                "serial_no": "138322251962",
+                "enable_accel": True,
+                "enable_gyro": True,
+                "unite_imu_method": 2,
+                "align_depth.enable": True,
+                "pointcloud.enable": True,
+                "initial_reset": False,
+                "depth_module.depth_profile": "640x480x15",
+                "rgb_camera.color_profile": "640x480x15",
+                "rgb_camera.white_balance": False,
+            }
+        ],
+        remappings=[("/imu", "/imu_raw"), 
+                    ("/cam_kiri/rs2_cam_kiri/color/image_raw", "/cam_kiri/image_bgr"),],
+        arguments=["--ros-args", "--log-level", "error"],
+        respawn=True,
+        prefix='nice -n -20 chrt -f 96',
+    )
+
+    rs2_cam_kanan = Node(
+        package="realsense2_camera",
+        executable="realsense2_camera_node",
+        name="rs2_cam_kanan",
+        namespace="cam_kanan",
+        parameters=[
+            {
+                "camera_name": "cam_kanan",
+                "camera_namespace": "cam_kanan",
+                "serial_no": "146222253102",
+                "enable_accel": True,
+                "enable_gyro": True,
+                "unite_imu_method": 2,
+                "align_depth.enable": True,
+                "pointcloud.enable": True,
+                "initial_reset": False,
+                "depth_module.depth_profile": "640x480x15",
+                "rgb_camera.color_profile": "640x480x15",
+            }
+        ],
+        remappings=[("/imu", "/imu_raw"), 
+                    ("/cam_kanan/rs2_cam_kanan/color/image_raw", "/cam_kanan/image_bgr"),],
+        arguments=["--ros-args", "--log-level", "error"],
+        respawn=True,
+        prefix='nice -n -20 chrt -f 96',
+    )
+
     # =============================================================================
 
     ui_server = Node(
@@ -221,7 +276,7 @@ def generate_launch_description():
             "if_name": "can0",
         }],
         respawn=True,
-        prefix='nice -n -20 chrt -f 99'
+        prefix='nice -n -20 chrt -f 98'
     )
 
 # CAnbus
@@ -368,6 +423,7 @@ def generate_launch_description():
             "setpoint_x": 320,
             "setpoint_y": 240,
             "detect_aruco": True,
+            "use_frame_bgr": True,
             "aruco_dictionary_type": "DICT_4X4_50",
             "min_aruco_range": 100.0,
             "aruco_in_counter_threshold": 30,
@@ -556,12 +612,15 @@ def generate_launch_description():
 
     return LaunchDescription(
         [
+            rs2_cam_kiri,
+            rs2_cam_kanan,
             # vision_capture_kanan,
-            # lane_detection_kanan,
-            # aruco_detection_kanan,
+            lane_detection_kanan,
+            aruco_detection_kanan,
             # vision_capture_kiri,
-            # lane_detection_kiri,
-            pose_estimator,
+            lane_detection_kiri,
+            aruco_detection_kiri,
+            # pose_estimator,
             # obstacle_filter,
             # tf_base_link_to_body_link,
             # tf_base_link_to_lidar1_link,
@@ -571,15 +630,15 @@ def generate_launch_description():
             # hokuyo_lidar_driver,
             # urg_node2_node_configure_event_handler,
             # urg_node2_node_activate_event_handler,
-            # rosbridge_server, 
-            # web_video_server,
+            rosbridge_server, 
+            web_video_server,
             # beckhoff,
-            CANbus_HAL,
+            # CANbus_HAL,
             # CANbus,
-            master,
-            # ui_server,
+            # master,
+            ui_server,
 
-            joy_node,
+            # joy_node,
 
 
 
