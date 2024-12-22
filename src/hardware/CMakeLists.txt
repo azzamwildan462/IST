@@ -5,6 +5,8 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
+set(CURRENT_WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
@@ -14,7 +16,7 @@ find_package(ros2_utils REQUIRED)
 include_directories(
   include
   /usr/local/include
-  /home/wildan/proyek/iris/SOEM/install/include
+  ${CURRENT_WORKING_DIRECTORY}/../../SOEM_local/install/include
 )
 
 add_executable(beckhoff src/beckhoff.cpp)
@@ -23,7 +25,7 @@ add_executable(CANbus_HAL src/CANbus_HAL.cpp)
 ament_target_dependencies(beckhoff rclcpp std_msgs ros2_utils)
 ament_target_dependencies(CANbus_HAL rclcpp std_msgs ros2_utils)
 
-target_link_libraries(beckhoff /home/wildan/proyek/iris/SOEM/install/lib/libsoem.a)
+target_link_libraries(beckhoff ${CURRENT_WORKING_DIRECTORY}/../../SOEM_local/install/lib/libsoem.a)
 
 install(TARGETS
   beckhoff
