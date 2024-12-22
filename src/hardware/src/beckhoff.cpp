@@ -16,7 +16,7 @@
 
 #define ANALOG_OUT_SCALER 3276.8f
 #define ANALOG_INPUT_SCALER 0.0003051757812f
-#define ANALOG_OUTPUT_SCALER 0.0196078431f
+#define LSB_VALUE 0.0196078431f
 
 PACKED_BEGIN
 typedef struct
@@ -355,7 +355,7 @@ public:
             fb_throttle_velocity_volt = (float)analog_input->data_1 * ANALOG_INPUT_SCALER;
 
             // Normalize from 0 - 7 to 143 - 0
-            float velocity_target_voltage = 143 - fmin(fmax(143 * master_target_velocity / 7, 0), 143);
+            float velocity_target_voltage = (143 - fmin(fmax(143 * master_target_velocity / 7, 0), 143)) * LSB_VALUE;
             lpf_velocity_target_voltage = 0.9 * lpf_velocity_target_voltage + 0.1 * velocity_target_voltage;
             analog_output->data_1 = (int16_t)(velocity_target_voltage * ANALOG_OUT_SCALER);
 
