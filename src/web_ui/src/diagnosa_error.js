@@ -255,6 +255,31 @@ const nodes = [
             2: 'Check Lidar data',
             // Add more Obstacle Filter error codes and solutions
         }
+    },
+    {
+        id: 'canbus',
+        topic: '/can/error_code',
+        messageType: 'std_msgs/Int16',
+        sectionId: 'canbus-section',
+        tableId: 'canbus-error-body',
+        errorCodes: {
+            99: 'Node is not running',
+            0: 'No error',
+            1: 'Connection error',
+            2: 'Failed to read CAN frame',
+            3: 'Select error',
+            4: 'Read timeout',
+            // Add more CANbus error codes and descriptions
+        },
+        errorSolutions: {
+            99: 'Start the node',
+            0: 'No action needed',
+            1: 'Check connection',
+            2: 'Check CAN frame',
+            3: 'Check select function',
+            4: 'Check read timeout',
+            // Add more CANbus error codes and solutions
+        }
     }
     // Add more nodes as needed
 ];

@@ -12,13 +12,13 @@
 #include "ros2_utils/help_marker.hpp"
 #include "ros2_utils/pid.hpp"
 #include "ros2_utils/simple_fsm.hpp"
+#include "sensor_msgs/msg/joy.hpp"
 #include "std_msgs/msg/bool.hpp"
 #include "std_msgs/msg/float32.hpp"
 #include "std_msgs/msg/float32_multi_array.hpp"
 #include "std_msgs/msg/int16.hpp"
 #include "tf2/LinearMath/Quaternion.h"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
-#include "sensor_msgs/msg/joy.hpp"
 
 #define FSM_GLOBAL_INIT 0
 #define FSM_GLOBAL_PREOP 1
@@ -30,8 +30,7 @@
 #define FSM_LOCAL_MENUNGGU_STATION_1 2
 #define FSM_LOCAL_MENUNGGU_STATION_2 3
 
-class Master : public rclcpp::Node
-{
+class Master : public rclcpp::Node {
 public:
     rclcpp::TimerBase::SharedPtr tim_50hz;
     rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr pub_initialpose;
@@ -59,6 +58,7 @@ public:
     rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_error_code_obstacle_filter;
     rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_error_code_aruco_kiri;
     rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_error_code_aruco_kanan;
+    rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_error_code_can;
     rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr sub_joy;
 
     // Configs
@@ -91,6 +91,7 @@ public:
     int16_t error_code_obstacle_filter = 0;
     int16_t error_code_aruco_kiri = 0;
     int16_t error_code_aruco_kanan = 0;
+    int16_t error_code_can = 0;
 
     float cam_kiri_pid_output = 0;
     float cam_kiri_pid_setpoint = 0;
@@ -171,6 +172,7 @@ public:
     void callback_sub_error_code_obstacle_filter(const std_msgs::msg::Int16::SharedPtr msg);
     void callback_sub_error_code_aruco_kiri(const std_msgs::msg::Int16::SharedPtr msg);
     void callback_sub_error_code_aruco_kanan(const std_msgs::msg::Int16::SharedPtr msg);
+    void callback_sub_error_code_can(const std_msgs::msg::Int16::SharedPtr msg);
 
     // Process
     // ===============================================================================================

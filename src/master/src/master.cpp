@@ -4,8 +4,7 @@
 Master::Master()
     : Node("master")
 {
-    if (!logger.init())
-    {
+    if (!logger.init()) {
         RCLCPP_ERROR(this->get_logger(), "Failed to initialize logger");
         rclcpp::shutdown();
     }
@@ -56,6 +55,8 @@ Master::Master()
         "/cam_kanan/error_code", 1, std::bind(&Master::callback_sub_error_code_aruco_kanan, this, std::placeholders::_1));
     sub_joy = this->create_subscription<sensor_msgs::msg::Joy>(
         "/joy", 1, std::bind(&Master::callback_sub_joy, this, std::placeholders::_1));
+    sub_error_code_can = this->create_subscription<std_msgs::msg::Int16>(
+        "/can/error_code", 1, std::bind(&Master::callback_sub_error_code_can, this, std::placeholders::_1));
 
     if (use_ekf_odometry)
         sub_odometry = this->create_subscription<nav_msgs::msg::Odometry>(
@@ -207,10 +208,14 @@ void Master::callback_sub_error_code_aruco_kanan(const std_msgs::msg::Int16::Sha
     error_code_aruco_kanan = msg->data;
 }
 
+void Master::callback_sub_error_code_can(const std_msgs::msg::Int16::SharedPtr msg)
+{
+    error_code_can = msg->data;
+}
+
 void Master::callback_tim_50hz()
 {
-    if (!marker.init(this->shared_from_this()))
-    {
+    if (!marker.init(this->shared_from_this())) {
         rclcpp::shutdown();
     }
 
@@ -218,25 +223,20 @@ void Master::callback_tim_50hz()
 
     process_marker();
 
-    switch (global_fsm.value)
-    {
+    switch (global_fsm.value) {
     /**
      * Pre-operation
      * Keadaan ini memastikan semua sistem tidak ada error
      */
     case FSM_GLOBAL_PREOP:
-        if (error_code_beckhoff + error_code_cam_kiri + error_code_cam_kanan + error_code_lidar + error_code_pose_estimator + error_code_obstacle_filter + error_code_aruco_kiri + error_code_aruco_kanan == 0)
-        {
+        if (error_code_beckhoff + error_code_cam_kiri + error_code_cam_kanan + error_code_lidar + error_code_pose_estimator + error_code_obstacle_filter + error_code_aruco_kiri + error_code_aruco_kanan + error_code_can == 0) {
             local_fsm.value = 0;
             global_fsm.value = FSM_GLOBAL_SAFEOP;
         }
 
-        if (fabs(target_velocity_joy_x) > 0.1 || fabs(target_velocity_joy_y) > 0.1 || fabs(target_velocity_joy_wz) > 0.1)
-        {
+        if (fabs(target_velocity_joy_x) > 0.1 || fabs(target_velocity_joy_y) > 0.1 || fabs(target_velocity_joy_wz) > 0.1) {
             manual_motion(target_velocity_joy_x, target_velocity_joy_y, target_velocity_joy_wz);
-        }
-        else
-        {
+        } else {
             manual_motion(-20, 0, 0);
         }
         break;
@@ -246,8 +246,7 @@ void Master::callback_tim_50hz()
      * Memastikan semua data bisa diterima
      */
     case FSM_GLOBAL_SAFEOP:
-        if (error_code_beckhoff + error_code_cam_kiri + error_code_cam_kanan + error_code_lidar + error_code_pose_estimator + error_code_obstacle_filter + error_code_aruco_kiri + error_code_aruco_kanan > 0)
-        {
+        if (error_code_beckhoff + error_code_cam_kiri + error_code_cam_kanan + error_code_lidar + error_code_pose_estimator + error_code_obstacle_filter + error_code_aruco_kiri + error_code_aruco_kanan + error_code_can > 0) {
             global_fsm.value = FSM_GLOBAL_PREOP;
         }
 
@@ -262,8 +261,7 @@ void Master::callback_tim_50hz()
             rclcpp::Duration dt_aruco_kanan = current_time - last_time_aruco_kanan;
 
             // Jika sudah berhasil menerima semua data yang diperlukan
-            if (dt_pose_estimator.seconds() < 1 && dt_cam_kiri.seconds() < 1 && dt_cam_kanan.seconds() < 1 && dt_obstacle_filter.seconds() < 1 && dt_beckhoff.seconds() < 1 && dt_lidar.seconds() < 1 && dt_aruco_kiri.seconds() < 1 && dt_aruco_kanan.seconds() < 1)
-            {
+            if (dt_pose_estimator.seconds() < 1 && dt_cam_kiri.seconds() < 1 && dt_cam_kanan.seconds() < 1 && dt_obstacle_filter.seconds() < 1 && dt_beckhoff.seconds() < 1 && dt_lidar.seconds() < 1 && dt_aruco_kiri.seconds() < 1 && dt_aruco_kanan.seconds() < 1) {
                 target_velocity_joy_x = 0;
                 target_velocity_joy_y = 0;
                 target_velocity_joy_wz = 0;
@@ -273,12 +271,9 @@ void Master::callback_tim_50hz()
             }
         }
 
-        if (fabs(target_velocity_joy_x) > 0.1 || fabs(target_velocity_joy_y) > 0.1 || fabs(target_velocity_joy_wz) > 0.1)
-        {
+        if (fabs(target_velocity_joy_x) > 0.1 || fabs(target_velocity_joy_y) > 0.1 || fabs(target_velocity_joy_wz) > 0.1) {
             manual_motion(target_velocity_joy_x, target_velocity_joy_y, target_velocity_joy_wz);
-        }
-        else
-        {
+        } else {
             manual_motion(-20, 0, 0);
         }
         break;
@@ -288,8 +283,7 @@ void Master::callback_tim_50hz()
      * Sistem beroperasi secara otomatis
      */
     case FSM_GLOBAL_OP:
-        if (error_code_beckhoff + error_code_cam_kiri + error_code_cam_kanan + error_code_lidar + error_code_pose_estimator + error_code_obstacle_filter + error_code_aruco_kiri + error_code_aruco_kanan > 0)
-        {
+        if (error_code_beckhoff + error_code_cam_kiri + error_code_cam_kanan + error_code_lidar + error_code_pose_estimator + error_code_obstacle_filter + error_code_aruco_kiri + error_code_aruco_kanan + error_code_can > 0) {
             global_fsm.value = FSM_GLOBAL_PREOP;
         }
         process_local_fsm();
@@ -301,7 +295,7 @@ void Master::callback_tim_50hz()
 
 // ===============================================================================================
 
-int main(int argc, char **argv)
+int main(int argc, char** argv)
 {
     rclcpp::init(argc, argv);
 

@@ -1,33 +1,34 @@
 #include "rclcpp/rclcpp.hpp"
-#include "std_msgs/msg/string.hpp"
 #include "ros2_utils/global_definitions.hpp"
 #include "ros2_utils/help_logger.hpp"
 #include "std_msgs/msg/int16.hpp"
-#include "std_msgs/msg/u_int16.hpp"
 #include "std_msgs/msg/int32.hpp"
+#include "std_msgs/msg/string.hpp"
+#include "std_msgs/msg/u_int16.hpp"
 #include "std_msgs/msg/u_int8.hpp"
 
-#include <cstring>
+#include <cerrno>
 #include <cstdio>
+#include <cstring>
+#include <fcntl.h>
+#include <ros2_utils/global_definitions.hpp>
 #include <stdint.h>
 #include <unistd.h>
-#include <fcntl.h>
-#include <cerrno>
 
+#include <linux/can.h>
+#include <linux/can/raw.h>
 #include <net/if.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
-#include <linux/can.h>
-#include <linux/can/raw.h>
 
-class CANbus_HAL : public rclcpp::Node
-{
+class CANbus_HAL : public rclcpp::Node {
 public:
     rclcpp::TimerBase::SharedPtr tim_50hz;
     rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr pub_battery;
     rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr pub_encoder;
     rclcpp::Publisher<std_msgs::msg::UInt8>::SharedPtr pub_fb_tps_accelerator;
     rclcpp::Publisher<std_msgs::msg::UInt8>::SharedPtr pub_fb_transmission;
+    rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr pub_error_code;
 
     HelpLogger logger;
     int error_code = 0;
@@ -44,7 +45,8 @@ public:
     uint8_t fb_tps_accelerator = 0;
     uint8_t fb_transmission = 0;
 
-    CANbus_HAL() : Node("CANbus_HAL")
+    CANbus_HAL()
+        : Node("CANbus_HAL")
     {
         this->declare_parameter("if_name", "can0");
         this->get_parameter("if_name", if_name);
@@ -60,9 +62,9 @@ public:
         pub_encoder = this->create_publisher<std_msgs::msg::Int32>("/can/encoder", 1);
         pub_fb_tps_accelerator = this->create_publisher<std_msgs::msg::UInt8>("/can/fb_tps_accelerator", 1);
         pub_fb_transmission = this->create_publisher<std_msgs::msg::UInt8>("/can/fb_transmission", 1);
+        pub_error_code = this->create_publisher<std_msgs::msg::Int16>("/can/error_code", 1);
 
-        if (!logger.init())
-        {
+        if (!logger.init()) {
             RCLCPP_ERROR(this->get_logger(), "Failed to initialize logger");
             rclcpp::shutdown();
         }
@@ -71,12 +73,11 @@ public:
         sprintf(cmd, "sudo ip link set %s up type can bitrate %d", if_name.c_str(), bitrate);
         system(cmd);
 
-        socket_can = can_init(if_name.c_str());
-        if (socket_can < 0)
-        {
-            RCLCPP_ERROR(this->get_logger(), "Failed to initialize CAN interface");
-            rclcpp::shutdown();
-        }
+        // socket_can = can_init(if_name.c_str());
+        // if (socket_can < 0) {
+        //     RCLCPP_ERROR(this->get_logger(), "Failed to initialize CAN interface");
+        //     rclcpp::shutdown();
+        // }
 
         logger.info("CANbus_HAL init success");
     }
@@ -100,6 +101,10 @@ public:
         std_msgs::msg::UInt8 msg_fb_transmission;
         msg_fb_transmission.data = fb_transmission;
         pub_fb_transmission->publish(msg_fb_transmission);
+
+        std_msgs::msg::Int16 msg_error_code;
+        msg_error_code.data = error_code;
+        pub_error_code->publish(msg_error_code);
     }
 
     void parse_can_frame()
@@ -121,31 +126,37 @@ public:
         // Wait for data to be available on the set
         retval = select(socket_can + 1, &read_fds, NULL, NULL, &timeout);
 
-        if (retval == -1 || retval == 0)
-        {
+        if (retval == -1) {
+            error_code = 2;
+            logger.error("Select error on CAN socket");
+            return;
+        } else if (retval == 0) {
+            error_code = 3;
+            logger.warn("CAN socket read timeout");
             return;
         }
 
-        if (read(socket_can, &frame, sizeof(struct can_frame)) < 0)
-        {
+        if (read(socket_can, &frame, sizeof(struct can_frame)) < 0) {
+            error_code = 1;
             logger.error("Error reading CAN frame");
+            return;
+        }
+
+        // Check if the connection is broken
+        if (frame.can_id == 0x000) {
+            error_code = 4;
+            logger.error("CAN connection broken");
+            return;
         }
 
         // Check if the response is from the expected node
-        if (frame.can_id == 0x388)
-        {
+        if (frame.can_id == 0x388) {
             encoder = frame.data[2] | (frame.data[3] << 8);
-        }
-        else if (frame.can_id == 0x109)
-        {
+        } else if (frame.can_id == 0x109) {
             battery = frame.data[1] + 1;
-        }
-        else if (frame.can_id == 0x101)
-        {
+        } else if (frame.can_id == 0x101) {
             fb_tps_accelerator = frame.data[2];
-        }
-        else if (frame.can_id == 0x18C)
-        {
+        } else if (frame.can_id == 0x18C) {
             /**
              * F-N-R = 1-3-5
              */
@@ -163,14 +174,12 @@ public:
         fcntl(s, F_SETFL, flags | O_NONBLOCK);
 
         // Read and discard all frames
-        while ((nbytes = read(s, &frame, sizeof(struct can_frame))) > 0)
-        {
+        while ((nbytes = read(s, &frame, sizeof(struct can_frame))) > 0) {
             // Frame read and discarded
         }
 
         // Check for read error
-        if (nbytes < 0 && errno != EAGAIN)
-        {
+        if (nbytes < 0 && errno != EAGAIN) {
             perror("Error clearing CAN receive buffer");
             return -1;
         }
@@ -181,14 +190,13 @@ public:
         return 0;
     }
 
-    int8_t can_init(const char *interface)
+    int8_t can_init(const char* interface)
     {
         int8_t s;
         struct sockaddr_can addr;
         struct ifreq ifr;
 
-        if ((s = socket(PF_CAN, SOCK_RAW, CAN_RAW)) < 0)
-        {
+        if ((s = socket(PF_CAN, SOCK_RAW, CAN_RAW)) < 0) {
             perror("Error while opening socket");
             return -1;
         }
@@ -199,8 +207,7 @@ public:
         addr.can_family = AF_CAN;
         addr.can_ifindex = ifr.ifr_ifindex;
 
-        if (bind(s, (struct sockaddr *)&addr, sizeof(addr)) < 0)
-        {
+        if (bind(s, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
             perror("Error in socket bind");
             return -1;
         }
@@ -209,7 +216,7 @@ public:
     }
 };
 
-int main(int argc, char **argv)
+int main(int argc, char** argv)
 {
     rclcpp::init(argc, argv);
 

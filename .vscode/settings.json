@@ -78,5 +78,7 @@
         "*.ipp": "cpp",
         "any": "cpp"
     },
-    "ros.distro": "noetic"
+    "ros.distro": "noetic",
+    "C_Cpp.default.compilerPath": "/usr/bin/g++",
+    "C_Cpp.errorSquiggles": "disabled"
 }

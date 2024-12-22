@@ -612,14 +612,14 @@ def generate_launch_description():
 
     return LaunchDescription(
         [
-            rs2_cam_kiri,
-            rs2_cam_kanan,
+            # rs2_cam_kiri,
+            # rs2_cam_kanan,
             # vision_capture_kanan,
-            lane_detection_kanan,
-            aruco_detection_kanan,
+            # lane_detection_kanan,
+            # aruco_detection_kanan,
             # vision_capture_kiri,
-            lane_detection_kiri,
-            aruco_detection_kiri,
+            # lane_detection_kiri,
+            # aruco_detection_kiri,
             # pose_estimator,
             # obstacle_filter,
             # tf_base_link_to_body_link,

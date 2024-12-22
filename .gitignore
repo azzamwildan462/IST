@@ -2,3 +2,4 @@ install/
 build/ 
 log/
 Livox-SDK2/build/
+.vscode/

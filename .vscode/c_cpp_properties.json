@@ -5,14 +5,17 @@
             "includePath": [
                 "${workspaceFolder}/**",
                 "/opt/ros/humble/include/**",
+                "/home/her/ros2_humble/install/**",
+                "/home/her/ros2_humble/build/**",
                 "/opt/ros/humble/lib/**",
-                "/home/wildan/proyek/iris/SOEM/install/include/**",
                 "/usr/include/opencv4/**",
                 "/usr/include/pcl-1.12/**",
-                "/usr/include/eigen3/**"
+                "/usr/include/eigen3/**",
+                "${workspaceFolder}/src/**",
+                "${workspaceFolder}/build/**",
             ],
             "defines": [],
-            "compilerPath": "/usr/bin/clang-13",
+            "compilerPath": null,
             "cStandard": "c17",
             "cppStandard": "c++14",
             "intelliSenseMode": "linux-clang-x64"
