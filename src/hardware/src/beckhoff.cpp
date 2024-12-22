@@ -256,6 +256,7 @@ public:
     // =======================================================
     std::string if_name;
     int po2so_config = 0;
+    float speed_to_volt = 0.7;
 
     // DAta raw beckhoff
     // =======================================================
@@ -273,12 +274,14 @@ public:
     float master_taret_steering = 0;  // rad
     int16_t master_local_fsm = 0;
     int16_t master_global_fsm = 0;
+    float lpf_velocity_target_voltage = 0.0;
 
     int16_t error_code = 0;
 
     float fb_steering_angle = 0.3;
-    uint16_t encoder_kiri = 0;
-    uint16_t encoder_kanan = 0;
+    float fb_throttle_velocity_volt = 0.0;
+    uint8_t fb_foot_brake_switch = 0;
+    uint8_t fb_foot_velocity_switch = 0;
 
     uint32_t counter_beckhoff_disconnect = 0;
     uint8_t transmission = 0;
@@ -290,6 +293,9 @@ public:
 
         this->declare_parameter("po2so_config", 0);
         this->get_parameter("po2so_config", po2so_config);
+
+        this->declare_parameter("speed_to_volt", 0.7);
+        this->get_parameter("speed_to_volt", speed_to_volt);
 
         if (!logger.init())
         {
@@ -367,7 +373,10 @@ public:
             test_digital_output();
             test_analog_input();
 
-            float velocity_target_voltage = fmaxf(0.0, master_target_velocity / 7.0 * 5.0);
+            fb_throttle_velocity_volt = (float)analog_input->data_1 * ANALOG_INPUT_SCALER;
+
+            float velocity_target_voltage = fminf(5.0, fmaxf(0.0, (master_target_velocity - 143) * speed_to_volt / (0 - 143)));
+            lpf_velocity_target_voltage = 0.9 * lpf_velocity_target_voltage + 0.1 * velocity_target_voltage;
             analog_output->data_1 = (int16_t)(velocity_target_voltage * ANALOG_OUT_SCALER);
 
             error_code = 0;

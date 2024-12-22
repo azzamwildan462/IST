@@ -5,6 +5,7 @@
 #include "std_msgs/msg/int16.hpp"
 #include "std_msgs/msg/u_int16.hpp"
 #include "std_msgs/msg/int32.hpp"
+#include "std_msgs/msg/u_int8.hpp"
 
 #include <cstring>
 #include <cstdio>
@@ -25,6 +26,8 @@ public:
     rclcpp::TimerBase::SharedPtr tim_50hz;
     rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr pub_battery;
     rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr pub_encoder;
+    rclcpp::Publisher<std_msgs::msg::UInt8>::SharedPtr pub_fb_tps_accelerator;
+    rclcpp::Publisher<std_msgs::msg::UInt8>::SharedPtr pub_fb_transmission;
 
     HelpLogger logger;
     int error_code = 0;
@@ -55,6 +58,8 @@ public:
         //----Publiher
         pub_battery = this->create_publisher<std_msgs::msg::Int16>("/can/battery", 1);
         pub_encoder = this->create_publisher<std_msgs::msg::Int32>("/can/encoder", 1);
+        pub_fb_tps_accelerator = this->create_publisher<std_msgs::msg::UInt8>("/can/fb_tps_accelerator", 1);
+        pub_fb_transmission = this->create_publisher<std_msgs::msg::UInt8>("/can/fb_transmission", 1);
 
         if (!logger.init())
         {
@@ -87,6 +92,14 @@ public:
         std_msgs::msg::Int32 msg_encoder;
         msg_encoder.data = encoder;
         pub_encoder->publish(msg_encoder);
+
+        std_msgs::msg::UInt8 msg_fb_tps_accelerator;
+        msg_fb_tps_accelerator.data = fb_tps_accelerator;
+        pub_fb_tps_accelerator->publish(msg_fb_tps_accelerator);
+
+        std_msgs::msg::UInt8 msg_fb_transmission;
+        msg_fb_transmission.data = fb_transmission;
+        pub_fb_transmission->publish(msg_fb_transmission);
     }
 
     void parse_can_frame()
@@ -115,7 +128,6 @@ public:
 
         if (read(socket_can, &frame, sizeof(struct can_frame)) < 0)
         {
-            perror("Read");
             logger.error("Error reading CAN frame");
         }
 
