@@ -1,0 +1,12 @@
+wr_ls1207de:
+  ros__parameters:
+    frame_id: "laser"
+    range_min: 0.01
+    range_max: 30.0
+    #min_ang:  -2.18
+    #max_ang:  2.18
+    min_ang:  -2.356194
+    max_ang:  2.356194
+    hostname: "192.168.0.10"
+   # checkframe: True
+

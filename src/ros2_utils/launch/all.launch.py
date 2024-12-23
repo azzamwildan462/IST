@@ -195,6 +195,30 @@ def generate_launch_description():
         prefix='nice -n -20 chrt -f 96',
     )
 
+    witty_lidar = Node(
+        package="wr_ls_udp",
+        executable="wr_ls_udp",
+        parameters=[
+            {"frame_id": "lidar2_link"},
+            {"range_min": 0.01},
+            {"range_max": 20.0},
+            {"hostname": "192.168.0.10"},
+            {"port": "2112" },
+            {"timelimit": 5},
+            {"checkframe": True},
+            {"min_ang": -2.357},
+            {"max_ang": 2.357},
+            {"intensity": 1},
+            {"skip": 0},
+            {"time_offset": -0.001},
+            {"auto_reboot": False},
+            {"debug_mode": False},
+            {"time_increment": 0.000061722},
+            {"angle_resolution": 0.25}
+        ],
+        output='screen'
+    )
+
     # =============================================================================
 
     ui_server = Node(
@@ -248,7 +272,7 @@ def generate_launch_description():
             "scan_r_max": 2.00,
             "publish_filtered_lidar": True,
             "lidar_topic": "/scan", 
-            "use_pointcloud2": False, # Untuk hokuyo
+            "use_pointcloud2": False, # Untuk hokuyo atau witty
         }],
         respawn=True,
         prefix='nice -n -8'
@@ -620,23 +644,28 @@ def generate_launch_description():
             # vision_capture_kiri,
             # lane_detection_kiri,
             # aruco_detection_kiri,
+
             # pose_estimator,
-            # obstacle_filter,
             # tf_base_link_to_body_link,
             # tf_base_link_to_lidar1_link,
-            # tf_base_link_to_lidar2_link,
-            # tf_map_empty,
+            tf_base_link_to_lidar2_link,
+            tf_map_empty,
+
+            witty_lidar,
             # DeclareLaunchArgument('auto_start', default_value='true'),
             # hokuyo_lidar_driver,
             # urg_node2_node_configure_event_handler,
             # urg_node2_node_activate_event_handler,
-            rosbridge_server, 
-            web_video_server,
+            obstacle_filter,
+
+            # rosbridge_server, 
+            # web_video_server,
+
             # beckhoff,
             # CANbus_HAL,
-            # CANbus,
+
             # master,
-            ui_server,
+            # ui_server,
 
             # joy_node,
 

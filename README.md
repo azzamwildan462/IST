@@ -4,6 +4,7 @@
 ```
 sudo apt install ros-humble-rosbridge-server
 sudo apt install ros-humble-rosbridge-suite
+sudo apt install ros-humble-web-video-server
 sudo apt install libyaml-cpp-dev 
 sudo apt install ros-humble-joy
 

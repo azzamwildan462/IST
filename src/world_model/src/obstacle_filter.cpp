@@ -143,7 +143,7 @@ public:
             }
         }
 
-        logger.info("ObstacleFilter init success");
+        logger.info("ObstacleFilter init success, lidar on %s (%d)", lidar_topic.c_str(),use_pointcloud2);
     }
 
     void callback_sub_lidar_laserscan(const sensor_msgs::msg::LaserScan::SharedPtr msg)
