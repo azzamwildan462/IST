@@ -21,15 +21,18 @@ include_directories(
 
 add_executable(beckhoff src/beckhoff.cpp)
 add_executable(CANbus_HAL src/CANbus_HAL.cpp)
+add_executable(serial_imu src/serial_imu.cpp)
 
 ament_target_dependencies(beckhoff rclcpp std_msgs ros2_utils)
 ament_target_dependencies(CANbus_HAL rclcpp std_msgs ros2_utils)
+ament_target_dependencies(serial_imu rclcpp std_msgs ros2_utils)
 
 target_link_libraries(beckhoff ${CURRENT_WORKING_DIRECTORY}/../../SOEM_local/install/lib/libsoem.a)
 
 install(TARGETS
   beckhoff
   CANbus_HAL
+  serial_imu
   DESTINATION lib/${PROJECT_NAME}
 )
 
