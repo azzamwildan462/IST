@@ -12,6 +12,8 @@ Panels:
         - /PointCloud21/Topic1
         - /LaserScan1
         - /PointCloud23
+        - /Imu1
+        - /Imu1/Status1
       Splitter Ratio: 0.5
     Tree Height: 656
   - Class: rviz_common/Selection
@@ -31,7 +33,7 @@ Panels:
     Experimental: false
     Name: Time
     SyncMode: 0
-    SyncSource: LaserScan
+    SyncSource: ""
 Visualization Manager:
   Class: ""
   Displays:
@@ -60,13 +62,7 @@ Visualization Manager:
         All Enabled: true
         base_link:
           Value: true
-        body_link:
-          Value: true
-        laser:
-          Value: true
-        lidar1_link:
-          Value: true
-        lidar2_link:
+        imu_link:
           Value: true
         map:
           Value: true
@@ -78,24 +74,19 @@ Visualization Manager:
       Show Axes: true
       Show Names: false
       Tree:
+        base_link:
+          imu_link:
+            {}
         map:
           odom:
-            base_link:
-              body_link:
-                {}
-              laser:
-                {}
-              lidar1_link:
-                {}
-              lidar2_link:
-                {}
+            {}
       Update Interval: 0
       Value: true
     - Class: rviz_default_plugins/MarkerArray
       Enabled: true
       Name: MarkerArray
       Namespaces:
-        body: true
+        {}
       Topic:
         Depth: 5
         Durability Policy: Volatile
@@ -260,10 +251,38 @@ Visualization Manager:
       Use Fixed Frame: true
       Use rainbow: true
       Value: false
+    - Acceleration properties:
+        Acc. vector alpha: 1
+        Acc. vector color: 255; 0; 0
+        Acc. vector scale: 1
+        Derotate acceleration: true
+        Enable acceleration: false
+      Axes properties:
+        Axes scale: 1
+        Enable axes: true
+      Box properties:
+        Box alpha: 1
+        Box color: 255; 0; 0
+        Enable box: false
+        x_scale: 1
+        y_scale: 1
+        z_scale: 1
+      Class: rviz_imu_plugin/Imu
+      Enabled: true
+      Name: Imu
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /imu/data_raw
+      Value: true
+      fixed_frame_orientation: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
-    Fixed Frame: base_link
+    Fixed Frame: imu_link
     Frame Rate: 30
   Name: root
   Tools:
@@ -321,10 +340,10 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 1.5697963237762451
+      Pitch: 0.8047975897789001
       Target Frame: <Fixed Frame>
       Value: XYOrbit (rviz_default_plugins)
-      Yaw: 3.0685887336730957
+      Yaw: 2.948587417602539
     Saved: ~
 Window Geometry:
   Displays:

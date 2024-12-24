@@ -219,6 +219,17 @@ def generate_launch_description():
         output='screen'
     )
 
+    imu_node = Node(
+        package='wit_ros2_imu',
+        executable='wit_ros2_imu',
+        name='imu',
+        remappings=[('/wit/imu', '/imu/data')],
+        parameters=[{'port': '/dev/ttyUSB0'},
+                    {"baud": 9600}],
+        output="screen"
+
+    )
+
     # =============================================================================
 
     ui_server = Node(
@@ -494,6 +505,17 @@ def generate_launch_description():
         respawn=True,
     )
 
+    tf_base_link_to_imu_link = Node(
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        name="tf_base_link_to_imu_link",
+        # fmt: off
+        arguments=["0.50","0.00","0.55","0.00","0.00","0.00","base_link","imu_link",
+            "--ros-args","--log-level","error",],
+        # fmt: on
+        respawn=True,
+    )
+
     tf_map_empty = Node(
         package="tf2_ros",
         executable="static_transform_publisher",
@@ -646,17 +668,20 @@ def generate_launch_description():
             # aruco_detection_kiri,
 
             # pose_estimator,
+            tf_map_empty,
             # tf_base_link_to_body_link,
             # tf_base_link_to_lidar1_link,
-            tf_base_link_to_lidar2_link,
-            tf_map_empty,
+            # tf_base_link_to_lidar2_link,
+            tf_base_link_to_imu_link,
 
-            witty_lidar,
+            # witty_lidar,
             # DeclareLaunchArgument('auto_start', default_value='true'),
             # hokuyo_lidar_driver,
             # urg_node2_node_configure_event_handler,
             # urg_node2_node_activate_event_handler,
-            obstacle_filter,
+            # obstacle_filter,
+
+            imu_node,
 
             # rosbridge_server, 
             # web_video_server,
@@ -671,7 +696,7 @@ def generate_launch_description():
 
 
 
-            # rviz2,
+            rviz2,
             # vision_capture,
             # lane_detection,
             # livox_lidar_driver,
