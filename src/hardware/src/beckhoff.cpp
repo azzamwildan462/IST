@@ -66,18 +66,21 @@ int scan_CANopen_Slaves(uint16_t slave)
 {
     // uint8_t _f002_1[2] = {0x01, 0x00};
     // ec_SDOwrite(slave, 0xf002, 0x01, FALSE, sizeof(_f002_1), &_f002_1, EC_TIMEOUTRXM);
-    uint8_t _f002_1[2] = { 0x01, 0x04 };
+    uint8_t _f002_1[2] = {0x01, 0x04};
     ec_SDOwrite(slave, 0xf002, 0x01, FALSE, sizeof(_f002_1), &_f002_1, EC_TIMEOUTRXM);
 
     logger.info("Wait...");
 
-    while (1) {
+    while (1)
+    {
         uint8_t _f002_2;
         static uint8_t prev_f002_2;
         int _f002_2_s = sizeof(_f002_2);
         int _f002_2_wkc = ec_SDOread(slave, 0xf002, 0x02, FALSE, &_f002_2_s, &_f002_2, EC_TIMEOUTRXM);
-        if (_f002_2_wkc > 0) {
-            if (prev_f002_2 != _f002_2) {
+        if (_f002_2_wkc > 0)
+        {
+            if (prev_f002_2 != _f002_2)
+            {
                 if (100 == _f002_2)
                     logger.info("f002_2: %d", _f002_2);
                 else if (130 == _f002_2)
@@ -95,56 +98,66 @@ int scan_CANopen_Slaves(uint16_t slave)
         usleep(10000);
     }
 
-    uint8_t _9000[200] = { 0x00 };
+    uint8_t _9000[200] = {0x00};
     int _9000_s = sizeof(_9000);
     int _9000_wkc = ec_SDOread(slave, 0x9000, 0x00, TRUE, &_9000_s, &_9000, 10 * EC_TIMEOUTRXM);
-    if (_9000_wkc > 0 && _9000_s > 2) {
+    if (_9000_wkc > 0 && _9000_s > 2)
+    {
         logger.info("CO slave0: ");
-        for (int k = 0; k < _9000_s; k++) {
+        for (int k = 0; k < _9000_s; k++)
+        {
             logger.info("0x%x ", _9000[k]);
         }
         logger.info("");
     }
 
-    uint8_t _9010[200] = { 0x00 };
+    uint8_t _9010[200] = {0x00};
     int _9010_s = sizeof(_9010);
     int _9010_wkc = ec_SDOread(slave, 0x9010, 0x00, TRUE, &_9010_s, &_9010, 10 * EC_TIMEOUTRXM);
-    if (_9010_wkc > 0 && _9010_s > 2) {
+    if (_9010_wkc > 0 && _9010_s > 2)
+    {
         logger.info("CO slave1: ");
-        for (int k = 0; k < _9010_s; k++) {
+        for (int k = 0; k < _9010_s; k++)
+        {
             logger.info("0x%x ", _9010[k]);
         }
         logger.info("");
     }
 
-    uint8_t _9020[200] = { 0x00 };
+    uint8_t _9020[200] = {0x00};
     int _9020_s = sizeof(_9020);
     int _9020_wkc = ec_SDOread(slave, 0x9020, 0x00, TRUE, &_9020_s, &_9020, 10 * EC_TIMEOUTRXM);
-    if (_9020_wkc > 0 && _9020_s > 2) {
+    if (_9020_wkc > 0 && _9020_s > 2)
+    {
         logger.info("CO slave2: ");
-        for (int k = 0; k < _9020_s; k++) {
+        for (int k = 0; k < _9020_s; k++)
+        {
             logger.info("0x%x ", _9020[k]);
         }
         logger.info("");
     }
 
-    uint8_t _9030[200] = { 0x00 };
+    uint8_t _9030[200] = {0x00};
     int _9030_s = sizeof(_9030);
     int _9030_wkc = ec_SDOread(slave, 0x9030, 0x00, TRUE, &_9030_s, &_9030, 10 * EC_TIMEOUTRXM);
-    if (_9030_wkc > 0 && _9030_s > 2) {
+    if (_9030_wkc > 0 && _9030_s > 2)
+    {
         logger.info("CO slave3: ");
-        for (int k = 0; k < _9030_s; k++) {
+        for (int k = 0; k < _9030_s; k++)
+        {
             logger.info("0x%x ", _9030[k]);
         }
         logger.info("");
     }
 
-    uint8_t _9040[200] = { 0x00 };
+    uint8_t _9040[200] = {0x00};
     int _9040_s = sizeof(_9040);
     int _9040_wkc = ec_SDOread(slave, 0x9040, 0x00, TRUE, &_9040_s, &_9040, 10 * EC_TIMEOUTRXM);
-    if (_9040_wkc > 0 && _9040_s > 2) {
+    if (_9040_wkc > 0 && _9040_s > 2)
+    {
         logger.info("CO slave4: ");
-        for (int k = 0; k < _9040_s; k++) {
+        for (int k = 0; k < _9040_s; k++)
+        {
             logger.info("0x%x ", _9040[k]);
         }
         logger.info("");
@@ -154,7 +167,8 @@ int scan_CANopen_Slaves(uint16_t slave)
     uint32_t _f921 = 0x65766173;
     ec_SDOwrite(slave, 0xf921, 0x01, TRUE, sizeof(_f921), &_f921, EC_TIMEOUTRXM);
 
-    while (ec_iserror()) {
+    while (ec_iserror())
+    {
         logger.warn("%s", ec_elist2string());
     }
 
@@ -219,8 +233,7 @@ int init_CAN_Startup(uint16_t slave)
         0x60, 0x60,
         0x00,
         0x01, 0x00,
-        0x03
-    };
+        0x03};
     ec_SDOwrite(slave, 0x8003, 0x00, TRUE, sizeof(_8003), &_8003, EC_TIMEOUTRXM);
 
     while (EcatError)
@@ -229,7 +242,8 @@ int init_CAN_Startup(uint16_t slave)
     return 1;
 }
 
-class Beckhoff : public rclcpp::Node {
+class Beckhoff : public rclcpp::Node
+{
 public:
     rclcpp::TimerBase::SharedPtr tim_50hz;
     rclcpp::Publisher<std_msgs::msg::Float32MultiArray>::SharedPtr pub_sensors;
@@ -247,9 +261,9 @@ public:
 
     // DAta raw beckhoff
     // =======================================================
-    digital_out_t* digital_out;
-    analog_input_t* analog_input;
-    analog_output_t* analog_output;
+    digital_out_t *digital_out;
+    analog_input_t *analog_input;
+    analog_output_t *analog_output;
 
     // Vars
     // =======================================================
@@ -258,7 +272,7 @@ public:
     uint8 IOmap[4096]; // I/O map for PDOs
 
     float master_target_velocity = 0; // m/s
-    float master_taret_steering = 0; // rad
+    float master_taret_steering = 0;  // rad
     int16_t master_local_fsm = 0;
     int16_t master_global_fsm = 0;
     float lpf_velocity_target_voltage = 0.0;
@@ -285,12 +299,14 @@ public:
         this->declare_parameter("speed_to_volt", 0.7);
         this->get_parameter("speed_to_volt", speed_to_volt);
 
-        if (!logger.init()) {
+        if (!logger.init())
+        {
             RCLCPP_ERROR(this->get_logger(), "Failed to initialize logger");
             rclcpp::shutdown();
         }
 
-        if (init_beckhoff() > 0) {
+        if (init_beckhoff() > 0)
+        {
             RCLCPP_ERROR(this->get_logger(), "Failed to initialize Beckhoff");
             rclcpp::shutdown();
         }
@@ -328,15 +344,21 @@ public:
         master_target_velocity = msg->data[0];
         master_taret_steering = msg->data[1];
 
-        if (master_target_velocity <= 0.1) {
+        if (master_target_velocity <= 0.1)
+        {
             counter_zero_velocity++;
-        } else {
+        }
+        else
+        {
             counter_zero_velocity = 0;
         }
 
-        if (counter_zero_velocity > 50) {
+        if (counter_zero_velocity > 50)
+        {
             transmission = 1;
-        } else {
+        }
+        else
+        {
             transmission = 3;
         }
     }
@@ -346,28 +368,34 @@ public:
         ec_send_processdata();
         int wkc = ec_receive_processdata(EC_TIMEOUTRET);
 
-        if (wkc >= expectedWKC) {
+        if (wkc >= expectedWKC)
+        {
             counter_beckhoff_disconnect = 0;
             // test_analog_output();
             test_digital_output();
             test_analog_input();
 
-            fb_throttle_velocity_volt = (float)analog_input->data_1 * ANALOG_INPUT_SCALER;
+            fb_throttle_velocity_volt = (float)analog_input->data_2 * ANALOG_INPUT_SCALER;
 
-            // Normalize from 0 - 7 to 143 - 0
-            float velocity_target_voltage = (143 - fmin(fmax(143 * master_target_velocity / 7, 0), 143)) * LSB_VALUE;
-            lpf_velocity_target_voltage = 0.9 * lpf_velocity_target_voltage + 0.1 * velocity_target_voltage;
+            float velocity_target_voltage = fmaxf(0.4, master_target_velocity / 7.0 * 3);
             analog_output->data_1 = (int16_t)(velocity_target_voltage * ANALOG_OUT_SCALER);
+            logger.info("INFO: %.2f || %.2f", fb_throttle_velocity_volt, velocity_target_voltage);
+
+            float default_5v = 5.0;
+            analog_output->data_2 = (int16_t)(default_5v * ANALOG_OUT_SCALER);
 
             error_code = 0;
 
             transmit_all();
-        } else {
+        }
+        else
+        {
             counter_beckhoff_disconnect++;
             error_code = 1;
         }
 
-        if (counter_beckhoff_disconnect > 100) {
+        if (counter_beckhoff_disconnect > 100)
+        {
             logger.error("Computer LAN Wiring error");
             rclcpp::shutdown();
         }
@@ -400,7 +428,8 @@ public:
         static uint16_t status_blink = 0b1010101010101010;
         static uint16_t cntr = 0;
 
-        if (cntr++ > 100) {
+        if (cntr++ > 100)
+        {
             cntr = 0;
             digital_out->data = status_blink;
             status_blink = ~status_blink;
@@ -430,25 +459,32 @@ public:
         uint16_t multiplier;
         int wc = ec_FPRD(ec_slave[slave].configadr, 0x400, 4, &multiplier, EC_TIMEOUTRXM);
 
-        if (wc > 0) {
+        if (wc > 0)
+        {
             logger.info("Watchdog time multiplier: %d", multiplier);
             double sf = (1.0 / 25.0) * (double)(multiplier + 2) / 1000.0;
             uint16_t wv = (uint16_t)((double)watchdog_time / sf);
 
             wc = ec_FPWR(ec_slave[slave].configadr, 0x420, 4, &wv, EC_TIMEOUTRXM);
 
-            if (wc > 0) {
+            if (wc > 0)
+            {
                 logger.info("Watchdog time set to %d ms", watchdog_time);
-            } else {
+            }
+            else
+            {
                 logger.error("Failed to set watchdog time\n");
                 return 0;
             }
-        } else {
+        }
+        else
+        {
             logger.error("Failed to read watchdog time multiplier\n");
             return 0;
         }
 
-        while (EcatError) {
+        while (EcatError)
+        {
             logger.warn("%s", ec_elist2string());
             return 0;
         }
@@ -458,8 +494,10 @@ public:
 
     int8_t init_beckhoff()
     {
-        if (ec_init(if_name.c_str())) {
-            if (ec_config_init(FALSE) > 0) {
+        if (ec_init(if_name.c_str()))
+        {
+            if (ec_config_init(FALSE) > 0)
+            {
                 while (EcatError)
                     logger.warn("%s", ec_elist2string());
 
@@ -486,15 +524,21 @@ public:
                 logger.info("Calculated workcounter %d", expectedWKC);
 
                 // ============= CONFIGURE STARTUP STATE =============
-                if (1 == po2so_config) {
+                if (1 == po2so_config)
+                {
                     ec_slave[slave_canopen_id].PO2SOconfig = &scan_CANopen_Slaves;
-                } else if (2 == po2so_config) {
+                }
+                else if (2 == po2so_config)
+                {
                     ec_slave[slave_canopen_id].PO2SOconfig = &remove_CAN_eeprom;
-                } else if (3 == po2so_config) {
+                }
+                else if (3 == po2so_config)
+                {
                     ec_slave[slave_canopen_id].PO2SOconfig = &init_CAN_Startup;
                 }
                 // =============== CONFIGURE WATCHDOG ================
-                for (uint8_t slave = 1; slave <= ec_slavecount; slave++) {
+                for (uint8_t slave = 1; slave <= ec_slavecount; slave++)
+                {
                     logger.info("Setting watchdog for slave %d", slave);
                     set_watchdog(slave, 100);
                 }
@@ -506,16 +550,20 @@ public:
                 ec_slave[0].state = EC_STATE_SAFE_OP;
                 ec_writestate(0);
 
-                while (ec_iserror()) {
+                while (ec_iserror())
+                {
                     logger.warn("%s", ec_elist2string());
                 }
 
                 ec_statecheck(0, EC_STATE_SAFE_OP, EC_TIMEOUTSTATE * 3);
-                if (ec_slave[0].state != EC_STATE_SAFE_OP) {
+                if (ec_slave[0].state != EC_STATE_SAFE_OP)
+                {
                     logger.warn("Not all slaves reached safe operational state.");
                     ec_readstate();
-                    for (int i = 1; i <= ec_slavecount; i++) {
-                        if (ec_slave[i].state != EC_STATE_SAFE_OP) {
+                    for (int i = 1; i <= ec_slavecount; i++)
+                    {
+                        if (ec_slave[i].state != EC_STATE_SAFE_OP)
+                        {
                             logger.warn("Slave %d State=0x%2.2x StatusCode=0x%4.4x : %s", i, ec_slave[i].state, ec_slave[i].ALstatuscode, ec_ALstatuscode2string(ec_slave[i].ALstatuscode));
                         }
                     }
@@ -525,26 +573,29 @@ public:
                 ec_slave[0].state = EC_STATE_OPERATIONAL;
                 ec_writestate(0);
 
-                if (ec_slave[0].state == EC_STATE_OPERATIONAL) {
+                if (ec_slave[0].state == EC_STATE_OPERATIONAL)
+                {
                     logger.info("Operational state reached for all slaves.");
 
                     ec_send_processdata();
                     ec_receive_processdata(EC_TIMEOUTRET);
 
-                    for (uint8_t slave = 1; slave <= ec_slavecount; slave++) {
-                        switch (ec_slave[slave].eep_id) {
+                    for (uint8_t slave = 1; slave <= ec_slavecount; slave++)
+                    {
+                        switch (ec_slave[slave].eep_id)
+                        {
                         case EL2889_ID:
-                            digital_out = (digital_out_t*)ec_slave[slave].outputs;
+                            digital_out = (digital_out_t *)ec_slave[slave].outputs;
                             logger.info("EL2889 Configured");
                             break;
 
                         case EL3068_ID:
-                            analog_input = (analog_input_t*)ec_slave[slave].inputs;
+                            analog_input = (analog_input_t *)ec_slave[slave].inputs;
                             logger.info("EL3068 Configured");
                             break;
 
                         case EL4004_ID:
-                            analog_output = (analog_output_t*)ec_slave[slave].outputs;
+                            analog_output = (analog_output_t *)ec_slave[slave].outputs;
                             logger.info("EL4004 Configured");
                             break;
                         }
@@ -552,16 +603,20 @@ public:
                 }
 
                 return 0;
-            } else {
+            }
+            else
+            {
                 return 2;
             }
-        } else {
+        }
+        else
+        {
             return 1;
         }
     }
 };
 
-int main(int argc, char** argv)
+int main(int argc, char **argv)
 {
     rclcpp::init(argc, argv);
 

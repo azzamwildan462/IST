@@ -5,6 +5,7 @@
 #include "std_msgs/msg/int32.hpp"
 #include "std_msgs/msg/string.hpp"
 #include "std_msgs/msg/float32.hpp"
+#include "sensor_msgs/msg/imu.hpp"
 #include "tf2/LinearMath/Quaternion.h"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 #include "tf2_ros/buffer.h"
@@ -19,6 +20,7 @@ public:
     rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr pub_error_code;
     rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr pub_encoder_meter;
     rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr sub_encoder;
+    rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr sub_gyro;
 
     //----TransformBroadcaster
     std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster;
@@ -61,6 +63,8 @@ public:
 
         sub_encoder = this->create_subscription<std_msgs::msg::Int32>(
             "/can/encoder", 1, std::bind(&PoseEstimator::callback_sub_encoder, this, std::placeholders::_1));
+        sub_gyro = this->create_subscription<sensor_msgs::msg::Imu>(
+            "/hardware/imu", 1, std::bind(&PoseEstimator::callback_sub_gyro, this, std::placeholders::_1));
     }
 
     void callback_sub_encoder(const std_msgs::msg::Int32::SharedPtr msg)
@@ -100,6 +104,11 @@ public:
         final_vel_dxdydo[1] = (sensor_left_encoder + sensor_right_encoder) / 2.0 * sinf(final_pose_xyo[2]) * encoder_to_meter / dt;
         final_vel_dxdydo[2] = d_gyro;
 
+        while (final_vel_dxdydo[2] > M_PI)
+            final_vel_dxdydo[2] -= 2 * M_PI;
+        while (final_vel_dxdydo[2] < -M_PI)
+            final_vel_dxdydo[2] += 2 * M_PI;
+
         final_pose_xyo[0] += final_vel_dxdydo[0] * dt;
         final_pose_xyo[1] += final_vel_dxdydo[1] * dt;
         final_pose_xyo[2] += final_vel_dxdydo[2] * dt;
@@ -109,8 +118,10 @@ public:
         while (final_pose_xyo[2] < -M_PI)
             final_pose_xyo[2] += 2 * M_PI;
 
+        float yaw_deg = final_pose_xyo[2] * 180.0 / M_PI;
+
         tf2::Quaternion q;
-        q.setRPY(0, 0, final_pose_xyo[2]);
+        q.setRPY(0, 0, yaw_deg);
 
         nav_msgs::msg::Odometry msg_odom;
         msg_odom.header.stamp = time_now;
@@ -154,6 +165,17 @@ public:
         std_msgs::msg::Int16 msg_error_code;
         msg_error_code.data = error_code;
         pub_error_code->publish(msg_error_code);
+    }
+
+    void callback_sub_gyro(const sensor_msgs::msg::Imu::SharedPtr msg)
+    {
+        // get_angle from quartenion
+        tf2::Quaternion q(msg->orientation.x, msg->orientation.y, msg->orientation.z, msg->orientation.w);
+        tf2::Matrix3x3 m(q);
+        double roll, pitch, yaw;
+        m.getRPY(roll, pitch, yaw);
+
+        gyro = yaw;
     }
 };
 

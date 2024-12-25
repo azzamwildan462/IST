@@ -15,6 +15,7 @@ set(var_dependencies
     tf2_geometry_msgs
     pcl_conversions
     pcl_ros
+    sensor_msgs
     tf2_ros)
     
 foreach(var_dependency ${var_dependencies})

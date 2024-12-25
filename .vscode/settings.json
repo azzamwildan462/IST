@@ -76,9 +76,12 @@
         "typeindex": "cpp",
         "typeinfo": "cpp",
         "*.ipp": "cpp",
-        "any": "cpp"
+        "any": "cpp",
+        "coroutine": "cpp",
+        "source_location": "cpp"
     },
     "ros.distro": "noetic",
     "C_Cpp.default.compilerPath": "/usr/bin/g++",
-    "C_Cpp.errorSquiggles": "disabled"
+    "C_Cpp.errorSquiggles": "disabled",
+    "cmake.sourceDirectory": "/home/wildan/proyek/robotika/IST/src/ros2_utils"
 }

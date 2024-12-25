@@ -219,17 +219,6 @@ def generate_launch_description():
         output='screen'
     )
 
-    imu_node = Node(
-        package='wit_ros2_imu',
-        executable='wit_ros2_imu',
-        name='imu',
-        remappings=[('/wit/imu', '/imu/data')],
-        parameters=[{'port': '/dev/ttyUSB0'},
-                    {"baud": 9600}],
-        output="screen"
-
-    )
-
     # =============================================================================
 
     ui_server = Node(
@@ -312,6 +301,19 @@ def generate_launch_description():
         }],
         respawn=True,
         prefix='nice -n -20 chrt -f 98'
+    )
+
+
+    imu_serial = Node(
+        package="hardware",
+        executable="serial_imu",
+        name="serial_imu",
+        output="screen",
+        parameters=[{
+            "port": "/dev/ttyUSB0",
+        }],
+        respawn=True,
+        prefix='nice -n -20 chrt -f 90'
     )
 
 # CAnbus
@@ -667,11 +669,11 @@ def generate_launch_description():
             # lane_detection_kiri,
             # aruco_detection_kiri,
 
-            # pose_estimator,
+            pose_estimator,
             tf_map_empty,
-            # tf_base_link_to_body_link,
-            # tf_base_link_to_lidar1_link,
-            # tf_base_link_to_lidar2_link,
+            tf_base_link_to_body_link,
+            tf_base_link_to_lidar1_link,
+            tf_base_link_to_lidar2_link,
             tf_base_link_to_imu_link,
 
             # witty_lidar,
@@ -681,22 +683,22 @@ def generate_launch_description():
             # urg_node2_node_activate_event_handler,
             # obstacle_filter,
 
-            imu_node,
+            # imu_serial,
 
             # rosbridge_server, 
             # web_video_server,
 
-            # beckhoff,
+            beckhoff,
             # CANbus_HAL,
 
-            # master,
+            master,
             # ui_server,
 
-            # joy_node,
+            joy_node,
 
 
 
-            rviz2,
+            # rviz2,
             # vision_capture,
             # lane_detection,
             # livox_lidar_driver,

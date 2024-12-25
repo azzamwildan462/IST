@@ -12,6 +12,7 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(ros2_utils REQUIRED)
+find_package(sensor_msgs REQUIRED)
 
 include_directories(
   include
@@ -25,7 +26,7 @@ add_executable(serial_imu src/serial_imu.cpp)
 
 ament_target_dependencies(beckhoff rclcpp std_msgs ros2_utils)
 ament_target_dependencies(CANbus_HAL rclcpp std_msgs ros2_utils)
-ament_target_dependencies(serial_imu rclcpp std_msgs ros2_utils)
+ament_target_dependencies(serial_imu rclcpp std_msgs sensor_msgs ros2_utils)
 
 target_link_libraries(beckhoff ${CURRENT_WORKING_DIRECTORY}/../../SOEM_local/install/lib/libsoem.a)
 

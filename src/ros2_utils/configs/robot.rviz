@@ -13,7 +13,6 @@ Panels:
         - /LaserScan1
         - /PointCloud23
         - /Imu1
-        - /Imu1/Status1
       Splitter Ratio: 0.5
     Tree Height: 656
   - Class: rviz_common/Selection
@@ -62,7 +61,13 @@ Visualization Manager:
         All Enabled: true
         base_link:
           Value: true
+        body_link:
+          Value: true
         imu_link:
+          Value: true
+        lidar1_link:
+          Value: true
+        lidar2_link:
           Value: true
         map:
           Value: true
@@ -74,19 +79,24 @@ Visualization Manager:
       Show Axes: true
       Show Names: false
       Tree:
-        base_link:
-          imu_link:
-            {}
         map:
           odom:
-            {}
+            base_link:
+              body_link:
+                {}
+              imu_link:
+                {}
+              lidar1_link:
+                {}
+              lidar2_link:
+                {}
       Update Interval: 0
       Value: true
     - Class: rviz_default_plugins/MarkerArray
       Enabled: true
       Name: MarkerArray
       Namespaces:
-        {}
+        body: true
       Topic:
         Depth: 5
         Durability Policy: Volatile
@@ -282,7 +292,7 @@ Visualization Manager:
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
-    Fixed Frame: imu_link
+    Fixed Frame: map
     Frame Rate: 30
   Name: root
   Tools:
