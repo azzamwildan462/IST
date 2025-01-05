@@ -108,7 +108,7 @@ void Master::manual_motion(float vx, float vy, float wz)
 
     float steering_rate = fmaxf(min_steering_rate,
                                 fminf(max_steering_rate,
-                                      gradient_steering_rate * (fb_final_vel_dxdydo[0] - min_velocity) + max_steering_rate));
+                                      gradient_steering_rate * (fb_encoder_meter - min_velocity) + max_steering_rate));
 
     if (wz > wz_buffer)
     {
@@ -135,7 +135,7 @@ void Master::manual_motion(float vx, float vy, float wz)
     }
     else
     {
-        // actuation_vx = pid_vx.calculate(vx_buffer - fb_final_vel_dxdydo[0]);
+        actuation_vx = pid_vx.calculate(vx_buffer - fb_encoder_meter);
         actuation_vx = vx_buffer; // Sementara untuk testing
         actuation_ay = 0;
         actuation_wz = wz_buffer;
@@ -188,7 +188,7 @@ void Master::follow_lane(float vx, float vy, float wz)
     static const float pixel_to_world = 0.053;
     static const float gain_kemiringan_terhadap_steering = 0.8;
     static const float steer2lane_sf = 0.99; // Smooth factor
-    static float target_steering_angle = 0;
+    static float target_steering_angle = 0;  // Ini adalah arah hadap roda
     static float target_max_velocity = 0;
 
     (void)vy;

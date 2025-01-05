@@ -58,6 +58,10 @@ void Master::process_transmitter()
     msg_actuator.data.push_back(actuation_vx);
     msg_actuator.data.push_back(actuation_wz);
     pub_actuator->publish(msg_actuator);
+
+    std_msgs::msg::Int16 msg_transmission_master;
+    msg_transmission_master.data = transmission_joy_master;
+    pub_transmission_master->publish(msg_transmission_master);
 }
 
 //=================================================================================================

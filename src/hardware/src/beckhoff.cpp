@@ -9,6 +9,10 @@
 
 #define EC_TIMEOUTMON 5000
 
+#define DO_TRANSMISSION_FORWARD 0b001
+#define DO_TRANSMISSION_NEUTRAL 0b010
+#define DO_TRANSMISSION_REVERSE 0b100
+
 #define EL6751_ID 0x1a5f3052 // CANopen
 #define EL2889_ID 0x0b493052 // Digital output
 #define EL3068_ID 0x0bfc3052 // Analog input
@@ -252,6 +256,7 @@ public:
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr sub_master_actuator;
     rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_master_local_fsm;
     rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_master_global_fsm;
+    rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_transmission_master;
 
     // Configs
     // =======================================================
@@ -271,11 +276,13 @@ public:
     int expectedWKC = 0;
     uint8 IOmap[4096]; // I/O map for PDOs
 
-    float master_target_velocity = 0; // m/s
-    float master_taret_steering = 0;  // rad
+    int16_t transmission_master = 0;  // Ini di-trigger manual dari joystick untuk testing
+    float master_target_volt_hat = 0; // turunan dari voltage
+    float master_target_steering = 0; // rad
     int16_t master_local_fsm = 0;
     int16_t master_global_fsm = 0;
     float lpf_velocity_target_voltage = 0.0;
+    float buffer_dac_velocity = 0.0;
 
     int16_t error_code = 0;
 
@@ -326,6 +333,13 @@ public:
             "/master/local_fsm", 1, std::bind(&Beckhoff::callback_sub_master_local_fsm, this, std::placeholders::_1));
         sub_master_global_fsm = this->create_subscription<std_msgs::msg::Int16>(
             "/master/global_fsm", 1, std::bind(&Beckhoff::callback_sub_master_global_fsm, this, std::placeholders::_1));
+        sub_transmission_master = this->create_subscription<std_msgs::msg::Int16>(
+            "/master/transmission", 1, std::bind(&Beckhoff::callback_sub_transmission_master, this, std::placeholders::_1));
+    }
+
+    void callback_sub_transmission_master(const std_msgs::msg::Int16::SharedPtr msg)
+    {
+        transmission_master = msg->data;
     }
 
     void callback_sub_master_local_fsm(const std_msgs::msg::Int16::SharedPtr msg)
@@ -341,10 +355,10 @@ public:
     void callback_sub_master_actuator(const std_msgs::msg::Float32MultiArray::SharedPtr msg)
     {
         static uint16_t counter_zero_velocity = 0;
-        master_target_velocity = msg->data[0];
-        master_taret_steering = msg->data[1];
+        master_target_volt_hat = msg->data[0];
+        master_target_steering = msg->data[1];
 
-        if (master_target_velocity <= 0.1)
+        if (buffer_dac_velocity <= 0.45)
         {
             counter_zero_velocity++;
         }
@@ -372,17 +386,69 @@ public:
         {
             counter_beckhoff_disconnect = 0;
             // test_analog_output();
-            test_digital_output();
+            // test_digital_output();
             test_analog_input();
+
+            if (transmission_master > 0)
+            {
+                // Netral
+                if (transmission_master == 1)
+                {
+                    digital_out->data &= ~DO_TRANSMISSION_FORWARD;
+                    digital_out->data &= ~DO_TRANSMISSION_REVERSE;
+                    digital_out->data |= DO_TRANSMISSION_NEUTRAL;
+                }
+                // Forward
+                else if (transmission_master == 3)
+                {
+                    digital_out->data &= ~DO_TRANSMISSION_NEUTRAL;
+                    digital_out->data &= ~DO_TRANSMISSION_REVERSE;
+                    digital_out->data |= DO_TRANSMISSION_FORWARD;
+                }
+                // Reverse
+                else if (transmission_master == 2)
+                {
+                    digital_out->data &= ~DO_TRANSMISSION_FORWARD;
+                    digital_out->data &= ~DO_TRANSMISSION_NEUTRAL;
+                    digital_out->data |= DO_TRANSMISSION_REVERSE;
+                }
+            }
+            else
+            {
+                // Netral
+                if (transmission == 1)
+                {
+                    digital_out->data &= ~DO_TRANSMISSION_FORWARD;
+                    digital_out->data &= ~DO_TRANSMISSION_REVERSE;
+                    digital_out->data |= DO_TRANSMISSION_NEUTRAL;
+                }
+                // Forward
+                else if (transmission == 3)
+                {
+                    digital_out->data &= ~DO_TRANSMISSION_NEUTRAL;
+                    digital_out->data &= ~DO_TRANSMISSION_REVERSE;
+                    digital_out->data |= DO_TRANSMISSION_FORWARD;
+                }
+            }
+
+            // ===================================================================================
 
             fb_throttle_velocity_volt = (float)analog_input->data_2 * ANALOG_INPUT_SCALER;
 
-            float velocity_target_voltage = fmaxf(0.4, master_target_velocity / 7.0 * 3);
-            analog_output->data_1 = (int16_t)(velocity_target_voltage * ANALOG_OUT_SCALER);
-            logger.info("INFO: %.2f || %.2f", fb_throttle_velocity_volt, velocity_target_voltage);
+            buffer_dac_velocity += master_target_volt_hat;
+
+            if (buffer_dac_velocity <= 0.4)
+                buffer_dac_velocity = 0.4;
+            else if (buffer_dac_velocity >= 4.0)
+                buffer_dac_velocity = 4.0;
+
+            analog_output->data_1 = (int16_t)(buffer_dac_velocity * ANALOG_OUT_SCALER);
+            logger.info("INFO: %.2f || %.2f", fb_throttle_velocity_volt, buffer_dac_velocity);
 
             float default_5v = 5.0;
             analog_output->data_2 = (int16_t)(default_5v * ANALOG_OUT_SCALER);
+
+            // ====================================================================================
 
             error_code = 0;
 

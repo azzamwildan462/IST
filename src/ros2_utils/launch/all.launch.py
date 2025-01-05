@@ -688,7 +688,7 @@ def generate_launch_description():
             # rosbridge_server, 
             # web_video_server,
 
-            beckhoff,
+            # beckhoff,
             # CANbus_HAL,
 
             master,

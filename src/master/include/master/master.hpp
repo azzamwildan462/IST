@@ -30,7 +30,8 @@
 #define FSM_LOCAL_MENUNGGU_STATION_1 2
 #define FSM_LOCAL_MENUNGGU_STATION_2 3
 
-class Master : public rclcpp::Node {
+class Master : public rclcpp::Node
+{
 public:
     rclcpp::TimerBase::SharedPtr tim_50hz;
     rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr pub_initialpose;
@@ -38,6 +39,7 @@ public:
     rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr pub_local_fsm;
     rclcpp::Publisher<std_msgs::msg::Float32MultiArray>::SharedPtr pub_to_ui;
     rclcpp::Publisher<std_msgs::msg::Float32MultiArray>::SharedPtr pub_actuator;
+    rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr pub_transmission_master;
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr sub_beckhoff_sensor;
     rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr sub_obs_find;
     rclcpp::Subscription<ros2_interface::msg::PointArray>::SharedPtr sub_lane_kiri;
@@ -60,20 +62,21 @@ public:
     rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_error_code_aruco_kanan;
     rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_error_code_can;
     rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr sub_joy;
+    rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr sub_encoder_meter;
 
     // Configs
     // ===============================================================================================
     bool use_ekf_odometry = false;
-    float profile_max_acceleration = 50;
+    float profile_max_acceleration = 30;
     float profile_max_decceleration = 50;
-    float profile_max_velocity = 7;
-    float profile_max_accelerate_jerk = 1000;
+    float profile_max_velocity = 4;
+    float profile_max_accelerate_jerk = 500;
     float profile_max_decelerate_jerk = 1000;
     float profile_max_braking = 80;
     float profile_max_braking_acceleration = 2000;
     float profile_max_braking_jerk = 3000;
     float max_obs_find_value = 100;
-    float profile_max_steering_rad = 12.56; // Ini adalah putaran steering nya bukan arah roda depannya
+    float profile_max_steering_rad = 0.785; // Ini adalah arah roda depannya
 
     // Vars
     // ===============================================================================================
@@ -125,6 +128,7 @@ public:
     bool aruco_kiri_detected = false;
     bool aruco_kanan_detected = false;
 
+    float fb_encoder_meter = 0;
     float fb_final_pose_xyo[3];
     float fb_final_vel_dxdydo[3];
     float fb_steering_angle = 0;
@@ -132,6 +136,8 @@ public:
     float dt = 0.02;
 
     float obs_find = 0;
+
+    int16_t transmission_joy_master = 0;
 
     rclcpp::Time current_time;
     rclcpp::Time last_time_beckhoff;
@@ -142,6 +148,7 @@ public:
     rclcpp::Time last_time_obstacle_filter;
     rclcpp::Time last_time_aruco_kiri;
     rclcpp::Time last_time_aruco_kanan;
+    rclcpp::Time last_time_joy;
     rclcpp::Time time_start_operation;
     rclcpp::Time time_start_follow_lane;
 
@@ -173,6 +180,7 @@ public:
     void callback_sub_error_code_aruco_kiri(const std_msgs::msg::Int16::SharedPtr msg);
     void callback_sub_error_code_aruco_kanan(const std_msgs::msg::Int16::SharedPtr msg);
     void callback_sub_error_code_can(const std_msgs::msg::Int16::SharedPtr msg);
+    void callback_sub_encoder_meter(const std_msgs::msg::Float32::SharedPtr msg);
 
     // Process
     // ===============================================================================================
