@@ -5,7 +5,8 @@
 #include "ros2_utils/help_logger.hpp"
 #include "std_msgs/msg/int16.hpp"
 
-class VisionCapture : public rclcpp::Node {
+class VisionCapture : public rclcpp::Node
+{
 public:
     //----Publisher
     rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr pub_image_bgr;
@@ -54,14 +55,16 @@ public:
         node_namespace = this->get_namespace();
         node_namespace = node_namespace.substr(1, node_namespace.size() - 1); // /cam_kanan jadi cam_kanan
 
-        if (!logger.init()) {
+        if (!logger.init())
+        {
             RCLCPP_ERROR(this->get_logger(), "Failed to initialize logger");
             rclcpp::shutdown();
         }
 
         logger.info("Init camera on: %s", camera_path.c_str());
 
-        if (!cap.open(camera_path)) {
+        if (!cap.open(camera_path))
+        {
             RCLCPP_ERROR(this->get_logger(), "Failed to open camera, Retry in 3 seconds");
             rclcpp::sleep_for(std::chrono::seconds(3));
             rclcpp::shutdown();
@@ -91,19 +94,23 @@ public:
         int _height = cap.get(cv::CAP_PROP_FRAME_HEIGHT);
         int _fps = cap.get(cv::CAP_PROP_FPS);
 
-        if (camera_fourcc != _fourcc) {
+        if (camera_fourcc != _fourcc)
+        {
             logger.warn("Failed to set camera fourcc");
             error_code = 1;
         }
-        if (camera_width != _width) {
+        if (camera_width != _width)
+        {
             logger.warn("Failed to set camera width");
             error_code = 2;
         }
-        if (camera_height != _height) {
+        if (camera_height != _height)
+        {
             logger.warn("Failed to set camera height");
             error_code = 3;
         }
-        if (camera_fps != _fps) {
+        if (camera_fps != _fps)
+        {
             logger.warn("Failed to set camera fps");
             error_code = 4;
         }
@@ -111,25 +118,27 @@ public:
 
     void callback_routine()
     {
-        while (rclcpp::ok()) {
+        while (rclcpp::ok())
+        {
             cv::Mat frame;
             cap >> frame;
 
-            if (frame.empty()) {
+            if (frame.empty())
+            {
                 logger.error("Failed to capture frame");
                 error_code = 11;
             }
 
             // Hardcode sementara, image dari file
             // cv::Mat frame2 = cv::imread("/home/wildan/proyek/robotika/IST/src/vision/assets/test_lane.webp");
-            // cv::Mat frame2 = cv::imread("/home/wildan/proyek/robotika/IST/src/vision/assets/" + node_namespace + ".jpeg");
+            cv::Mat frame2 = cv::imread("/home/wildan/proyek/robotika/IST/src/vision/assets/" + node_namespace + ".jpeg");
             // cv::Mat frame2 = cv::imread("/home/wildan/proyek/robotika/IST/src/vision/assets/aruco_kanan.jpeg");
 
             // cv::Mat flippedImg;
             // cv::flip(frame2, flippedImg, 1); // 1 specifies flipping around the Y-axis
 
             cv::Mat frame_bgr;
-            cv::resize(frame, frame_bgr, cv::Size(output_width, output_height));
+            cv::resize(frame2, frame_bgr, cv::Size(output_width, output_height));
             auto msg_frame_bgr = cv_bridge::CvImage(std_msgs::msg::Header(), "bgr8", frame_bgr).toImageMsg();
             pub_image_bgr->publish(*msg_frame_bgr);
 
@@ -145,7 +154,7 @@ public:
     }
 };
 
-int main(int argc, char** argv)
+int main(int argc, char **argv)
 {
     rclcpp::init(argc, argv);
 

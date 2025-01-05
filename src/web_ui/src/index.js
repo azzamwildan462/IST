@@ -105,7 +105,7 @@ function set_velocity(selector1, selector2, id_text, value1, value2) {
     progressText.textContent = `${value1_display.toFixed(2)}`;
 }
 
-function set_steering(selector1, selector2, id_text, value1, value2) {
+function set_steering(selector1, selector2, id_text, value1, value2, raw_actuation) {
 
     value1 = value1 * -1;
     value2 = value2 * -1;
@@ -134,7 +134,7 @@ function set_steering(selector1, selector2, id_text, value1, value2) {
     circle2.style.transform = "rotate(-90deg)"; // Adjust the rotation as needed
     circle2.style.transformOrigin = "50% 50%"; // Ensure rotation is centered
 
-    progressText.textContent = `${value1.toFixed(0)}%`;
+    progressText.textContent = `${raw_actuation.toFixed(2)}`;
 }
 
 function control_display_fsm() {
@@ -177,12 +177,12 @@ const master_fsm = document.getElementById('master-fsm');
 setInterval(() => {
     let velocity_actuation_display = velocity_actuation * 10;
     let velocity_feedback_display = velocity_feedback * 10;
-    let steering_actuation_display = (steering_actuation) * 135 / 25.12;
-    let steering_feedback_display = (steering_feedback) * 135 / 25.12;
+    let steering_actuation_display = (steering_actuation) * 135 / 6.28;
+    let steering_feedback_display = (steering_feedback) * 135 / 6.28;
 
     set_velocity('.velocity-circle1', '.velocity-circle2', 'velocity-text', velocity_actuation_display, velocity_feedback_display);
     velocity_kmph.textContent = `${velocity_feedback.toFixed(2)} km/h`;
-    set_steering('.steering-circle1', '.steering-circle2', 'steering-text', steering_actuation_display, steering_feedback_display);
+    set_steering('.steering-circle1', '.steering-circle2', 'steering-text', steering_actuation_display, steering_feedback_display, steering_actuation);
     steering_rad.textContent = `${steering_feedback.toFixed(2)} rad`;
 
     if (battery_value > 50) {

@@ -201,7 +201,7 @@ public:
         //----Timer
         tim_50hz = this->create_wall_timer(std::chrono::milliseconds(20), std::bind(&SingleDetection::callback_tim_50hz, this));
 
-        pid_point_emergency.init(0.5, 0.0001, 0.01, 0.02, 0.00, 10, 0.00, 0.001);
+        pid_point_emergency.init(1.5, 0.0001, 0.01, 0.02, 0.00, 10, 0.00, 0.001);
 
         logger.info("SingleDetection %s init success", node_namespace.c_str());
     }

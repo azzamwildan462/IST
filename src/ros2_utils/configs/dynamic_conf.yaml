@@ -25,7 +25,7 @@ Detection:
     high_l: 255
     high_s: 255
   lane_kanan:
-    low_h: 21
+    low_h: 16
     low_l: 107
     low_s: 0
     high_h: 255

@@ -19,7 +19,7 @@ void Master::process_local_fsm()
         break;
 
     case FSM_LOCAL_FOLLOW_LANE:
-        follow_lane_2_cam(7, 0, 1.57);
+        follow_lane_2_cam(7, 0, 0.3);
 
         if ((current_time - time_start_follow_lane).seconds() > 10 && aruco_kanan_detected)
         {
@@ -44,7 +44,7 @@ void Master::process_transmitter()
     pub_global_fsm->publish(msg_global_fsm);
 
     std_msgs::msg::Int16 msg_local_fsm;
-    msg_global_fsm.data = local_fsm.value;
+    msg_local_fsm.data = local_fsm.value;
     pub_local_fsm->publish(msg_local_fsm);
 
     std_msgs::msg::Float32MultiArray msg_to_ui;

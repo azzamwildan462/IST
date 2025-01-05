@@ -67,12 +67,12 @@ public:
     // Configs
     // ===============================================================================================
     bool use_ekf_odometry = false;
-    float profile_max_acceleration = 30;
+    float profile_max_acceleration = 10;
     float profile_max_decceleration = 50;
     float profile_max_velocity = 4;
-    float profile_max_accelerate_jerk = 500;
+    float profile_max_accelerate_jerk = 100;
     float profile_max_decelerate_jerk = 1000;
-    float profile_max_braking = 80;
+    float profile_max_braking = 20;
     float profile_max_braking_acceleration = 2000;
     float profile_max_braking_jerk = 3000;
     float max_obs_find_value = 100;

@@ -254,7 +254,7 @@ def generate_launch_description():
         name='pose_estimator',
         output='screen',
         parameters=[{
-            "encoder_to_meter" : 0.0000006,
+            "encoder_to_meter" : 0.0000006155822,
         }],
         respawn=True,
         prefix='nice -n -9'
@@ -379,7 +379,7 @@ def generate_launch_description():
             "point_to_velocity_ratio": 0.003,
             "point_to_velocity_angle_threshold": 0.56,
             "metode_perhitungan": 1,
-            "setpoint_x": 320,
+            "setpoint_x": 120,
             "setpoint_y": 240,
             "camera_namespace": "cam_kanan",
             "right_to_left_scan": False,
@@ -662,8 +662,8 @@ def generate_launch_description():
         [
             # rs2_cam_kiri,
             # rs2_cam_kanan,
-            # vision_capture_kanan,
-            # lane_detection_kanan,
+            vision_capture_kanan,
+            lane_detection_kanan,
             # aruco_detection_kanan,
             # vision_capture_kiri,
             # lane_detection_kiri,
@@ -681,20 +681,20 @@ def generate_launch_description():
             # hokuyo_lidar_driver,
             # urg_node2_node_configure_event_handler,
             # urg_node2_node_activate_event_handler,
-            # obstacle_filter,
+            obstacle_filter,
 
             # imu_serial,
 
-            # rosbridge_server, 
-            # web_video_server,
+            rosbridge_server, 
+            web_video_server,
 
             # beckhoff,
             # CANbus_HAL,
 
             master,
-            # ui_server,
+            ui_server,
 
-            joy_node,
+            # joy_node,
 
 
 
