@@ -73,7 +73,7 @@ public:
         sensor_right_encoder = msg->data * 0.5;
 
         std_msgs::msg::Float32 msg_encoder_meter;
-        msg_encoder_meter.data = msg->data * encoder_to_meter;
+        msg_encoder_meter.data = msg->data * encoder_to_meter * 50;
         pub_encoder_meter->publish(msg_encoder_meter);
     }
 

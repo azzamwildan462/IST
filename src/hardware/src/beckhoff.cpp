@@ -9,9 +9,10 @@
 
 #define EC_TIMEOUTMON 5000
 
-#define DO_TRANSMISSION_FORWARD 0b001
-#define DO_TRANSMISSION_NEUTRAL 0b010
-#define DO_TRANSMISSION_REVERSE 0b100
+#define DO_SWITCH_THROTTLE 0b10000
+#define DO_TRANSMISSION_NEUTRAL 0b100
+#define DO_TRANSMISSION_REVERSE 0b001
+#define DO_TRANSMISSION_FORWARD 0b010
 
 #define EL6751_ID 0x1a5f3052 // CANopen
 #define EL2889_ID 0x0b493052 // Digital output
@@ -355,23 +356,26 @@ public:
     void callback_sub_master_actuator(const std_msgs::msg::Float32MultiArray::SharedPtr msg)
     {
         static uint16_t counter_zero_velocity = 0;
+        static uint16_t counter_plus_velocity = 0;
         master_target_volt_hat = msg->data[0];
         master_target_steering = msg->data[1];
 
-        if (buffer_dac_velocity <= 0.45)
+        if (buffer_dac_velocity < 0.45)
         {
             counter_zero_velocity++;
+            counter_plus_velocity = 0;
         }
         else
         {
             counter_zero_velocity = 0;
+            counter_plus_velocity++;
         }
 
-        if (counter_zero_velocity > 50)
+        if (counter_zero_velocity > 1)
         {
             transmission = 1;
         }
-        else
+        else if (counter_plus_velocity > 0)
         {
             transmission = 3;
         }
@@ -379,6 +383,7 @@ public:
 
     void callback_tim_50hz()
     {
+        // static uint16_t do_data_buffer = digital_out->data;
         ec_send_processdata();
         int wkc = ec_receive_processdata(EC_TIMEOUTRET);
 
@@ -394,6 +399,7 @@ public:
                 // Netral
                 if (transmission_master == 1)
                 {
+                    digital_out->data &= ~DO_SWITCH_THROTTLE;
                     digital_out->data &= ~DO_TRANSMISSION_FORWARD;
                     digital_out->data &= ~DO_TRANSMISSION_REVERSE;
                     digital_out->data |= DO_TRANSMISSION_NEUTRAL;
@@ -404,13 +410,21 @@ public:
                     digital_out->data &= ~DO_TRANSMISSION_NEUTRAL;
                     digital_out->data &= ~DO_TRANSMISSION_REVERSE;
                     digital_out->data |= DO_TRANSMISSION_FORWARD;
+
+                    // Sementara
+                    if (transmission == 3)
+                        digital_out->data |= DO_SWITCH_THROTTLE;
                 }
                 // Reverse
-                else if (transmission_master == 2)
+                else if (transmission_master == 5)
                 {
                     digital_out->data &= ~DO_TRANSMISSION_FORWARD;
                     digital_out->data &= ~DO_TRANSMISSION_NEUTRAL;
                     digital_out->data |= DO_TRANSMISSION_REVERSE;
+
+                    // Sementara
+                    if (transmission == 3)
+                        digital_out->data |= DO_SWITCH_THROTTLE;
                 }
             }
             else
@@ -418,6 +432,7 @@ public:
                 // Netral
                 if (transmission == 1)
                 {
+                    digital_out->data &= ~DO_SWITCH_THROTTLE;
                     digital_out->data &= ~DO_TRANSMISSION_FORWARD;
                     digital_out->data &= ~DO_TRANSMISSION_REVERSE;
                     digital_out->data |= DO_TRANSMISSION_NEUTRAL;
@@ -427,26 +442,42 @@ public:
                 {
                     digital_out->data &= ~DO_TRANSMISSION_NEUTRAL;
                     digital_out->data &= ~DO_TRANSMISSION_REVERSE;
+                    digital_out->data |= DO_SWITCH_THROTTLE;
                     digital_out->data |= DO_TRANSMISSION_FORWARD;
                 }
             }
+
+            // digital_out->data = ~do_data_buffer;
 
             // ===================================================================================
 
             fb_throttle_velocity_volt = (float)analog_input->data_2 * ANALOG_INPUT_SCALER;
 
-            buffer_dac_velocity += master_target_volt_hat;
+            // Ketika throttle ditekan, maka ikut throttle
+            if (fb_throttle_velocity_volt > 0.5)
+            {
+                buffer_dac_velocity = fb_throttle_velocity_volt;
+            }
+            else
+            {
+                buffer_dac_velocity += master_target_volt_hat;
+            }
 
             if (buffer_dac_velocity <= 0.4)
                 buffer_dac_velocity = 0.4;
-            else if (buffer_dac_velocity >= 4.0)
-                buffer_dac_velocity = 4.0;
+            else if (buffer_dac_velocity >= 1.2)
+                buffer_dac_velocity = 1.2;
 
-            analog_output->data_1 = (int16_t)(buffer_dac_velocity * ANALOG_OUT_SCALER);
-            logger.info("INFO: %.2f || %.2f", fb_throttle_velocity_volt, buffer_dac_velocity);
+            float dac_velocity_send = 0.40;
 
-            float default_5v = 5.0;
-            analog_output->data_2 = (int16_t)(default_5v * ANALOG_OUT_SCALER);
+            // Aktifkan relay dulu lalu beri throttle
+            if (transmission == 3)
+            {
+                dac_velocity_send = buffer_dac_velocity;
+            }
+
+            analog_output->data_2 = (int16_t)(dac_velocity_send * ANALOG_OUT_SCALER);
+            logger.info("INFO: %.2f || %.2f %.2f %d", fb_throttle_velocity_volt, buffer_dac_velocity, dac_velocity_send, digital_out->data);
 
             // ====================================================================================
 

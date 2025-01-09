@@ -23,7 +23,9 @@
 #define FSM_GLOBAL_INIT 0
 #define FSM_GLOBAL_PREOP 1
 #define FSM_GLOBAL_SAFEOP 2
-#define FSM_GLOBAL_OP 3
+#define FSM_GLOBAL_OP_3 3
+#define FSM_GLOBAL_OP_4 4
+#define FSM_GLOBAL_OP_5 5
 
 #define FSM_LOCAL_PRE_FOLLOW_LANE 0
 #define FSM_LOCAL_FOLLOW_LANE 1
@@ -67,12 +69,12 @@ public:
     // Configs
     // ===============================================================================================
     bool use_ekf_odometry = false;
-    float profile_max_acceleration = 10;
-    float profile_max_decceleration = 50;
-    float profile_max_velocity = 4;
+    float profile_max_acceleration = 30;
+    float profile_max_decceleration = 60;
+    float profile_max_velocity = 1; // m/s (1 m/s == 3.6 km/h)
     float profile_max_accelerate_jerk = 100;
     float profile_max_decelerate_jerk = 1000;
-    float profile_max_braking = 20;
+    float profile_max_braking = 3;
     float profile_max_braking_acceleration = 2000;
     float profile_max_braking_jerk = 3000;
     float max_obs_find_value = 100;
@@ -193,6 +195,8 @@ public:
     void manual_motion(float vx, float vy, float wz);
     void follow_lane(float vx, float vy, float wz);
     void follow_lane_2_cam(float vx, float vy, float wz);
+    void follow_lane_2_cam_gas_manual(float vx, float vy, float wz);
+    void follow_lane_2_cam_steer_manual(float vx, float vy, float wz);
     float obstacle_influence(float gain);
 
     // Misc

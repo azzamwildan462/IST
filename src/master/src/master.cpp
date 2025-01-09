@@ -72,7 +72,7 @@ Master::Master()
     //----Timer
     tim_50hz = this->create_wall_timer(std::chrono::milliseconds(20), std::bind(&Master::callback_tim_50hz, this));
 
-    pid_vx.init(0.277, 0.00001, 0, dt, 0, 1, 0, 0.5);
+    pid_vx.init(0.0020, 0.000001, 0, dt, 0, 0.004, 0, 0.00005);
 
     logger.info("Master init success");
     global_fsm.value = FSM_GLOBAL_PREOP;
@@ -95,9 +95,17 @@ void Master::callback_sub_joy(const sensor_msgs::msg::Joy::SharedPtr msg)
 
     if (msg->buttons[0] > 0)
     {
-        transmission_joy_master = 1;
+        transmission_joy_master = 5;
     }
     else if (msg->buttons[1] > 0)
+    {
+        transmission_joy_master = 1;
+    }
+    else if (msg->buttons[2] > 0)
+    {
+        transmission_joy_master = 0;
+    }
+    else if (msg->buttons[3] > 0)
     {
         transmission_joy_master = 3;
     }
@@ -243,85 +251,83 @@ void Master::callback_tim_50hz()
 
     process_marker();
 
-    // switch (global_fsm.value)
-    // {
-    // /**
-    //  * Pre-operation
-    //  * Keadaan ini memastikan semua sistem tidak ada error
-    //  */
-    // case FSM_GLOBAL_PREOP:
-    //     if (error_code_beckhoff + error_code_cam_kiri + error_code_cam_kanan + error_code_lidar + error_code_pose_estimator + error_code_obstacle_filter + error_code_aruco_kiri + error_code_aruco_kanan + error_code_can == 0)
-    //     {
-    //         local_fsm.value = 0;
-    //         global_fsm.value = FSM_GLOBAL_SAFEOP;
-    //     }
+    switch (global_fsm.value)
+    {
+    /**
+     * Pre-operation
+     * Keadaan ini memastikan semua sistem tidak ada error
+     */
+    case FSM_GLOBAL_PREOP:
+        if (error_code_beckhoff + error_code_cam_kiri + error_code_cam_kanan + error_code_lidar + error_code_pose_estimator + error_code_obstacle_filter + error_code_aruco_kiri + error_code_aruco_kanan + error_code_can == 0)
+        {
+            local_fsm.value = 0;
+            global_fsm.value = FSM_GLOBAL_SAFEOP;
+        }
 
-    //     if (fabs(target_velocity_joy_x) > 0.1 || fabs(target_velocity_joy_y) > 0.1 || fabs(target_velocity_joy_wz) > 0.1)
-    //     {
-    //         manual_motion(target_velocity_joy_x, target_velocity_joy_y, target_velocity_joy_wz);
-    //     }
-    //     else
-    //     {
-    //         manual_motion(-20, 0, 0);
-    //     }
-    //     break;
+        if (fabs(target_velocity_joy_x) > 0.1 || fabs(target_velocity_joy_y) > 0.1 || fabs(target_velocity_joy_wz) > 0.1)
+        {
+            manual_motion(target_velocity_joy_x, target_velocity_joy_y, target_velocity_joy_wz);
+        }
+        else
+        {
+            manual_motion(-profile_max_braking, 0, 0);
+        }
+        break;
 
-    // /**
-    //  * Safe operation
-    //  * Memastikan semua data bisa diterima
-    //  */
-    // case FSM_GLOBAL_SAFEOP:
-    //     if (error_code_beckhoff + error_code_cam_kiri + error_code_cam_kanan + error_code_lidar + error_code_pose_estimator + error_code_obstacle_filter + error_code_aruco_kiri + error_code_aruco_kanan + error_code_can > 0)
-    //     {
-    //         global_fsm.value = FSM_GLOBAL_PREOP;
-    //     }
+    /**
+     * Safe operation
+     * Memastikan semua data bisa diterima
+     */
+    case FSM_GLOBAL_SAFEOP:
+        if (error_code_beckhoff + error_code_cam_kiri + error_code_cam_kanan + error_code_lidar + error_code_pose_estimator + error_code_obstacle_filter + error_code_aruco_kiri + error_code_aruco_kanan + error_code_can > 0)
+        {
+            global_fsm.value = FSM_GLOBAL_PREOP;
+        }
 
-    //     {
-    //         rclcpp::Duration dt_pose_estimator = current_time - last_time_pose_estimator;
-    //         rclcpp::Duration dt_cam_kiri = current_time - last_time_cam_kiri;
-    //         rclcpp::Duration dt_cam_kanan = current_time - last_time_cam_kanan;
-    //         rclcpp::Duration dt_obstacle_filter = current_time - last_time_obstacle_filter;
-    //         rclcpp::Duration dt_beckhoff = current_time - last_time_beckhoff;
-    //         rclcpp::Duration dt_lidar = current_time - last_time_lidar;
-    //         rclcpp::Duration dt_aruco_kiri = current_time - last_time_aruco_kiri;
-    //         rclcpp::Duration dt_aruco_kanan = current_time - last_time_aruco_kanan;
+        {
+            rclcpp::Duration dt_pose_estimator = current_time - last_time_pose_estimator;
+            rclcpp::Duration dt_cam_kiri = current_time - last_time_cam_kiri;
+            rclcpp::Duration dt_cam_kanan = current_time - last_time_cam_kanan;
+            rclcpp::Duration dt_obstacle_filter = current_time - last_time_obstacle_filter;
+            rclcpp::Duration dt_beckhoff = current_time - last_time_beckhoff;
+            rclcpp::Duration dt_lidar = current_time - last_time_lidar;
+            rclcpp::Duration dt_aruco_kiri = current_time - last_time_aruco_kiri;
+            rclcpp::Duration dt_aruco_kanan = current_time - last_time_aruco_kanan;
 
-    //         // Jika sudah berhasil menerima semua data yang diperlukan
-    //         if (dt_pose_estimator.seconds() < 1 && dt_cam_kiri.seconds() < 1 && dt_cam_kanan.seconds() < 1 && dt_obstacle_filter.seconds() < 1 && dt_beckhoff.seconds() < 1 && dt_lidar.seconds() < 1 && dt_aruco_kiri.seconds() < 1 && dt_aruco_kanan.seconds() < 1)
-    //         {
-    //             target_velocity_joy_x = 0;
-    //             target_velocity_joy_y = 0;
-    //             target_velocity_joy_wz = 0;
-    //             local_fsm.value = 0;
-    //             global_fsm.value = FSM_GLOBAL_OP;
-    //             time_start_operation = current_time;
-    //         }
-    //     }
+            // Jika sudah berhasil menerima semua data yang diperlukan
+            if (dt_pose_estimator.seconds() < 1 && dt_cam_kiri.seconds() < 1 && dt_cam_kanan.seconds() < 1 && dt_obstacle_filter.seconds() < 1 && dt_beckhoff.seconds() < 1 && dt_lidar.seconds() < 1 && dt_aruco_kiri.seconds() < 1 && dt_aruco_kanan.seconds() < 1)
+            {
+                target_velocity_joy_x = 0;
+                target_velocity_joy_y = 0;
+                target_velocity_joy_wz = 0;
+                local_fsm.value = 0;
+                global_fsm.value = FSM_GLOBAL_OP_3;
+                time_start_operation = current_time;
+            }
+        }
 
-    //     if (fabs(target_velocity_joy_x) > 0.1 || fabs(target_velocity_joy_y) > 0.1 || fabs(target_velocity_joy_wz) > 0.1)
-    //     {
-    //         manual_motion(target_velocity_joy_x, target_velocity_joy_y, target_velocity_joy_wz);
-    //     }
-    //     else
-    //     {
-    //         manual_motion(-20, 0, 0);
-    //     }
-    //     break;
+        if (fabs(target_velocity_joy_x) > 0.1 || fabs(target_velocity_joy_y) > 0.1 || fabs(target_velocity_joy_wz) > 0.1)
+        {
+            manual_motion(target_velocity_joy_x, target_velocity_joy_y, target_velocity_joy_wz);
+        }
+        else
+        {
+            manual_motion(-profile_max_braking, 0, 0);
+        }
+        break;
 
-    // /**
-    //  * Global operation
-    //  * Sistem beroperasi secara otomatis
-    //  */
-    // case FSM_GLOBAL_OP:
-    //     if (error_code_beckhoff + error_code_cam_kiri + error_code_cam_kanan + error_code_lidar + error_code_pose_estimator + error_code_obstacle_filter + error_code_aruco_kiri + error_code_aruco_kanan + error_code_can > 0)
-    //     {
-    //         global_fsm.value = FSM_GLOBAL_PREOP;
-    //     }
-    //     process_local_fsm();
-    //     break;
-    // }
-
-    process_local_fsm();
+    /**
+     * Global operation
+     * Sistem beroperasi secara otomatis
+     */
+    case FSM_GLOBAL_OP_3:
+        if (error_code_beckhoff + error_code_cam_kiri + error_code_cam_kanan + error_code_lidar + error_code_pose_estimator + error_code_obstacle_filter + error_code_aruco_kiri + error_code_aruco_kanan + error_code_can > 0)
+        {
+            global_fsm.value = FSM_GLOBAL_PREOP;
+        }
+        process_local_fsm();
+        break;
+    }
 
     rclcpp::Duration dt_joy = current_time - last_time_joy;
     if (dt_joy.seconds() > 0.8)

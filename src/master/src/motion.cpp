@@ -136,7 +136,7 @@ void Master::manual_motion(float vx, float vy, float wz)
     else
     {
         actuation_vx = pid_vx.calculate(vx_buffer - fb_encoder_meter);
-        actuation_vx = vx_buffer; // Sementara untuk testing
+        // actuation_vx = vx_buffer; // Sementara untuk testing
         actuation_ay = 0;
         actuation_wz = wz_buffer;
     }
@@ -181,6 +181,63 @@ void Master::follow_lane_2_cam(float vx, float vy, float wz)
     }
 
     manual_motion(target_max_velocity, 0, out_steer);
+}
+
+void Master::follow_lane_2_cam_gas_manual(float vx, float vy, float wz)
+{
+    static float target_max_velocity = 0;
+
+    (void)vy;
+    (void)wz;
+
+    /**
+     * Panic state!
+     * Ketika tidak atau kurang mendeteksi garis
+     */
+    if (lane_kiri_single_cam.points.size() < 4 && lane_kanan_single_cam.points.size() < 4)
+    {
+        manual_motion(-profile_max_braking, 0, 0);
+        return;
+    }
+
+    float out_steer = cam_kiri_pid_output * 0.5 + cam_kanan_pid_output * 0.5;
+
+    manual_motion(vx, 0, out_steer);
+}
+
+void Master::follow_lane_2_cam_steer_manual(float vx, float vy, float wz)
+{
+    static float target_max_velocity = 0;
+
+    (void)vy;
+
+    /**
+     * Panic state!
+     * Ketika tidak atau kurang mendeteksi garis
+     */
+    if (lane_kiri_single_cam.points.size() < 4 && lane_kanan_single_cam.points.size() < 4)
+    {
+        manual_motion(-profile_max_braking, 0, 0);
+        return;
+    }
+
+    float velocity_gain = cam_kiri_velocity_gain * 0.5 + cam_kanan_velocity_gain * 0.5;
+
+    target_max_velocity = target_max_velocity * 0.2 + fmaxf(vx, profile_max_velocity) * velocity_gain * 0.8;
+
+    /**
+     * Menghitung efek obstacle
+     * Semakin besar emergency, semakin cepat robot untuk berhenti
+     */
+    float obstacle_emergency = obstacle_influence(2);
+    if (obstacle_emergency > 0.2)
+    {
+        // logger.info("Emergency brake ada obstacle %.2f", obstacle_emergency);
+        manual_motion(-profile_max_braking * obstacle_emergency, 0, 0);
+        return;
+    }
+
+    manual_motion(target_max_velocity, 0, wz);
 }
 
 void Master::follow_lane(float vx, float vy, float wz)
