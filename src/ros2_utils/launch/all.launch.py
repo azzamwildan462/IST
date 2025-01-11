@@ -316,15 +316,14 @@ def generate_launch_description():
         prefix='nice -n -20 chrt -f 90'
     )
 
-# CAnbus
-    # CANbus = Node(
-    #     package='hardware',
-    #     executable='CANbus',
-    #     name='CANbus',
-    #     output='screen',
-    #     parameters=[{}],
-    #     respawn=True,
-    # )
+    keyboard_input = Node(
+        package='hardware',
+        executable='keyboard_input',
+        name='keyboard_input',
+        output='screen',
+        respawn=True,
+        prefix=['xterm -e'],
+    )
 
     # vision_capture = Node(
     #     package='vision',
@@ -688,13 +687,14 @@ def generate_launch_description():
             # rosbridge_server, 
             # web_video_server,
 
-            beckhoff,
-            CANbus_HAL,
+            # beckhoff,
+            # CANbus_HAL,
 
             master,
             # ui_server,
 
             joy_node,
+            keyboard_input,
 
 
 

@@ -65,6 +65,7 @@ public:
     rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_error_code_can;
     rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr sub_joy;
     rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr sub_encoder_meter;
+    rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_key_pressed;
 
     // Configs
     // ===============================================================================================
@@ -151,6 +152,7 @@ public:
     rclcpp::Time last_time_aruco_kiri;
     rclcpp::Time last_time_aruco_kanan;
     rclcpp::Time last_time_joy;
+    rclcpp::Time last_time_key_pressed;
     rclcpp::Time time_start_operation;
     rclcpp::Time time_start_follow_lane;
 
@@ -183,6 +185,7 @@ public:
     void callback_sub_error_code_aruco_kanan(const std_msgs::msg::Int16::SharedPtr msg);
     void callback_sub_error_code_can(const std_msgs::msg::Int16::SharedPtr msg);
     void callback_sub_encoder_meter(const std_msgs::msg::Float32::SharedPtr msg);
+    void callback_sub_key_pressed(const std_msgs::msg::Int16::SharedPtr msg);
 
     // Process
     // ===============================================================================================

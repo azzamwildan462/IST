@@ -23,10 +23,12 @@ include_directories(
 add_executable(beckhoff src/beckhoff.cpp)
 add_executable(CANbus_HAL src/CANbus_HAL.cpp)
 add_executable(serial_imu src/serial_imu.cpp)
+add_executable(keyboard_input src/keyboard_input.cpp)
 
 ament_target_dependencies(beckhoff rclcpp std_msgs ros2_utils)
 ament_target_dependencies(CANbus_HAL rclcpp std_msgs ros2_utils)
 ament_target_dependencies(serial_imu rclcpp std_msgs sensor_msgs ros2_utils)
+ament_target_dependencies(keyboard_input rclcpp std_msgs)
 
 target_link_libraries(beckhoff ${CURRENT_WORKING_DIRECTORY}/../../SOEM_local/install/lib/libsoem.a)
 
@@ -34,6 +36,7 @@ install(TARGETS
   beckhoff
   CANbus_HAL
   serial_imu
+  keyboard_input
   DESTINATION lib/${PROJECT_NAME}
 )
 

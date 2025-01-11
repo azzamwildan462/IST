@@ -23,4 +23,12 @@ Command penting:
 ```
 sudo su (Run program menggunakan root)
 ps -eo pid,comm,pri,ni,cls (Untuk melihat priority, niceness, Scheduling)
+
+Pastikan ssh (di server) forward x11 
+sudo nano /etc/ssh/sshd_config
+PermitRootLogin yes
+X11Forwarding yes
+X11UseLocalhost yes 
+
+Pastikan untuk auth setelah melakukan sudo su (lihar di auth_x11_ssh.txt)
 ```

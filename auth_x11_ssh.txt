@@ -1,0 +1,2 @@
+export DISPLAY=$DISPLAY
+export XAUTHORITY=/home/wildan/.Xauthority

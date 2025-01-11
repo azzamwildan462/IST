@@ -61,6 +61,8 @@ Master::Master()
         "/can/error_code", 1, std::bind(&Master::callback_sub_error_code_can, this, std::placeholders::_1));
     sub_encoder_meter = this->create_subscription<std_msgs::msg::Float32>(
         "/encoder_meter", 1, std::bind(&Master::callback_sub_encoder_meter, this, std::placeholders::_1));
+    sub_key_pressed = this->create_subscription<std_msgs::msg::Int16>(
+        "/key_pressed", 1, std::bind(&Master::callback_sub_key_pressed, this, std::placeholders::_1));
 
     if (use_ekf_odometry)
         sub_odometry = this->create_subscription<nav_msgs::msg::Odometry>(
@@ -79,6 +81,47 @@ Master::Master()
 }
 Master::~Master()
 {
+}
+
+void Master::callback_sub_key_pressed(const std_msgs::msg::Int16::SharedPtr msg)
+{
+    last_time_key_pressed = rclcpp::Clock(RCL_SYSTEM_TIME).now();
+
+    switch (msg->data)
+    {
+    case 'j':
+        target_velocity_joy_x = 0.4166;
+        break;
+    case 'u':
+        target_velocity_joy_x = 0.638;
+        break;
+    case 'i':
+        target_velocity_joy_x = profile_max_velocity;
+        break;
+    case 'm':
+        target_velocity_joy_wz = fb_steering_angle - 0.1;
+        break;
+    case 'b':
+        target_velocity_joy_wz = fb_steering_angle + 0.1;
+        break;
+
+    case ' ':
+        target_velocity_joy_x = 0;
+        break;
+
+    case 'e':
+        transmission_joy_master = 3;
+        break;
+    case 'd':
+        transmission_joy_master = 1;
+        break;
+    case 'c':
+        transmission_joy_master = 5;
+        break;
+    case 's':
+        transmission_joy_master = 0;
+        break;
+    }
 }
 
 void Master::callback_sub_encoder_meter(const std_msgs::msg::Float32::SharedPtr msg)
@@ -270,7 +313,7 @@ void Master::callback_tim_50hz()
         }
         else
         {
-            manual_motion(-profile_max_braking, 0, 0);
+            manual_motion(0, 0, 0);
         }
         break;
 
@@ -312,7 +355,7 @@ void Master::callback_tim_50hz()
         }
         else
         {
-            manual_motion(-profile_max_braking, 0, 0);
+            manual_motion(0, 0, 0);
         }
         break;
 
@@ -330,7 +373,8 @@ void Master::callback_tim_50hz()
     }
 
     rclcpp::Duration dt_joy = current_time - last_time_joy;
-    if (dt_joy.seconds() > 0.8)
+    rclcpp::Duration dt_key_pressed = current_time - last_time_key_pressed;
+    if (dt_joy.seconds() > 0.8 && dt_key_pressed.seconds() > 5)
     {
         transmission_joy_master = 0;
     }

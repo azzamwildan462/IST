@@ -185,8 +185,6 @@ void Master::follow_lane_2_cam(float vx, float vy, float wz)
 
 void Master::follow_lane_2_cam_gas_manual(float vx, float vy, float wz)
 {
-    static float target_max_velocity = 0;
-
     (void)vy;
     (void)wz;
 
