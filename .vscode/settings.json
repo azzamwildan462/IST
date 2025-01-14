@@ -83,5 +83,21 @@
     "ros.distro": "noetic",
     "C_Cpp.default.compilerPath": "/usr/bin/g++",
     "C_Cpp.errorSquiggles": "disabled",
-    "cmake.sourceDirectory": "/home/wildan/proyek/robotika/IST/src/ros2_utils"
+    "cmake.sourceDirectory": "/home/wildan/proyek/robotika/IST/src/ros2_utils",
+    "python.autoComplete.extraPaths": [
+        "/home/her/Documents/project/IST/install/wit_ros2_imu/lib/python3.10/site-packages",
+        "/home/her/Documents/project/IST/install/ros2_interface/local/lib/python3.10/dist-packages",
+        "/home/her/Documents/project/IST/install/realsense2_camera_msgs/local/lib/python3.10/dist-packages",
+        "/home/her/Documents/project/IST/install/livox_ros_driver2/local/lib/python3.10/dist-packages",
+        "/opt/ros/humble/lib/python3.10/site-packages",
+        "/opt/ros/humble/local/lib/python3.10/dist-packages"
+    ],
+    "python.analysis.extraPaths": [
+        "/home/her/Documents/project/IST/install/wit_ros2_imu/lib/python3.10/site-packages",
+        "/home/her/Documents/project/IST/install/ros2_interface/local/lib/python3.10/dist-packages",
+        "/home/her/Documents/project/IST/install/realsense2_camera_msgs/local/lib/python3.10/dist-packages",
+        "/home/her/Documents/project/IST/install/livox_ros_driver2/local/lib/python3.10/dist-packages",
+        "/opt/ros/humble/lib/python3.10/site-packages",
+        "/opt/ros/humble/local/lib/python3.10/dist-packages"
+    ]
 }
