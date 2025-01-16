@@ -16,6 +16,7 @@ Master::Master()
     pub_to_ui = this->create_publisher<std_msgs::msg::Float32MultiArray>("/master/to_ui", 1);
     pub_actuator = this->create_publisher<std_msgs::msg::Float32MultiArray>("/master/actuator", 1);
     pub_transmission_master = this->create_publisher<std_msgs::msg::Int16>("/master/transmission", 1);
+    pub_pose_offset = this->create_publisher<nav_msgs::msg::Odometry>("/master/pose_offset", 1);
 
     sub_obs_find = this->create_subscription<std_msgs::msg::Float32>(
         "/obstacle_filter/obs_find", 1, std::bind(&Master::callback_sub_obs_find, this, std::placeholders::_1));
@@ -120,6 +121,16 @@ void Master::callback_sub_key_pressed(const std_msgs::msg::Int16::SharedPtr msg)
         break;
     case 's':
         transmission_joy_master = 0;
+        break;
+
+    case 'o':
+        set_pose_offset(0, 0, 0);
+        break;
+    case 'p':
+        set_pose_offset(1, 2, -1.57);
+        break;
+    case 'l':
+        set_pose_offset(1, 2, 1.57);
         break;
     }
 }

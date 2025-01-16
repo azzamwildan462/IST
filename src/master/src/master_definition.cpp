@@ -143,3 +143,13 @@ void Master::set_initialpose(float x, float y, float yaw)
     msg_initialpose.pose.pose.orientation = get_quat(0, 0, yaw);
     pub_initialpose->publish(msg_initialpose);
 }
+
+void Master::set_pose_offset(float x, float y, float yaw)
+{
+    nav_msgs::msg::Odometry msg_pose_offset;
+    msg_pose_offset.header.frame_id = "pose_offset";
+    msg_pose_offset.header.stamp = this->now();
+    msg_pose_offset.pose.pose.position = get_point(x, y, 0);
+    msg_pose_offset.pose.pose.orientation = get_quat(0, 0, yaw);
+    pub_pose_offset->publish(msg_pose_offset);
+}

@@ -693,12 +693,12 @@ def generate_launch_description():
             master,
             # ui_server,
 
-            joy_node,
+            # joy_node,
             keyboard_input,
 
 
 
-            # rviz2,
+            rviz2,
             # vision_capture,
             # lane_detection,
             # livox_lidar_driver,

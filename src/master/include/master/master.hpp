@@ -42,6 +42,7 @@ public:
     rclcpp::Publisher<std_msgs::msg::Float32MultiArray>::SharedPtr pub_to_ui;
     rclcpp::Publisher<std_msgs::msg::Float32MultiArray>::SharedPtr pub_actuator;
     rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr pub_transmission_master;
+    rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr pub_pose_offset;
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr sub_beckhoff_sensor;
     rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr sub_obs_find;
     rclcpp::Subscription<ros2_interface::msg::PointArray>::SharedPtr sub_lane_kiri;
@@ -209,6 +210,7 @@ public:
     std::vector<geometry_msgs::msg::Point> get_path(float x0, float y0, float x1, float y1, float resolution);
     geometry_msgs::msg::Point get_near(float x, float y, std::vector<geometry_msgs::msg::Point> ps);
     void set_initialpose(float x, float y, float yaw);
+    void set_pose_offset(float x, float y, float yaw);
 };
 
 #endif // MASTER_HPP

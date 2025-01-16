@@ -1,6 +1,7 @@
 #include "nav_msgs/msg/odometry.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "ros2_utils/global_definitions.hpp"
+#include "ros2_utils/help_logger.hpp"
 #include "std_msgs/msg/int16.hpp"
 #include "std_msgs/msg/int32.hpp"
 #include "std_msgs/msg/string.hpp"
@@ -21,9 +22,12 @@ public:
     rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr pub_encoder_meter;
     rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr sub_encoder;
     rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr sub_gyro;
+    rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr sub_pose_offset;
 
     //----TransformBroadcaster
     std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster;
+
+    HelpLogger logger;
 
     // Configs (static)
     // =======================================================
@@ -47,9 +51,14 @@ public:
     PoseEstimator()
         : Node("master")
     {
-        RCLCPP_INFO(this->get_logger(), "PoseEstimator init");
         this->declare_parameter("encoder_to_meter", 1.0);
         this->get_parameter("encoder_to_meter", encoder_to_meter);
+
+        if (!logger.init())
+        {
+            RCLCPP_ERROR(this->get_logger(), "Failed to initialize logger");
+            rclcpp::shutdown();
+        }
 
         tf_broadcaster = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
 
@@ -65,6 +74,24 @@ public:
             "/can/encoder", 1, std::bind(&PoseEstimator::callback_sub_encoder, this, std::placeholders::_1));
         sub_gyro = this->create_subscription<sensor_msgs::msg::Imu>(
             "/hardware/imu", 1, std::bind(&PoseEstimator::callback_sub_gyro, this, std::placeholders::_1));
+        sub_pose_offset = this->create_subscription<nav_msgs::msg::Odometry>(
+            "/master/pose_offset", 1, std::bind(&PoseEstimator::callback_sub_pose_offset, this, std::placeholders::_1));
+
+        logger.info("PoseEstimator initialized");
+    }
+
+    void callback_sub_pose_offset(const nav_msgs::msg::Odometry::SharedPtr msg)
+    {
+        final_pose_xyo[0] = msg->pose.pose.position.x;
+        final_pose_xyo[1] = msg->pose.pose.position.y;
+
+        // get_angle from quartenion
+        tf2::Quaternion q(msg->pose.pose.orientation.x, msg->pose.pose.orientation.y, msg->pose.pose.orientation.z, msg->pose.pose.orientation.w);
+        tf2::Matrix3x3 m(q);
+        double roll, pitch, yaw;
+        m.getRPY(roll, pitch, yaw);
+
+        final_pose_xyo[2] = yaw;
     }
 
     void callback_sub_encoder(const std_msgs::msg::Int32::SharedPtr msg)
@@ -100,6 +127,11 @@ public:
         memcpy(prev_encoder, encoder, sizeof(prev_encoder));
         prev_gyro = gyro;
 
+        while (d_gyro > M_PI)
+            d_gyro -= 2 * M_PI;
+        while (d_gyro < -M_PI)
+            d_gyro += 2 * M_PI;
+
         final_vel_dxdydo[0] = (sensor_left_encoder + sensor_right_encoder) / 2.0 * cosf(final_pose_xyo[2]) * encoder_to_meter / dt;
         final_vel_dxdydo[1] = (sensor_left_encoder + sensor_right_encoder) / 2.0 * sinf(final_pose_xyo[2]) * encoder_to_meter / dt;
         final_vel_dxdydo[2] = d_gyro;
@@ -118,10 +150,10 @@ public:
         while (final_pose_xyo[2] < -M_PI)
             final_pose_xyo[2] += 2 * M_PI;
 
-        float yaw_deg = final_pose_xyo[2] * 180.0 / M_PI;
+        // float yaw_deg = final_pose_xyo[2] * 180.0 / M_PI;
 
         tf2::Quaternion q;
-        q.setRPY(0, 0, yaw_deg);
+        q.setRPY(0, 0, final_pose_xyo[2]);
 
         nav_msgs::msg::Odometry msg_odom;
         msg_odom.header.stamp = time_now;
