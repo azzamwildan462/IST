@@ -401,7 +401,7 @@ int main(int argc, char **argv)
 
     auto node_master = std::make_shared<Master>();
 
-    rclcpp::executors::SingleThreadedExecutor executor;
+    rclcpp::executors::MultiThreadedExecutor executor;
     executor.add_node(node_master);
     executor.spin();
 

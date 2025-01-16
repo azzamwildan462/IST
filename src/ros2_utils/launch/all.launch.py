@@ -682,7 +682,7 @@ def generate_launch_description():
             # urg_node2_node_activate_event_handler,
             # obstacle_filter,
 
-            # imu_serial,
+            imu_serial,
 
             # rosbridge_server, 
             # web_video_server,

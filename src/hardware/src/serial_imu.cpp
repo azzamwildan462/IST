@@ -2,6 +2,7 @@
 #include "ros2_utils/global_definitions.hpp"
 #include "ros2_utils/help_logger.hpp"
 #include "sensor_msgs/msg/imu.hpp"
+#include "tf2/LinearMath/Quaternion.h"
 
 //--Linux Headers
 #include <errno.h>     // Error integer and strerror() function
@@ -244,22 +245,14 @@ public:
                     double pitch = angle_y * M_PI / 180.0;
                     double yaw = angle_z * M_PI / 180.0;
 
-                    double cy = cos(yaw * 0.5);
-                    double sy = sin(yaw * 0.5);
-                    double cp = cos(pitch * 0.5);
-                    double sp = sin(pitch * 0.5);
-                    double cr = cos(roll * 0.5);
-                    double sr = sin(roll * 0.5);
-
-                    double qw = cy * cp * cr + sy * sp * sr;
-                    double qx = cy * cp * sr - sy * sp * cr;
-                    double qy = sy * cp * sr + cy * sp * cr;
-                    double qz = sy * cp * cr - cy * sp * sr;
-
-                    imu_msg.orientation.w = qw;
-                    imu_msg.orientation.x = qx;
-                    imu_msg.orientation.y = qy;
-                    imu_msg.orientation.z = qz;
+                    tf2::Quaternion q_tf2;
+                    q_tf2.setRPY(roll, pitch, yaw);
+                    geometry_msgs::msg::Quaternion q_msg;
+                    q_msg.x = q_tf2.x();
+                    q_msg.y = q_tf2.y();
+                    q_msg.z = q_tf2.z();
+                    q_msg.w = q_tf2.w();
+                    imu_msg.orientation = q_msg;
 
                     uint16_t crc_sum = 0;
                     crc_sum = READ_PROTOCOL + TYPE_ANGLE + (angle_x_buffer & 0xFF) + (angle_x_buffer >> 8) + (angle_y_buffer & 0xFF) + (angle_y_buffer >> 8) + (angle_z_buffer & 0xFF) + (angle_z_buffer >> 8);

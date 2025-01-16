@@ -13,6 +13,7 @@ find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(ros2_utils REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(tf2_ros REQUIRED)
 
 include_directories(
   include
@@ -27,7 +28,7 @@ add_executable(keyboard_input src/keyboard_input.cpp)
 
 ament_target_dependencies(beckhoff rclcpp std_msgs ros2_utils)
 ament_target_dependencies(CANbus_HAL rclcpp std_msgs ros2_utils)
-ament_target_dependencies(serial_imu rclcpp std_msgs sensor_msgs ros2_utils)
+ament_target_dependencies(serial_imu rclcpp std_msgs sensor_msgs ros2_utils tf2_ros)
 ament_target_dependencies(keyboard_input rclcpp std_msgs)
 
 target_link_libraries(beckhoff ${CURRENT_WORKING_DIRECTORY}/../../SOEM_local/install/lib/libsoem.a)

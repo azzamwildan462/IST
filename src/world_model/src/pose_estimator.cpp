@@ -44,6 +44,9 @@ public:
     int32_t sensor_left_encoder = 0;
     int32_t sensor_right_encoder = 0;
 
+    rclcpp::Time last_time_gyro_update;
+    rclcpp::Time current_time;
+
     // Vars
     // =======================================================
     int16_t error_code = 0;
@@ -118,12 +121,24 @@ public:
             return;
         }
 
+        current_time = rclcpp::Clock(RCL_SYSTEM_TIME).now();
+
         /* Not used */
         // int16_t d_left_encoder = encoder[0] - prev_encoder[0];
         // int16_t d_right_encoder = encoder[1] - prev_encoder[1];
         //======================================================
 
         float d_gyro = gyro - prev_gyro;
+
+        rclcpp::Duration dt_gyro = current_time - last_time_gyro_update;
+        static rclcpp::Duration prev_dt_gyro = dt_gyro;
+        if ((prev_dt_gyro.seconds() > 0.12 && dt_gyro.seconds() <= 0.12) || fabs(d_gyro) > 7.28)
+        {
+            logger.warn("Gyro restarted");
+            d_gyro = 0;
+        }
+        prev_dt_gyro = dt_gyro;
+
         memcpy(prev_encoder, encoder, sizeof(prev_encoder));
         prev_gyro = gyro;
 
@@ -143,14 +158,12 @@ public:
 
         final_pose_xyo[0] += final_vel_dxdydo[0] * dt;
         final_pose_xyo[1] += final_vel_dxdydo[1] * dt;
-        final_pose_xyo[2] += final_vel_dxdydo[2] * dt;
+        final_pose_xyo[2] += final_vel_dxdydo[2];
 
         while (final_pose_xyo[2] > M_PI)
             final_pose_xyo[2] -= 2 * M_PI;
         while (final_pose_xyo[2] < -M_PI)
             final_pose_xyo[2] += 2 * M_PI;
-
-        // float yaw_deg = final_pose_xyo[2] * 180.0 / M_PI;
 
         tf2::Quaternion q;
         q.setRPY(0, 0, final_pose_xyo[2]);
@@ -208,6 +221,7 @@ public:
         m.getRPY(roll, pitch, yaw);
 
         gyro = yaw;
+        last_time_gyro_update = rclcpp::Clock(RCL_SYSTEM_TIME).now();
     }
 };
 
