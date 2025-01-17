@@ -75,6 +75,9 @@ public:
     bool is_frame_bgr_available = false;
     cv::Ptr<cv::aruco::Dictionary> aruco_dictionary;
 
+    int center_frame_x = 0;
+    int center_frame_y = 0;
+
     SingleDetection()
         : Node("single_detection")
     {
@@ -815,8 +818,8 @@ public:
         for (size_t i = 0; i < point_garis.size(); i++)
         {
             geometry_msgs::msg::Point p;
-            p.x = point_garis[i].x;
-            p.y = point_garis[i].y;
+            p.x = point_garis[i].x - center_frame_x;
+            p.y = center_frame_y - point_garis[i].y;
             msg_point_garis.points.push_back(p);
         }
         pub_point_garis->publish(msg_point_garis);
@@ -905,6 +908,12 @@ public:
 
     void callback_tim_50hz()
     {
+        if (center_frame_x == 0 && center_frame_y == 0)
+        {
+            center_frame_x = frame_bgr.cols / 2;
+            center_frame_y = frame_bgr.rows / 2;
+        }
+
         if (use_frame_bgr && !detect_aruco)
         {
             process_frame_bgr();

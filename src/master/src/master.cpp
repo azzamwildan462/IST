@@ -102,12 +102,15 @@ void Master::callback_sub_key_pressed(const std_msgs::msg::Int16::SharedPtr msg)
     case 'm':
         target_velocity_joy_wz = fb_steering_angle - 0.1;
         break;
+    case 'n':
+        target_velocity_joy_wz = fb_steering_angle;
+        break;
     case 'b':
         target_velocity_joy_wz = fb_steering_angle + 0.1;
         break;
 
     case ' ':
-        target_velocity_joy_x = 0;
+        target_velocity_joy_x = -1;
         break;
 
     case 'e':
@@ -131,6 +134,25 @@ void Master::callback_sub_key_pressed(const std_msgs::msg::Int16::SharedPtr msg)
         break;
     case 'l':
         set_pose_offset(1, 2, 1.57);
+        break;
+
+    case '0':
+        global_fsm.value = FSM_GLOBAL_INIT;
+        break;
+    case '1':
+        global_fsm.value = FSM_GLOBAL_PREOP;
+        break;
+    case '2':
+        global_fsm.value = FSM_GLOBAL_SAFEOP;
+        break;
+    case '3':
+        global_fsm.value = FSM_GLOBAL_OP_3;
+        break;
+    case '4':
+        global_fsm.value = FSM_GLOBAL_OP_4;
+        break;
+    case '5':
+        global_fsm.value = FSM_GLOBAL_OP_5;
         break;
     }
 }
@@ -312,11 +334,11 @@ void Master::callback_tim_50hz()
      * Keadaan ini memastikan semua sistem tidak ada error
      */
     case FSM_GLOBAL_PREOP:
-        if (error_code_beckhoff + error_code_cam_kiri + error_code_cam_kanan + error_code_lidar + error_code_pose_estimator + error_code_obstacle_filter + error_code_aruco_kiri + error_code_aruco_kanan + error_code_can == 0)
-        {
-            local_fsm.value = 0;
-            global_fsm.value = FSM_GLOBAL_SAFEOP;
-        }
+        // if (error_code_beckhoff + error_code_cam_kiri + error_code_cam_kanan + error_code_lidar + error_code_pose_estimator + error_code_obstacle_filter + error_code_aruco_kiri + error_code_aruco_kanan + error_code_can == 0)
+        // {
+        //     local_fsm.value = 0;
+        //     global_fsm.value = FSM_GLOBAL_SAFEOP;
+        // }
 
         if (fabs(target_velocity_joy_x) > 0.1 || fabs(target_velocity_joy_y) > 0.1 || fabs(target_velocity_joy_wz) > 0.1)
         {
@@ -324,7 +346,7 @@ void Master::callback_tim_50hz()
         }
         else
         {
-            manual_motion(0, 0, 0);
+            manual_motion(-1, 0, 0);
         }
         break;
 
@@ -333,10 +355,10 @@ void Master::callback_tim_50hz()
      * Memastikan semua data bisa diterima
      */
     case FSM_GLOBAL_SAFEOP:
-        if (error_code_beckhoff + error_code_cam_kiri + error_code_cam_kanan + error_code_lidar + error_code_pose_estimator + error_code_obstacle_filter + error_code_aruco_kiri + error_code_aruco_kanan + error_code_can > 0)
-        {
-            global_fsm.value = FSM_GLOBAL_PREOP;
-        }
+        // if (error_code_beckhoff + error_code_cam_kiri + error_code_cam_kanan + error_code_lidar + error_code_pose_estimator + error_code_obstacle_filter + error_code_aruco_kiri + error_code_aruco_kanan + error_code_can > 0)
+        // {
+        //     global_fsm.value = FSM_GLOBAL_PREOP;
+        // }
 
         {
             rclcpp::Duration dt_pose_estimator = current_time - last_time_pose_estimator;
@@ -366,7 +388,7 @@ void Master::callback_tim_50hz()
         }
         else
         {
-            manual_motion(0, 0, 0);
+            manual_motion(-1, 0, 0);
         }
         break;
 
@@ -375,11 +397,27 @@ void Master::callback_tim_50hz()
      * Sistem beroperasi secara otomatis
      */
     case FSM_GLOBAL_OP_3:
-        if (error_code_beckhoff + error_code_cam_kiri + error_code_cam_kanan + error_code_lidar + error_code_pose_estimator + error_code_obstacle_filter + error_code_aruco_kiri + error_code_aruco_kanan + error_code_can > 0)
-        {
-            global_fsm.value = FSM_GLOBAL_PREOP;
-        }
+        // if (error_code_beckhoff + error_code_cam_kiri + error_code_cam_kanan + error_code_lidar + error_code_pose_estimator + error_code_obstacle_filter + error_code_aruco_kiri + error_code_aruco_kanan + error_code_can > 0)
+        // {
+        //     global_fsm.value = FSM_GLOBAL_PREOP;
+        // }
         process_local_fsm();
+        break;
+
+    /**
+     * Global operation (Untuk testing)
+     * Sistem beroperasi secara otomatis, tetapi untuk steeringnya bisa dikontrol melalui joystick
+     */
+    case FSM_GLOBAL_OP_4:
+        follow_lane_2_cam_steer_manual(0, 0, target_velocity_joy_wz);
+        break;
+
+    /**
+     * Global operation (Untuk testing)
+     * Sistem beroperasi secara otomatis, tetapi untuk gasnya bisa dikontrol melalui joystick
+     */
+    case FSM_GLOBAL_OP_5:
+        follow_lane_2_cam_gas_manual(target_velocity_joy_x, 0, 0);
         break;
     }
 

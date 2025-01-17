@@ -52,7 +52,7 @@ public:
     int16_t error_code = 0;
 
     PoseEstimator()
-        : Node("master")
+        : Node("PoseEstimator")
     {
         this->declare_parameter("encoder_to_meter", 1.0);
         this->get_parameter("encoder_to_meter", encoder_to_meter);

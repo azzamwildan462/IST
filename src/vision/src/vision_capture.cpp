@@ -23,6 +23,7 @@ public:
     int output_height;
     bool use_default_params;
     std::string node_namespace = "";
+    std::string hardcoded_image = ""; // Hardcode sementara, image dari file
 
     HelpLogger logger;
     cv::VideoCapture cap;
@@ -52,6 +53,9 @@ public:
         this->declare_parameter("use_default_params", true);
         this->get_parameter("use_default_params", use_default_params);
 
+        this->declare_parameter("hardcoded_image", "");
+        this->get_parameter("hardcoded_image", hardcoded_image);
+
         node_namespace = this->get_namespace();
         node_namespace = node_namespace.substr(1, node_namespace.size() - 1); // /cam_kanan jadi cam_kanan
 
@@ -59,6 +63,46 @@ public:
         {
             RCLCPP_ERROR(this->get_logger(), "Failed to initialize logger");
             rclcpp::shutdown();
+        }
+
+        if (hardcoded_image != "")
+        {
+            logger.info("Hardcoded image: %s", hardcoded_image.c_str());
+
+            //----Publisher
+            pub_image_bgr = this->create_publisher<sensor_msgs::msg::Image>("image_bgr", 1);
+            pub_image_gray = this->create_publisher<sensor_msgs::msg::Image>("image_gray", 1);
+            pub_error_code = this->create_publisher<std_msgs::msg::Int16>("error_code", 1);
+
+            logger.info("VisionCapture init success");
+
+            cv::Mat frame2 = cv::imread(hardcoded_image);
+            if (frame2.empty())
+            {
+                logger.error("Failed to read hardcoded image");
+                rclcpp::shutdown();
+            }
+
+            while (rclcpp::ok())
+            {
+                cv::Mat frame_bgr;
+                cv::resize(frame2, frame_bgr, cv::Size(output_width, output_height));
+                auto msg_frame_bgr = cv_bridge::CvImage(std_msgs::msg::Header(), "bgr8", frame_bgr).toImageMsg();
+                pub_image_bgr->publish(*msg_frame_bgr);
+
+                cv::Mat frame_gray;
+                cv::cvtColor(frame_bgr, frame_gray, cv::COLOR_BGR2GRAY);
+                auto msg_frame_gray = cv_bridge::CvImage(std_msgs::msg::Header(), "mono8", frame_gray).toImageMsg();
+                pub_image_gray->publish(*msg_frame_gray);
+
+                std_msgs::msg::Int16 msg_error_code;
+                msg_error_code.data = error_code;
+                pub_error_code->publish(msg_error_code);
+
+                usleep(1000000 / camera_fps);
+            }
+
+            return;
         }
 
         logger.info("Init camera on: %s", camera_path.c_str());
@@ -131,14 +175,14 @@ public:
 
             // Hardcode sementara, image dari file
             // cv::Mat frame2 = cv::imread("/home/wildan/proyek/robotika/IST/src/vision/assets/test_lane.webp");
-            cv::Mat frame2 = cv::imread("/home/wildan/proyek/robotika/IST/src/vision/assets/" + node_namespace + ".jpeg");
+            // cv::Mat frame2 = cv::imread("/home/wildan/proyek/robotika/IST/src/vision/assets/" + node_namespace + ".jpeg");
             // cv::Mat frame2 = cv::imread("/home/wildan/proyek/robotika/IST/src/vision/assets/aruco_kanan.jpeg");
 
             // cv::Mat flippedImg;
             // cv::flip(frame2, flippedImg, 1); // 1 specifies flipping around the Y-axis
 
             cv::Mat frame_bgr;
-            cv::resize(frame2, frame_bgr, cv::Size(output_width, output_height));
+            cv::resize(frame, frame_bgr, cv::Size(output_width, output_height));
             auto msg_frame_bgr = cv_bridge::CvImage(std_msgs::msg::Header(), "bgr8", frame_bgr).toImageMsg();
             pub_image_bgr->publish(*msg_frame_bgr);
 

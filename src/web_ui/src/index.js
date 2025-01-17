@@ -148,7 +148,13 @@ function control_display_fsm() {
         global_fsm.innerHTML = ": Safe-Operation"
     }
     else if (global_fsm_value == 3) {
-        global_fsm.innerHTML = ": Operation"
+        global_fsm.innerHTML = ": Operation Mode 3"
+    }
+    else if (global_fsm_value == 4) {
+        global_fsm.innerHTML = ": Operation Mode 4"
+    }
+    else if (global_fsm_value == 5) {
+        global_fsm.innerHTML = ": Operation Mode 5"
     }
 
 
@@ -175,8 +181,8 @@ const global_fsm = document.getElementById('global-fsm');
 const master_fsm = document.getElementById('master-fsm');
 
 setInterval(() => {
-    let velocity_actuation_display = velocity_actuation * 10;
-    let velocity_feedback_display = velocity_feedback * 10;
+    let velocity_actuation_display = velocity_actuation * 10 * 3.6;
+    let velocity_feedback_display = velocity_feedback * 10 * 3.6;
     let steering_actuation_display = (steering_actuation) * 135 / 6.28;
     let steering_feedback_display = (steering_feedback) * 135 / 6.28;
 

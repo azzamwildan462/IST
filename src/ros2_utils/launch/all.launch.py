@@ -362,6 +362,10 @@ def generate_launch_description():
         name='vision_capture_kanan',
         output='screen',
         namespace='cam_kanan',
+        parameters=[{
+            "camera_path": "/dev/v4l/by-id/usb-046d_C922_Pro_Stream_Webcam_70F3B3DF-video-index0",
+            "hardcoded_image": "/home/wildan/proyek/robotika/IST/src/vision/assets/cam_kanan.jpeg"
+        }],
         respawn=True,
         prefix='nice -n -8'
     )
@@ -419,7 +423,8 @@ def generate_launch_description():
         output='screen',
         namespace='cam_kiri',
         parameters=[{
-            "camera_path": "/dev/v4l/by-id/usb-046d_C922_Pro_Stream_Webcam_70F3B3DF-video-index0"
+            "camera_path": "/dev/v4l/by-id/usb-046d_C922_Pro_Stream_Webcam_70F3B3DF-video-index0",
+            "hardcoded_image": "/home/wildan/proyek/robotika/IST/src/vision/assets/cam_kiri.jpeg"
         }],
         respawn=True,
         prefix='nice -n -8'
@@ -661,12 +666,12 @@ def generate_launch_description():
         [
             # rs2_cam_kiri,
             # rs2_cam_kanan,
-            # vision_capture_kanan,
-            # lane_detection_kanan,
-            # aruco_detection_kanan,
-            # vision_capture_kiri,
-            # lane_detection_kiri,
-            # aruco_detection_kiri,
+            vision_capture_kanan,
+            lane_detection_kanan,
+            aruco_detection_kanan,
+            vision_capture_kiri,
+            lane_detection_kiri,
+            aruco_detection_kiri,
 
             pose_estimator,
             tf_map_empty,
@@ -682,23 +687,23 @@ def generate_launch_description():
             # urg_node2_node_activate_event_handler,
             # obstacle_filter,
 
-            imu_serial,
+            # imu_serial,
 
-            # rosbridge_server, 
-            # web_video_server,
+            rosbridge_server, 
+            web_video_server,
 
             # beckhoff,
             # CANbus_HAL,
 
             master,
-            # ui_server,
+            ui_server,
 
             # joy_node,
             keyboard_input,
 
 
 
-            rviz2,
+            # rviz2,
             # vision_capture,
             # lane_detection,
             # livox_lidar_driver,

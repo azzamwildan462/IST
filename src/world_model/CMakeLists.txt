@@ -34,6 +34,10 @@ add_executable(obstacle_filter src/obstacle_filter.cpp)
 ament_target_dependencies(obstacle_filter ${var_dependencies})
 target_link_libraries(obstacle_filter ${PCL_LIBRARIES})
 
+add_executable(icp src/icp.cpp)
+ament_target_dependencies(icp ${var_dependencies})
+target_link_libraries(icp ${PCL_LIBRARIES})
+
 install(TARGETS
   pose_estimator
   obstacle_filter
