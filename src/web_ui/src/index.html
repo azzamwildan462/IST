@@ -50,66 +50,160 @@
   </nav>
   <br>
 
-  <div class="grid">
-    <div class="cell">
+  <div class="container is-fluid">
 
-    </div>
-    <div class="cell">
-      <div class="columns">
-        <div class="column is-flex is-flex-direction-column is-align-items-center">
-          <p id="velocity-header" style="padding-bottom: 10px;">Kecepatan</p>
-          <svg>
-            <circle class="velocity-circle0" cx="50" cy="50" r="40" stroke="#e0e0e0"></circle>
-            <circle class="velocity-circle1" cx="50" cy="50" r="40" stroke="#4caf50"></circle>
-            <circle class="velocity-circle2" cx="50" cy="50" r="30" stroke="#cf1f10"></circle>
-            <text x="52" y="52" id="velocity-text">0%</text>
-          </svg>
-          <p id="velocity-kmph" class="has-text-centered" style="padding-top: 10px;">0 km/h</p>
-        </div>
-
-        <div class="column is-flex is-flex-direction-column is-align-items-center">
-          <p id="steering-header" style="padding-bottom: 10px;">Steering</p>
-          <svg>
-            <circle class="steering-circle0" cx="50" cy="50" r="40" stroke="#e0e0e0"></circle>
-            <circle class="steering-circle1" cx="50" cy="50" r="40" stroke="#4caf50"></circle>
-            <circle class="steering-circle2" cx="50" cy="50" r="30" stroke="#cf1f10"></circle>
-            <text x="52" y="52" id="steering-text">0%</text>
-          </svg>
-          <p id="steering-rad" class="has-text-centered" style="padding-top: 10px;">0 rad</p>
-        </div>
-      </div>
-      <div class="columns">
-        <div class="column">
-          <div class="is-size-3 has-text-centered is-family-primary">
-            Baterai:
+    <div class="grid">
+      <div class="cell">
+        <div class="columns">
+          <div class="column">
+            Kontrol UI
+          </div>
+          <div class="column is-four-fifths">
+            <div id="kontrol-ui" class="control">
+              <label class="radio">
+                <input type="radio" name="kontrol-ui" id="kontrol-disable" name="foobar" checked />
+                Disable
+              </label>
+              <label class="radio">
+                <input type="radio" name="kontrol-ui" id="kontrol-enable" name="foobar" />
+                Enable
+              </label>
+            </div>
           </div>
         </div>
-        <div class="column is-four-fifths py-auto my-auto">
-          <progress id="baterai-dom" class="progress is-info" value="0" max="100"></progress>
+
+        <div class="columns">
+          <div class="column">
+            Mode
+          </div>
+          <div class="column is-four-fifths">
+            <div id="mode-radio" class="control">
+              <label class="radio">
+                <input type="radio" name="mode-radio" id="mode-otomatis" name="foobar" checked />
+                Otomatis
+              </label>
+              <label class="radio">
+                <input type="radio" name="mode-radio" id="mode-manual" name="foobar" />
+                Manual
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="columns">
+          <div class="column">
+            Mode Otomatis
+          </div>
+          <div class="column is-four-fifths">
+            <div id="mode-otomatis-radio" class="control">
+              <label class="radio">
+                <input type="radio" name="mode-otomatis-radio" id="full-manual" name="foobar" checked />
+                Full manual
+              </label>
+              <label class="radio">
+                <input type="radio" name="mode-otomatis-radio" id="steer-manual" name="foobar" />
+                Steer manual
+              </label>
+              <label class="radio">
+                <input type="radio" name="mode-otomatis-radio" id="gas-manual" name="foobar" />
+                Gas manual
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="columns">
+          <div class="column">
+            Transmisi
+          </div>
+          <div class="column is-four-fifths">
+            <div id="transmisi" class="control">
+              <label class="radio">
+                <input type="radio" name="transmisi" id="transmisi-auto" name="foobar" checked />
+                Auto
+              </label>
+              <label class="radio">
+                <input type="radio" name="transmisi" id="transmisi-forward" name="foobar" />
+                Forward
+              </label>
+              <label class="radio">
+                <input type="radio" name="transmisi" id="transmisi-neutral" name="foobar" />
+                Neutral
+              </label>
+              <label class="radio">
+                <input type="radio" name="transmisi" id="transmisi-reverse" name="foobar" />
+                Reverse
+              </label>
+            </div>
+          </div>
         </div>
       </div>
+      <div class="cell">
+        <div class="columns">
+          <div class="column is-flex is-flex-direction-column is-align-items-center">
+            <p id="velocity-header" style="padding-bottom: 10px;">Kecepatan</p>
+            <svg>
+              <circle class="velocity-circle0" cx="50" cy="50" r="40" stroke="#e0e0e0"></circle>
+              <circle class="velocity-circle1" cx="50" cy="50" r="40" stroke="#4caf50"></circle>
+              <circle class="velocity-circle2" cx="50" cy="50" r="30" stroke="#cf1f10"></circle>
+              <text x="52" y="52" id="velocity-text">0%</text>
+            </svg>
+            <p id="velocity-kmph" class="has-text-centered" style="padding-top: 10px;">0 km/h</p>
+          </div>
+
+          <div class="column is-flex is-flex-direction-column is-align-items-center">
+            <p id="steering-header" style="padding-bottom: 10px;">Steering</p>
+            <svg>
+              <circle class="steering-circle0" cx="50" cy="50" r="40" stroke="#e0e0e0"></circle>
+              <circle class="steering-circle1" cx="50" cy="50" r="40" stroke="#4caf50"></circle>
+              <circle class="steering-circle2" cx="50" cy="50" r="30" stroke="#cf1f10"></circle>
+              <text x="52" y="52" id="steering-text">0%</text>
+            </svg>
+            <p id="steering-rad" class="has-text-centered" style="padding-top: 10px;">0 rad</p>
+          </div>
+        </div>
+        <div class="columns">
+          <div class="column">
+            <div class="is-size-3 has-text-centered is-family-primary">
+              Baterai:
+            </div>
+          </div>
+          <div class="column is-four-fifths py-auto my-auto">
+            <progress id="baterai-dom" class="progress is-info" value="0" max="100"></progress>
+          </div>
+        </div>
+      </div>
+
+      <div class="cell">
+        <div class="columns">
+          <div class="column">
+            Main FSM
+          </div>
+          <div id="global-fsm" class="column is-four-fifths">
+            INIT
+          </div>
+        </div>
+        <div class="columns">
+          <div class="column">
+            Master FSM
+          </div>
+          <div id="master-fsm" class="column is-four-fifths">
+            INIT
+          </div>
+        </div>
+        <div class="columns">
+          <div class="column">
+            Transmisi
+          </div>
+          <div id="master-transmission" class="column is-four-fifths">
+            Auto
+          </div>
+        </div>
+      </div>
+
     </div>
 
-    <div class="cell">
-      <div class="columns">
-        <div class="column">
-          Main FSM
-        </div>
-        <div id="global-fsm" class="column is-four-fifths">
-          INIT
-        </div>
-      </div>
-      <div class="columns">
-        <div class="column">
-          Master FSM
-        </div>
-        <div id="master-fsm" class="column is-four-fifths">
-          INIT
-        </div>
-      </div>
-    </div>
   </div>
-
 
   <script type="text/javascript" src="index.js">
   </script>

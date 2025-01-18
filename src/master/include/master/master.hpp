@@ -17,6 +17,7 @@
 #include "std_msgs/msg/float32.hpp"
 #include "std_msgs/msg/float32_multi_array.hpp"
 #include "std_msgs/msg/int16.hpp"
+#include "std_msgs/msg/u_int16.hpp"
 #include "tf2/LinearMath/Quaternion.h"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 
@@ -26,6 +27,7 @@
 #define FSM_GLOBAL_OP_3 3
 #define FSM_GLOBAL_OP_4 4
 #define FSM_GLOBAL_OP_5 5
+#define FSM_GLOBAL_OP_2 6
 
 #define FSM_LOCAL_PRE_FOLLOW_LANE 0
 #define FSM_LOCAL_FOLLOW_LANE 1
@@ -67,6 +69,8 @@ public:
     rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr sub_joy;
     rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr sub_encoder_meter;
     rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_key_pressed;
+    rclcpp::Subscription<std_msgs::msg::UInt16>::SharedPtr sub_ui_control_btn;
+    rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr sub_ui_control_velocity_and_steering;
 
     // Configs
     // ===============================================================================================
@@ -154,6 +158,7 @@ public:
     rclcpp::Time last_time_aruco_kanan;
     rclcpp::Time last_time_joy;
     rclcpp::Time last_time_key_pressed;
+    rclcpp::Time last_time_ui_control_btn;
     rclcpp::Time time_start_operation;
     rclcpp::Time time_start_follow_lane;
 
@@ -187,6 +192,8 @@ public:
     void callback_sub_error_code_can(const std_msgs::msg::Int16::SharedPtr msg);
     void callback_sub_encoder_meter(const std_msgs::msg::Float32::SharedPtr msg);
     void callback_sub_key_pressed(const std_msgs::msg::Int16::SharedPtr msg);
+    void callback_sub_ui_control_btn(const std_msgs::msg::UInt16::SharedPtr msg);
+    void callback_sub_ui_control_velocity_and_steering(const std_msgs::msg::Float32MultiArray::SharedPtr msg);
 
     // Process
     // ===============================================================================================

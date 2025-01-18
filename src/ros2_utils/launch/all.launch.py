@@ -673,12 +673,12 @@ def generate_launch_description():
             lane_detection_kiri,
             aruco_detection_kiri,
 
-            pose_estimator,
-            tf_map_empty,
-            tf_base_link_to_body_link,
-            tf_base_link_to_lidar1_link,
-            tf_base_link_to_lidar2_link,
-            tf_base_link_to_imu_link,
+            # pose_estimator,
+            # tf_map_empty,
+            # tf_base_link_to_body_link,
+            # tf_base_link_to_lidar1_link,
+            # tf_base_link_to_lidar2_link,
+            # tf_base_link_to_imu_link,
 
             # witty_lidar,
             # DeclareLaunchArgument('auto_start', default_value='true'),
@@ -699,7 +699,7 @@ def generate_launch_description():
             ui_server,
 
             # joy_node,
-            keyboard_input,
+            # keyboard_input,
 
 
 

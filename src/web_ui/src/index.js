@@ -15,6 +15,11 @@ let steering_feedback = 0;
 let battery_value = 45;
 let global_fsm_value = 0;
 let master_fsm_value = 0;
+let master_transmission_value = 0;
+
+let ui_control_btn = 0;
+let ui_target_velocity = 0;
+let ui_target_steering = 0;
 
 // ================================================================
 
@@ -78,6 +83,53 @@ sub_battery.subscribe(function (message) {
     battery_value = message.data;
 });
 
+var sub_master_transmission = new ROSLIB.Topic({
+    ros: ros,
+    name: "/master/transmission",
+    messageType: "std_msgs/Int16",
+});
+
+sub_master_transmission.subscribe(function (message) {
+    master_transmission_value = message.data;
+});
+
+const topic = new ROSLIB.Topic({
+    ros: ros,
+    name: '/master/ui_control_btn',
+    messageType: 'std_msgs/UInt16'
+});
+
+const topic_velocity_and_steering = new ROSLIB.Topic({
+    ros: ros,
+    name: '/master/ui_target_velocity_and_steering',
+    messageType: 'std_msgs/Float32MultiArray'
+});
+
+document.addEventListener('keydown', function (event) {
+    if (event.key == "j") {
+        ui_target_velocity = 0.4;
+    }
+    else if (event.key == 'u') {
+        ui_target_velocity = 0.6;
+    }
+    else if (event.key == 'i') {
+        ui_target_velocity = 1;
+    }
+    else if (event.key == 'm') {
+        ui_target_steering = steering_feedback - 0.1;
+    }
+    else if (event.key == 'n') {
+        ui_target_steering = steering_feedback;
+    }
+    else if (event.key == 'b') {
+        ui_target_steering = steering_feedback + 0.1;
+    }
+    else if (event.key == ' ') {
+        ui_target_velocity = -1;
+        ui_target_steering = 0;
+    }
+
+});
 
 // ================================================================
 
@@ -156,6 +208,9 @@ function control_display_fsm() {
     else if (global_fsm_value == 5) {
         global_fsm.innerHTML = ": Operation Mode 5"
     }
+    else if (global_fsm_value == 6) {
+        global_fsm.innerHTML = ": Operation Mode 2"
+    }
 
 
     if (master_fsm_value == 0) {
@@ -170,15 +225,131 @@ function control_display_fsm() {
     else if (master_fsm_value == 3) {
         master_fsm.innerHTML = ": Menunggu di Station 2"
     }
+
+    if (master_transmission_value == 0) {
+        master_transmission.innerHTML = ": Auto"
+    }
+    else if (master_transmission_value == 1) {
+        master_transmission.innerHTML = ": Neutral"
+    }
+    else if (master_transmission_value == 3) {
+        master_transmission.innerHTML = ": Forward"
+    }
+    else if (master_transmission_value == 5) {
+        master_transmission.innerHTML = ": Reverse"
+    }
+}
+
+function ui_control_controller() {
+    /**
+     * Bit 0 untuk enable control 
+     * Bit 1 untuk mode kontrol (0 = otomatis, 1 = manual)
+     * Bit 2-3-4 untuk mode manual (0b011 = full otomatis, 0b101 = steer manual, 0b110 = gas manual)
+     * Bit 5-6-7 untuk transmisi (0b011 = forward, 0b001 = neutral, 0b110 = reverse)
+     */
+    ui_control_btn = 0;
+
+    if (kontrol_enable.checked) {
+        mode_otomatis.disabled = false;
+        mode_manual.disabled = false;
+
+        if (kontrol_enable.checked) ui_control_btn |= 1;
+        else ui_control_btn &= ~(1);
+
+        if (mode_otomatis.checked) ui_control_btn &= ~(1 << 1);
+        else ui_control_btn |= (1 << 1);
+
+        if (mode_manual.checked) {
+            full_manual.disabled = false;
+            steer_manual.disabled = false;
+            gas_manual.disabled = false;
+
+            if (full_manual.checked) {
+                ui_control_btn &= ~(7 << 2);
+                ui_control_btn |= (6 << 2);
+            }
+            else if (steer_manual.checked) {
+                ui_control_btn &= ~(7 << 2);
+                ui_control_btn |= (4 << 2);
+            }
+            else if (gas_manual.checked) {
+                ui_control_btn &= ~(7 << 2);
+                ui_control_btn |= (5 << 2);
+            }
+
+            if (gas_manual.checked || full_manual.checked) {
+                transmisi_forward.disabled = false;
+                transmisi_neutral.disabled = false;
+                transmisi_reverse.disabled = false;
+                transmisi_auto.disabled = false;
+                if (transmisi_forward.checked) {
+                    ui_control_btn &= ~(7 << 5);
+                    ui_control_btn |= (3 << 5);
+                }
+                else if (transmisi_neutral.checked) {
+                    ui_control_btn &= ~(7 << 5);
+                    ui_control_btn |= (1 << 5);
+                }
+                else if (transmisi_reverse.checked) {
+                    ui_control_btn &= ~(7 << 5);
+                    ui_control_btn |= (5 << 5);
+                }
+                else if (transmisi_auto.checked) {
+                    ui_control_btn &= ~(7 << 5);
+                }
+            }
+            else {
+                transmisi_forward.disabled = true;
+                transmisi_neutral.disabled = true;
+                transmisi_reverse.disabled = true;
+                transmisi_auto.disabled = true;
+            }
+        }
+        else {
+            full_manual.disabled = true;
+            steer_manual.disabled = true;
+            gas_manual.disabled = true;
+            transmisi_forward.disabled = true;
+            transmisi_neutral.disabled = true;
+            transmisi_reverse.disabled = true;
+            transmisi_auto.disabled = true;
+        }
+
+        topic.publish({ data: ui_control_btn });
+        topic_velocity_and_steering.publish({ data: [ui_target_velocity, ui_target_steering] });
+    }
+    else {
+        mode_otomatis.disabled = true;
+        mode_manual.disabled = true;
+        full_manual.disabled = true;
+        steer_manual.disabled = true;
+        gas_manual.disabled = true;
+        transmisi_forward.disabled = true;
+        transmisi_neutral.disabled = true;
+        transmisi_reverse.disabled = true;
+        transmisi_auto.disabled = true;
+    }
 }
 
 // ================================================================
 
 const velocity_kmph = document.getElementById('velocity-kmph');
 const steering_rad = document.getElementById('steering-rad');
-const batera_dom = document.getElementById('baterai-dom');
+const baterai_dom = document.getElementById('baterai-dom');
 const global_fsm = document.getElementById('global-fsm');
 const master_fsm = document.getElementById('master-fsm');
+const mode_otomatis = document.getElementById('mode-otomatis');
+const mode_manual = document.getElementById('mode-manual');
+const full_manual = document.getElementById('full-manual');
+const steer_manual = document.getElementById('steer-manual');
+const gas_manual = document.getElementById('gas-manual');
+const transmisi_forward = document.getElementById('transmisi-forward');
+const transmisi_neutral = document.getElementById('transmisi-neutral');
+const transmisi_reverse = document.getElementById('transmisi-reverse');
+const transmisi_auto = document.getElementById('transmisi-auto');
+const kontrol_disable = document.getElementById('kontrol-disable');
+const kontrol_enable = document.getElementById('kontrol-enable');
+const master_transmission = document.getElementById('master-transmission');
 
 setInterval(() => {
     let velocity_actuation_display = velocity_actuation * 10 * 3.6;
@@ -192,16 +363,17 @@ setInterval(() => {
     steering_rad.textContent = `${steering_feedback.toFixed(2)} rad`;
 
     if (battery_value > 50) {
-        batera_dom.className = "progress is-success"
+        baterai_dom.className = "progress is-success"
     }
     else if (battery_value > 40) {
-        batera_dom.className = "progress is-warning"
+        baterai_dom.className = "progress is-warning"
     }
     else {
-        batera_dom.className = "progress is-danger"
+        baterai_dom.className = "progress is-danger"
     }
-    batera_dom.value = battery_value;
+    baterai_dom.value = battery_value;
 
     control_display_fsm();
 
+    ui_control_controller();
 }, 50);

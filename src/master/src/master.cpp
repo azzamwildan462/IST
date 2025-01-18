@@ -64,6 +64,10 @@ Master::Master()
         "/encoder_meter", 1, std::bind(&Master::callback_sub_encoder_meter, this, std::placeholders::_1));
     sub_key_pressed = this->create_subscription<std_msgs::msg::Int16>(
         "/key_pressed", 1, std::bind(&Master::callback_sub_key_pressed, this, std::placeholders::_1));
+    sub_ui_control_btn = this->create_subscription<std_msgs::msg::UInt16>(
+        "/master/ui_control_btn", 1, std::bind(&Master::callback_sub_ui_control_btn, this, std::placeholders::_1));
+    sub_ui_control_velocity_and_steering = this->create_subscription<std_msgs::msg::Float32MultiArray>(
+        "/master/ui_target_velocity_and_steering", 1, std::bind(&Master::callback_sub_ui_control_velocity_and_steering, this, std::placeholders::_1));
 
     if (use_ekf_odometry)
         sub_odometry = this->create_subscription<nav_msgs::msg::Odometry>(
@@ -82,6 +86,24 @@ Master::Master()
 }
 Master::~Master()
 {
+}
+
+void Master::callback_sub_ui_control_btn(const std_msgs::msg::UInt16::SharedPtr msg)
+{
+    last_time_ui_control_btn = rclcpp::Clock(RCL_SYSTEM_TIME).now();
+    uint16_t data = msg->data;
+
+    if ((data & 0b10) == 0)
+        global_fsm.value = FSM_GLOBAL_INIT;
+    else
+        global_fsm.value = (data & 0b11100) >> 2;
+    transmission_joy_master = (data & 0b11100000) >> 5;
+}
+
+void Master::callback_sub_ui_control_velocity_and_steering(const std_msgs::msg::Float32MultiArray::SharedPtr msg)
+{
+    target_velocity_joy_x = msg->data[0];
+    target_velocity_joy_wz = msg->data[1];
 }
 
 void Master::callback_sub_key_pressed(const std_msgs::msg::Int16::SharedPtr msg)
@@ -153,6 +175,9 @@ void Master::callback_sub_key_pressed(const std_msgs::msg::Int16::SharedPtr msg)
         break;
     case '5':
         global_fsm.value = FSM_GLOBAL_OP_5;
+        break;
+    case '6':
+        global_fsm.value = FSM_GLOBAL_OP_2;
         break;
     }
 }
@@ -419,13 +444,14 @@ void Master::callback_tim_50hz()
     case FSM_GLOBAL_OP_5:
         follow_lane_2_cam_gas_manual(target_velocity_joy_x, 0, 0);
         break;
-    }
 
-    rclcpp::Duration dt_joy = current_time - last_time_joy;
-    rclcpp::Duration dt_key_pressed = current_time - last_time_key_pressed;
-    if (dt_joy.seconds() > 0.8 && dt_key_pressed.seconds() > 5)
-    {
-        transmission_joy_master = 0;
+    /**
+     * Global operation (Untuk testing)
+     * Sistem beroperasi secara manual bisa dikontrol melalui joystick
+     */
+    case FSM_GLOBAL_OP_2:
+        manual_motion(target_velocity_joy_x, target_velocity_joy_y, target_velocity_joy_wz);
+        break;
     }
 
     process_transmitter();
