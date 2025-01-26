@@ -77,7 +77,7 @@ public:
     bool use_ekf_odometry = false;
     float profile_max_acceleration = 30;
     float profile_max_decceleration = 60;
-    float profile_max_velocity = 1; // m/s (1 m/s == 3.6 km/h)
+    float profile_max_velocity = 2.5; // m/s (1 m/s == 3.6 km/h)
     float profile_max_accelerate_jerk = 100;
     float profile_max_decelerate_jerk = 1000;
     float profile_max_braking = 3;

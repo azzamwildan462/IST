@@ -50,7 +50,7 @@ void Master::process_transmitter()
     std_msgs::msg::Float32MultiArray msg_to_ui;
     msg_to_ui.data.push_back(target_velocity);
     msg_to_ui.data.push_back(actuation_wz);
-    msg_to_ui.data.push_back(fb_final_vel_dxdydo[0]);
+    msg_to_ui.data.push_back(fb_encoder_meter);
     msg_to_ui.data.push_back(fb_steering_angle);
     pub_to_ui->publish(msg_to_ui);
 

@@ -296,7 +296,8 @@ int init_Brake_Driver(uint16_t slave)
 class Beckhoff : public rclcpp::Node
 {
 public:
-    rclcpp::TimerBase::SharedPtr tim_50hz;
+    rclcpp::TimerBase::SharedPtr tim_routine;
+    rclcpp::TimerBase::SharedPtr tim_control_brake;
     rclcpp::Publisher<std_msgs::msg::Float32MultiArray>::SharedPtr pub_sensors;
     rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr pub_error_code;
     rclcpp::Publisher<std_msgs::msg::Float32MultiArray>::SharedPtr pub_analog_input;
@@ -344,7 +345,9 @@ public:
     uint8_t fb_foot_velocity_switch = 0;
 
     uint32_t counter_beckhoff_disconnect = 0;
-    uint8_t auto_transmission = 0;
+    uint8_t accelerator_switch = 0;
+
+    uint8_t fsm_brake_driver = 0;
 
     Beckhoff()
         : Node("beckhoff")
@@ -377,7 +380,8 @@ public:
         }
 
         //----Timer
-        tim_50hz = this->create_wall_timer(std::chrono::milliseconds(10), std::bind(&Beckhoff::callback_tim_50hz, this));
+        tim_routine = this->create_wall_timer(std::chrono::milliseconds(10), std::bind(&Beckhoff::callback_tim_routine, this));
+        tim_control_brake = this->create_wall_timer(std::chrono::milliseconds(100), std::bind(&Beckhoff::callback_tim_control_brake, this));
 
         //----Publisher
         pub_sensors = this->create_publisher<std_msgs::msg::Float32MultiArray>("/beckhoff/sensors", 1);
@@ -417,7 +421,7 @@ public:
         master_target_volt_hat = msg->data[0];
         master_target_steering = msg->data[1];
 
-        if (buffer_dac_velocity < 0.45)
+        if (buffer_dac_velocity < 0.41)
         {
             counter_zero_velocity++;
             counter_plus_velocity = 0;
@@ -430,28 +434,91 @@ public:
 
         if (counter_zero_velocity > 1)
         {
-            auto_transmission = 1;
+            accelerator_switch = 1;
         }
         else if (counter_plus_velocity > 0)
         {
-            auto_transmission = 3;
+            accelerator_switch = 3;
         }
     }
 
-    void callback_tim_50hz()
+    void callback_tim_control_brake()
+    {
+        if (brake_slave_id == 255)
+        {
+            return;
+        }
+        if (brake_jiayu() > 0)
+        {
+            logger.warn("Brake Jiayu error");
+        }
+    }
+
+    void callback_tim_routine()
     {
         ec_send_processdata();
         int wkc = ec_receive_processdata(EC_TIMEOUTRET);
 
-        uint8_t _6060 = 9;
-        (void)ec_SDOwrite(brake_slave_id, 0x6060, 0x00, FALSE, sizeof(_6060), &_6060, EC_TIMEOUTRXM);
+        if (brake_slave_id != 255)
+        {
+            uint8_t _6060 = 9;
+            (void)ec_SDOwrite(brake_slave_id, 0x6060, 0x00, FALSE, sizeof(_6060), &_6060, EC_TIMEOUTRXM);
+        }
 
         if (wkc >= expectedWKC)
         {
             counter_beckhoff_disconnect = 0;
             // test_analog_output();
             // test_digital_output();
-            test_analog_input();
+            // test_analog_input();
+
+            // ===================================================================================
+
+            // Ketika brake
+            if (master_target_volt_hat < -0.9)
+            {
+                static const float brake_minimum = -1.0;
+                static const float brake_maximum = -3.0;
+                static const float brake_torq_minimum = 0.0;
+                static const float brake_torq_maximum = 10.0;
+                static const float brake_max_velocity = 100.0;
+
+                float current_torq = 0;
+                if (brake_slave_id != 255)
+                    current_torq = (float)if_brake_input->torque_actual_value;
+
+                float normalized_brake = (master_target_volt_hat - brake_minimum) / (brake_maximum - brake_minimum);
+                float normalized_torq = (current_torq - brake_torq_minimum) / (brake_torq_maximum - brake_torq_minimum);
+
+                float error_brake = normalized_brake - normalized_torq;
+                int32_t output_velocity = (int32_t)(error_brake * brake_max_velocity);
+
+                // logger.info("Brake: %.2f %.2f %.2f %.2f -> %d", master_target_volt_hat, current_torq, normalized_brake, normalized_torq, output_velocity);
+
+                if (brake_slave_id != 255)
+                    memcpy(&if_brake_output->target_velocity, &output_velocity, sizeof(output_velocity));
+            }
+            else
+            {
+                static const float unbrake_torq_minimum = 0.0;
+                static const float unbrake_torq_maximum = 10.0;
+                static const float unbrake_max_velocity = 1000.0;
+
+                float current_torq = 0;
+                if (brake_slave_id != 255)
+                    current_torq = (float)if_brake_input->torque_actual_value;
+
+                float normalized_torq = (current_torq - unbrake_torq_minimum) / (unbrake_torq_maximum - unbrake_torq_minimum);
+
+                int32_t output_velocity = (int32_t)(normalized_torq * unbrake_max_velocity);
+
+                // logger.info("UnBrake: %.2f %.2f %.2f -> %d", master_target_volt_hat, current_torq, normalized_torq, output_velocity);
+
+                if (brake_slave_id != 255)
+                    memcpy(&if_brake_output->target_velocity, &output_velocity, sizeof(output_velocity));
+            }
+
+            // ===================================================================================
 
             if (transmission_master > 0)
             {
@@ -470,9 +537,9 @@ public:
                     digital_out->data &= ~DO_TRANSMISSION_REVERSE;
                     digital_out->data |= DO_TRANSMISSION_FORWARD;
 
-                    if (auto_transmission == 3)
+                    if (accelerator_switch == 3)
                         digital_out->data |= DO_SWITCH_THROTTLE;
-                    else if (auto_transmission == 1)
+                    else if (accelerator_switch == 1)
                         digital_out->data &= ~DO_SWITCH_THROTTLE;
                 }
                 // Reverse
@@ -482,16 +549,16 @@ public:
                     digital_out->data &= ~DO_TRANSMISSION_NEUTRAL;
                     digital_out->data |= DO_TRANSMISSION_REVERSE;
 
-                    if (auto_transmission == 3)
+                    if (accelerator_switch == 3)
                         digital_out->data |= DO_SWITCH_THROTTLE;
-                    else if (auto_transmission == 1)
+                    else if (accelerator_switch == 1)
                         digital_out->data &= ~DO_SWITCH_THROTTLE;
                 }
             }
             else
             {
                 // Netral
-                if (auto_transmission == 1)
+                if (accelerator_switch == 1)
                 {
                     digital_out->data &= ~DO_SWITCH_THROTTLE;
                     digital_out->data &= ~DO_TRANSMISSION_FORWARD;
@@ -499,7 +566,7 @@ public:
                     digital_out->data |= DO_TRANSMISSION_NEUTRAL;
                 }
                 // Forward
-                else if (auto_transmission == 3)
+                else if (accelerator_switch == 3)
                 {
                     digital_out->data &= ~DO_TRANSMISSION_NEUTRAL;
                     digital_out->data &= ~DO_TRANSMISSION_REVERSE;
@@ -513,7 +580,7 @@ public:
             fb_throttle_velocity_volt = (float)analog_input->data_2 * ANALOG_INPUT_SCALER;
 
             // Ketika throttle ditekan, maka ikut throttle
-            if (fb_throttle_velocity_volt > 0.5)
+            if (fb_throttle_velocity_volt > 0.415)
             {
                 buffer_dac_velocity = fb_throttle_velocity_volt;
             }
@@ -530,13 +597,13 @@ public:
             float dac_velocity_send = 0.40;
 
             // Aktifkan relay dulu lalu beri throttle
-            if (auto_transmission == 3)
+            if (accelerator_switch == 3)
             {
                 dac_velocity_send = buffer_dac_velocity;
             }
 
             analog_output->data_2 = (int16_t)(dac_velocity_send * ANALOG_OUT_SCALER);
-            logger.info("INFO: %.2f || %.2f %.2f %d", fb_throttle_velocity_volt, buffer_dac_velocity, dac_velocity_send, digital_out->data);
+            // logger.info("INFO: %.2f || %.2f %.2f %d", fb_throttle_velocity_volt, buffer_dac_velocity, dac_velocity_send, digital_out->data);
 
             // ====================================================================================
 
@@ -559,6 +626,48 @@ public:
         std_msgs::msg::Int16 msg_error_code;
         msg_error_code.data = error_code;
         pub_error_code->publish(msg_error_code);
+    }
+
+    int8_t brake_jiayu()
+    {
+        uint16_t sword = if_brake_input->status_word;
+        static uint16_t last_sword = sword;
+
+        if (0 == sword && 0 < last_sword)
+        {
+            fsm_brake_driver = 0;
+            return 1;
+        }
+
+        last_sword = sword;
+
+        if (3 == fsm_brake_driver)
+        {
+            return 0;
+        }
+
+        if (5216 == sword)
+        {
+            if_brake_output->control_word = 0x06;
+            fsm_brake_driver = 1;
+        }
+        else if (5153 == sword)
+        {
+            if_brake_output->control_word = 0x07;
+            fsm_brake_driver = 2;
+        }
+        else if (5155 == sword)
+        {
+            if_brake_output->control_word = 0x0f;
+            fsm_brake_driver = 3;
+        }
+        else
+        {
+            if_brake_output->control_word = 0x06;
+            fsm_brake_driver = 0;
+        }
+
+        return 0;
     }
 
     void transmit_all()
@@ -673,7 +782,7 @@ public:
                 if (brake_slave_id == 255)
                 {
                     logger.warn("No slave found with brake driver ID");
-                    return 4;
+                    // return 4;
                 }
 
                 expectedWKC = (ec_group[0].outputsWKC * 2) + ec_group[0].inputsWKC;
@@ -692,11 +801,12 @@ public:
                 {
                     ec_slave[slave_canopen_id].PO2SOconfig = &init_CAN_Startup;
                 }
-
-                if (3 == po2so_config)
+                else if (4 == po2so_config)
                 {
-                    ec_slave[brake_slave_id].PO2SOconfig = &init_Brake_Driver;
+                    if (brake_slave_id != 255)
+                        ec_slave[brake_slave_id].PO2SOconfig = &init_Brake_Driver;
                 }
+
                 // =============== CONFIGURE WATCHDOG ================
                 for (uint8_t slave = 1; slave <= ec_slavecount; slave++)
                 {
@@ -789,7 +899,7 @@ int main(int argc, char **argv)
 
     auto node_beckhoff = std::make_shared<Beckhoff>();
 
-    rclcpp::executors::SingleThreadedExecutor executor;
+    rclcpp::executors::MultiThreadedExecutor executor;
     executor.add_node(node_beckhoff);
     executor.spin();
 

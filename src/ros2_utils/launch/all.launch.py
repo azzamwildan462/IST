@@ -284,8 +284,9 @@ def generate_launch_description():
         name='beckhoff',
         output='screen',
         parameters=[{
-            "if_name": "enx000000000083",
-            "po2so_config": BECKHOFF_NO_CONFIG
+            "if_name": "enp5s0",
+            "po2so_config": BECKHOFF_NO_CONFIG,
+            "dac_velocity_maximum": 3.0
         }],
         respawn=True,
         prefix='nice -n -20 chrt -f 99'
@@ -310,7 +311,7 @@ def generate_launch_description():
         name="serial_imu",
         output="screen",
         parameters=[{
-            "port": "/dev/serial/by-id/usb-1a86_USB_Serial-if00-port0",
+            "port": "/dev/imu_usb",
         }],
         respawn=True,
         prefix='nice -n -20 chrt -f 90'
@@ -364,7 +365,7 @@ def generate_launch_description():
         namespace='cam_kanan',
         parameters=[{
             "camera_path": "/dev/v4l/by-id/usb-046d_C922_Pro_Stream_Webcam_70F3B3DF-video-index0",
-            "hardcoded_image": "/home/wildan/proyek/robotika/IST/src/vision/assets/cam_kanan.jpeg"
+            "hardcoded_image": os.path.join(ws_path,"src/vision/assets/cam_kanan.jpeg")
         }],
         respawn=True,
         prefix='nice -n -8'
@@ -424,7 +425,7 @@ def generate_launch_description():
         namespace='cam_kiri',
         parameters=[{
             "camera_path": "/dev/v4l/by-id/usb-046d_C922_Pro_Stream_Webcam_70F3B3DF-video-index0",
-            "hardcoded_image": "/home/wildan/proyek/robotika/IST/src/vision/assets/cam_kiri.jpeg"
+            "hardcoded_image": os.path.join(ws_path,"src/vision/assets/cam_kiri.jpeg")
         }],
         respawn=True,
         prefix='nice -n -8'
@@ -673,40 +674,51 @@ def generate_launch_description():
             lane_detection_kiri,
             aruco_detection_kiri,
 
-            # pose_estimator,
-            # tf_map_empty,
-            # tf_base_link_to_body_link,
-            # tf_base_link_to_lidar1_link,
-            # tf_base_link_to_lidar2_link,
-            # tf_base_link_to_imu_link,
+            # =============================================================================
+
+            pose_estimator,
+            tf_map_empty,
+            tf_base_link_to_body_link,
+            tf_base_link_to_lidar1_link,
+            tf_base_link_to_lidar2_link,
+            tf_base_link_to_imu_link,
+            
+            # =============================================================================
 
             # witty_lidar,
+
             # DeclareLaunchArgument('auto_start', default_value='true'),
             # hokuyo_lidar_driver,
             # urg_node2_node_configure_event_handler,
             # urg_node2_node_activate_event_handler,
+
+            # livox_lidar_driver,
+
             # obstacle_filter,
 
-            # imu_serial,
+            # =============================================================================
+
+            imu_serial,
+            beckhoff,
+            CANbus_HAL,
+
+            # =============================================================================
 
             rosbridge_server, 
             web_video_server,
-
-            # beckhoff,
-            # CANbus_HAL,
-
             master,
             ui_server,
+
+            # =============================================================================
 
             # joy_node,
             # keyboard_input,
 
-
+            # =============================================================================
 
             # rviz2,
             # vision_capture,
             # lane_detection,
-            # livox_lidar_driver,
             # TimerAction(
             #     period=4.0,
             #     actions=[

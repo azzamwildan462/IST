@@ -123,8 +123,8 @@ public:
         tty.c_cc[VMIN] = 0;
 
         // Set in/out baud rate to be 9600
-        cfsetispeed(&tty, B9600);
-        cfsetospeed(&tty, B9600);
+        cfsetispeed(&tty, B115200);
+        cfsetospeed(&tty, B115200);
 
         // status |= TIOCM_DTR; /* turn on DTR */
         // status |= TIOCM_RTS; /* turn on RTS */

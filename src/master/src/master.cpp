@@ -79,7 +79,7 @@ Master::Master()
     //----Timer
     tim_50hz = this->create_wall_timer(std::chrono::milliseconds(20), std::bind(&Master::callback_tim_50hz, this));
 
-    pid_vx.init(0.0020, 0.000001, 0, dt, 0, 0.004, 0, 0.00005);
+    pid_vx.init(0.0030, 0.000000, 0, dt, -0.04, 0.4, -0.0005, 0.0005);
 
     logger.info("Master init success");
     global_fsm.value = FSM_GLOBAL_PREOP;

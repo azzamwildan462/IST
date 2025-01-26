@@ -6,6 +6,7 @@
 #include "std_msgs/msg/int32.hpp"
 #include "std_msgs/msg/string.hpp"
 #include "std_msgs/msg/float32.hpp"
+#include "std_msgs/msg/u_int8.hpp"
 #include "sensor_msgs/msg/imu.hpp"
 #include "tf2/LinearMath/Quaternion.h"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
@@ -23,6 +24,7 @@ public:
     rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr sub_encoder;
     rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr sub_gyro;
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr sub_pose_offset;
+    rclcpp::Subscription<std_msgs::msg::UInt8>::SharedPtr sub_fb_transmission;
 
     //----TransformBroadcaster
     std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster;
@@ -46,6 +48,8 @@ public:
 
     rclcpp::Time last_time_gyro_update;
     rclcpp::Time current_time;
+
+    uint8_t fb_transmission = 0;
 
     // Vars
     // =======================================================
@@ -79,8 +83,15 @@ public:
             "/hardware/imu", 1, std::bind(&PoseEstimator::callback_sub_gyro, this, std::placeholders::_1));
         sub_pose_offset = this->create_subscription<nav_msgs::msg::Odometry>(
             "/master/pose_offset", 1, std::bind(&PoseEstimator::callback_sub_pose_offset, this, std::placeholders::_1));
+        sub_fb_transmission = this->create_subscription<std_msgs::msg::UInt8>(
+            "/can/fb_transmission", 1, std::bind(&PoseEstimator::callback_sub_fb_transmission, this, std::placeholders::_1));
 
         logger.info("PoseEstimator initialized");
+    }
+
+    void callback_sub_fb_transmission(const std_msgs::msg::UInt8::SharedPtr msg)
+    {
+        fb_transmission = msg->data;
     }
 
     void callback_sub_pose_offset(const nav_msgs::msg::Odometry::SharedPtr msg)
@@ -103,7 +114,12 @@ public:
         sensor_right_encoder = msg->data * 0.5;
 
         std_msgs::msg::Float32 msg_encoder_meter;
-        msg_encoder_meter.data = msg->data * encoder_to_meter * 50;
+
+        if (fb_transmission == 5)
+            msg_encoder_meter.data = (sensor_left_encoder + sensor_right_encoder) / 2.0 * encoder_to_meter * 50 * -1;
+        else
+            msg_encoder_meter.data = (sensor_left_encoder + sensor_right_encoder) / 2.0 * encoder_to_meter * 50;
+
         pub_encoder_meter->publish(msg_encoder_meter);
     }
 
@@ -113,13 +129,15 @@ public:
         static rclcpp::Time time_now = this->now();
         time_old = time_now;
         time_now = this->now();
-        double dt = (time_now - time_old).seconds();
+        // double dt = (time_now - time_old).seconds();
 
-        if (dt < FLT_EPSILON)
-        {
-            error_code = 1;
-            return;
-        }
+        // if (dt < FLT_EPSILON)
+        // {
+        //     error_code = 1;
+        //     return;
+        // }
+
+        static const float dt = 0.02;
 
         current_time = rclcpp::Clock(RCL_SYSTEM_TIME).now();
 

@@ -136,6 +136,7 @@ void Master::manual_motion(float vx, float vy, float wz)
     else
     {
         actuation_vx = pid_vx.calculate(vx_buffer - fb_encoder_meter);
+        // logger.info("motion: %.2f %.2f -> %.2f -> %.2f", vx_buffer, fb_encoder_meter, (vx_buffer - fb_encoder_meter), actuation_vx);
         // actuation_vx = vx_buffer; // Sementara untuk testing
         actuation_ay = 0;
         actuation_wz = wz_buffer;

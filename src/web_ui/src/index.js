@@ -107,13 +107,13 @@ const topic_velocity_and_steering = new ROSLIB.Topic({
 
 document.addEventListener('keydown', function (event) {
     if (event.key == "j") {
-        ui_target_velocity = 0.4;
+        ui_target_velocity = 0.48;
     }
     else if (event.key == 'u') {
-        ui_target_velocity = 0.6;
+        ui_target_velocity = 0.85;
     }
     else if (event.key == 'i') {
-        ui_target_velocity = 1;
+        ui_target_velocity = 1.5;
     }
     else if (event.key == 'm') {
         ui_target_steering = steering_feedback - 0.1;
@@ -357,8 +357,10 @@ setInterval(() => {
     let steering_actuation_display = (steering_actuation) * 135 / 6.28;
     let steering_feedback_display = (steering_feedback) * 135 / 6.28;
 
+    let velocity_feedback_kmh = velocity_feedback * 3.6;
+
     set_velocity('.velocity-circle1', '.velocity-circle2', 'velocity-text', velocity_actuation_display, velocity_feedback_display);
-    velocity_kmph.textContent = `${velocity_feedback.toFixed(2)} km/h`;
+    velocity_kmph.textContent = `${velocity_feedback_kmh.toFixed(2)} km/h`;
     set_steering('.steering-circle1', '.steering-circle2', 'steering-text', steering_actuation_display, steering_feedback_display, steering_actuation);
     steering_rad.textContent = `${steering_feedback.toFixed(2)} rad`;
 
