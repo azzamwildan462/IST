@@ -24,7 +24,10 @@
 #define ANALOG_INPUT_SCALER 0.0003051757812f
 #define LSB_VALUE 0.0196078431f
 
+#define ADDRESS_CONTROL_WORD 0x6040
+#define ADDRESS_STATUS_WORD 0x6041
 #define ADDRESS_MODES_OF_OPERATION 0x6060
+#define ADDRESS_ACTUAL_VELOCITY 0x6069
 #define ADDRESS_ACTUAL_TORQUE 0x6077
 #define ADDRESS_TARGET_VELOCITY 0x60FF
 
@@ -272,14 +275,14 @@ int init_Brake_Driver(uint16_t slave)
 {
     uint16_t _1c12_zero[2] = { 0x00, 0x00 };
     uint16_t _1c13_zero[2] = { 0x00, 0x00 };
-    uint16_t _1c12_val[2] = { 0x01, 0x1600 };
-    uint16_t _1c13_val[2] = { 0x01, 0x1a00 };
+    // uint16_t _1c12_val[2] = { 0x01, 0x1600 };
+    // uint16_t _1c13_val[2] = { 0x01, 0x1a00 };
 
     uint16_t ret_val = 0;
     ret_val += ec_SDOwrite(slave, 0x1c12, 0x00, TRUE, sizeof(_1c12_zero), _1c12_zero, EC_TIMEOUTRXM);
     ret_val += ec_SDOwrite(slave, 0x1c13, 0x00, TRUE, sizeof(_1c13_zero), _1c13_zero, EC_TIMEOUTRXM);
-    ret_val += ec_SDOwrite(slave, 0x1c12, 0x00, TRUE, sizeof(_1c12_val), _1c12_val, EC_TIMEOUTRXM);
-    ret_val += ec_SDOwrite(slave, 0x1c13, 0x00, TRUE, sizeof(_1c13_val), _1c13_val, EC_TIMEOUTRXM);
+    // ret_val += ec_SDOwrite(slave, 0x1c12, 0x00, TRUE, sizeof(_1c12_val), _1c12_val, EC_TIMEOUTRXM);
+    // ret_val += ec_SDOwrite(slave, 0x1c13, 0x00, TRUE, sizeof(_1c13_val), _1c13_val, EC_TIMEOUTRXM);
 
     return 1;
 }
@@ -339,9 +342,13 @@ public:
 
     uint8_t fsm_brake_driver = 0;
 
+    uint16_t control_word = 0;
+    uint16_t status_word = 0;
+    int status_word_size = sizeof(status_word);
     int32_t output_velocity_brake = 0;
     int16_t current_torque_brake = 0;
-    uint8_t brake_mode = 9; // 8: Position, 9: Velocity
+    int current_torque_brake_size = sizeof(current_torque_brake);
+    int8_t brake_mode = 9; // 8: Position, 9: Velocity
 
     Beckhoff()
         : Node("beckhoff")
@@ -440,14 +447,17 @@ public:
 
     void callback_tim_routine()
     {
-        ec_send_processdata();
-        int wkc = ec_receive_processdata(EC_TIMEOUTRET);
-
-        if (brake_slave_id != 255) {
+        if (brake_slave_id != 255 && fsm_brake_driver == 3) {
+            (void)ec_SDOread(brake_slave_id, ADDRESS_STATUS_WORD, 0x00, FALSE, &status_word_size, &status_word, EC_TIMEOUTRXM);
+            (void)ec_SDOread(brake_slave_id, ADDRESS_ACTUAL_TORQUE, 0x00, FALSE, &current_torque_brake_size, &current_torque_brake, EC_TIMEOUTRXM);
             (void)ec_SDOwrite(brake_slave_id, ADDRESS_MODES_OF_OPERATION, 0x00, FALSE, sizeof(brake_mode), &brake_mode, EC_TIMEOUTRXM);
             (void)ec_SDOwrite(brake_slave_id, ADDRESS_TARGET_VELOCITY, 0x00, FALSE, sizeof(output_velocity_brake), &output_velocity_brake, EC_TIMEOUTRXM);
-            (void)ec_SDOread(brake_slave_id, ADDRESS_ACTUAL_TORQUE, 0x00, FALSE, sizeof(current_torque_brake), &current_torque_brake, EC_TIMEOUTRXM);
+        } else {
+            return;
         }
+
+        ec_send_processdata();
+        int wkc = ec_receive_processdata(EC_TIMEOUTRET);
 
         if (wkc >= expectedWKC) {
             counter_beckhoff_disconnect = 0;
@@ -475,7 +485,7 @@ public:
                 float error_brake = normalized_brake - normalized_torq;
                 int32_t output_velocity = (int32_t)(error_brake * brake_max_velocity);
 
-                // logger.info("Brake: %.2f %.2f %.2f %.2f -> %d", master_target_volt_hat, current_torq, normalized_brake, normalized_torq, output_velocity);
+                // logger.info("Brake: %.2f %.2f %.2f %.2f %d -> %d", master_target_volt_hat, current_torq, normalized_brake, normalized_torq, output_velocity_brake, output_velocity);
 
                 if (brake_slave_id != 255)
                     output_velocity_brake = output_velocity;
@@ -483,7 +493,7 @@ public:
             } else {
                 static const float unbrake_torq_minimum = 0.0;
                 static const float unbrake_torq_maximum = 10.0;
-                static const float unbrake_max_velocity = 1000.0;
+                static const float unbrake_max_velocity = -100.0;
 
                 float current_torq = 0;
                 if (brake_slave_id != 255)
@@ -493,7 +503,7 @@ public:
 
                 int32_t output_velocity = (int32_t)(normalized_torq * unbrake_max_velocity);
 
-                // logger.info("UnBrake: %.2f %.2f %.2f -> %d", master_target_volt_hat, current_torq, normalized_torq, output_velocity);
+                // logger.info("UnBrake: %.2f %.2f %.2f %d -> %d", master_target_volt_hat, current_torq, normalized_torq, output_velocity_brake, output_velocity);
 
                 if (brake_slave_id != 255)
                     output_velocity_brake = output_velocity;
@@ -596,7 +606,9 @@ public:
 
     int8_t brake_jiayu()
     {
-        uint16_t sword = if_brake_input->status_word;
+        // uint16_t sword = if_brake_input->status_word;
+        (void)ec_SDOread(brake_slave_id, ADDRESS_STATUS_WORD, 0x00, FALSE, &status_word_size, &status_word, EC_TIMEOUTRXM);
+        uint16_t sword = status_word;
         static uint16_t last_sword = sword;
 
         if (0 == sword && 0 < last_sword) {
@@ -610,19 +622,26 @@ public:
             return 0;
         }
 
-        if (5216 == sword) {
-            if_brake_output->control_word = 0x06;
+        if (5216 == sword || 1088 == sword || 33 == sword) {
+            // if_brake_output->control_word = 0x06;
+            control_word = 6;
             fsm_brake_driver = 1;
-        } else if (5153 == sword) {
-            if_brake_output->control_word = 0x07;
+        } else if (5153 == sword || 1057 == sword) {
+            // if_brake_output->control_word = 0x07;
+            control_word = 7;
             fsm_brake_driver = 2;
-        } else if (5155 == sword) {
-            if_brake_output->control_word = 0x0f;
+        } else if (5155 == sword || 1059 == sword) {
+            // if_brake_output->control_word = 0x0f;
+            control_word = 15;
             fsm_brake_driver = 3;
         } else {
-            if_brake_output->control_word = 0x06;
+            // if_brake_output->control_word = 0x06;
+            control_word = 6;
             fsm_brake_driver = 0;
         }
+
+        (void)ec_SDOwrite(brake_slave_id, ADDRESS_CONTROL_WORD, 0x00, FALSE, sizeof(control_word), &control_word, EC_TIMEOUTRXM);
+        // logger.info("SWORD: %d CWORD: %d", status_word, control_word);
 
         return 0;
     }
@@ -800,8 +819,8 @@ public:
                             break;
 
                         case JIAYU_ID:
-                            if_brake_input = (if_brake_input_t*)ec_slave[slave].inputs;
-                            if_brake_output = (if_brake_output_t*)ec_slave[slave].outputs;
+                            // if_brake_input = (if_brake_input_t*)ec_slave[slave].inputs;
+                            // if_brake_output = (if_brake_output_t*)ec_slave[slave].outputs;
                             logger.info("JIAYU Found & Configured");
                             break;
                         }
