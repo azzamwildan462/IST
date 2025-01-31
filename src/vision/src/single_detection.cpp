@@ -60,6 +60,7 @@ public:
     int aruco_in_counter_threshold = 50;
     int aruco_out_counter_threshold = 50;
     std::string camera_namespace = "cam_kanan";
+    std::string absolute_image_topic = "";
 
     // Vars
     // =======================================================
@@ -153,6 +154,9 @@ public:
         this->declare_parameter("right_to_left_scan", false);
         this->get_parameter("right_to_left_scan", right_to_left_scan);
 
+        this->declare_parameter("absolute_image_topic", "");
+        this->get_parameter("absolute_image_topic", absolute_image_topic);
+
         node_namespace = this->get_namespace();
         node_namespace = node_namespace.substr(1, node_namespace.size() - 1); // /cam_kanan jadi cam_kanan
 
@@ -179,15 +183,24 @@ public:
                 aruco_dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_4X4_250);
         }
 
-        if (use_frame_bgr)
+        if (absolute_image_topic != "")
         {
+            logger.info("Subscribing to absolute image topic: %s", absolute_image_topic.c_str());
             sub_image_bgr = this->create_subscription<sensor_msgs::msg::Image>(
-                "/" + camera_namespace + "/image_bgr", 1, std::bind(&SingleDetection::callback_sub_image_bgr, this, std::placeholders::_1));
+                absolute_image_topic, 1, std::bind(&SingleDetection::callback_sub_image_bgr, this, std::placeholders::_1));
         }
         else
         {
-            sub_image_gray = this->create_subscription<sensor_msgs::msg::Image>(
-                "/" + camera_namespace + "/image_gray", 1, std::bind(&SingleDetection::callback_sub_image_gray, this, std::placeholders::_1));
+            if (use_frame_bgr)
+            {
+                sub_image_bgr = this->create_subscription<sensor_msgs::msg::Image>(
+                    "/" + camera_namespace + "/image_bgr", 1, std::bind(&SingleDetection::callback_sub_image_bgr, this, std::placeholders::_1));
+            }
+            else
+            {
+                sub_image_gray = this->create_subscription<sensor_msgs::msg::Image>(
+                    "/" + camera_namespace + "/image_gray", 1, std::bind(&SingleDetection::callback_sub_image_gray, this, std::placeholders::_1));
+            }
         }
 
         pub_point_garis = this->create_publisher<ros2_interface::msg::PointArray>("point_garis", 1);

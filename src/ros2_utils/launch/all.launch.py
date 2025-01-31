@@ -326,35 +326,79 @@ def generate_launch_description():
         prefix=['xterm -e'],
     )
 
-    # vision_capture = Node(
-    #     package='vision',
-    #     executable='vision_capture',
-    #     name='vision_capture',
-    #     output='screen',
-    #     respawn=True,
-    #     prefix='nice -n -8'
-    # )
+    vision_capture = Node(
+        package='vision',
+        executable='vision_capture',
+        name='vision_capture',
+        output='screen',
+        respawn=True,
+        prefix='nice -n -8'
+    )
 
-    # lane_detection = Node(
-    #     package='vision',
-    #     executable='lane_detection',
-    #     name='lane_detection',
-    #     output='screen',
-    #     parameters=[{
-    #         "low_h": 27,
-    #         "high_h": 255,
-    #         "low_l": 153,
-    #         "high_l": 255,
-    #         "low_s": 0,
-    #         "high_s": 255,
-    #         "gray_threshold": 200,
-    #         "use_dynamic_config": True,
-    #         "config_path": os.path.join(path_config,"dynamic_conf.yaml")
-    #     }
-    #     ],
-    #     respawn=True,
-    #     prefix='nice -n -8'
-    # )
+    lane_detection = Node(
+        package='vision',
+        executable='lane_detection',
+        name='lane_detection',
+        output='screen',
+        parameters=[{
+            "low_h": 27,
+            "high_h": 255,
+            "low_l": 153,
+            "high_l": 255,
+            "low_s": 0,
+            "high_s": 255,
+            "gray_threshold": 200,
+            "use_dynamic_config": True,
+            "config_path": os.path.join(path_config,"dynamic_conf.yaml")
+        }
+        ],
+        respawn=True,
+        prefix='nice -n -8'
+    )
+
+    ascamera_kiri = Node(
+        namespace= "ascamera_kiri",
+        package='ascamera',
+        executable='ascamera_node',
+        name='ascamera_kiri',
+        respawn=True,
+        output='both',
+        parameters=[
+            {"usb_bus_no": -1},
+            {"usb_path": "/dev/v4l/by-path/pci-0000:00:14.0-usb-0:2:1.0-video-index0"},
+            {"confiPath": os.path.join(ws_path,"src/ascamera/configurationfiles")},
+            {"color_pcl": False},
+            {"pub_tfTree": True},
+            {"depth_width": 640},
+            {"depth_height": 480},
+            {"rgb_width": 640},
+            {"rgb_height": 480},
+            {"fps": 25},
+        ],
+        # remappings=[("/ascamera_kiri/ascamera_kiri/rgb0/image", "/cam_kiri/image_bgr")],
+    )
+
+    ascamera_kanan = Node(
+        namespace= "ascamera_kanan",
+        package='ascamera',
+        executable='ascamera_node',
+        name='ascamera_kanan',
+        respawn=True,
+        output='both',
+        parameters=[
+            {"usb_bus_no": -1},
+            {"usb_path": "/dev/v4l/by-path/pci-0000:00:14.0-usb-0:1:1.0-video-index0"},
+            {"confiPath": os.path.join(ws_path,"src/ascamera/configurationfiles")},
+            {"color_pcl": False},
+            {"pub_tfTree": True},
+            {"depth_width": 640},
+            {"depth_height": 480},
+            {"rgb_width": 640},
+            {"rgb_height": 480},
+            {"fps": 25},
+        ],
+        # remappings=[("/ascamera_kanan/ascamera_kanan/rgb1/image", "/cam_kanan/image_bgr")],
+    )
     
 
     vision_capture_kanan = Node(
@@ -387,6 +431,7 @@ def generate_launch_description():
             "setpoint_y": 240,
             "camera_namespace": "cam_kanan",
             "right_to_left_scan": False,
+            "absolute_image_topic": "/ascamera_kanan/ascamera_kanan/rgb1/image",
         }
         ],
         respawn=True,
@@ -447,6 +492,7 @@ def generate_launch_description():
             "setpoint_y": 240,
             "camera_namespace": "cam_kiri",
             "right_to_left_scan": True,
+            "absolute_image_topic": "/ascamera_kiri/ascamera_kiri/rgb0/image",
         }
         ],
         respawn=True,
@@ -665,12 +711,14 @@ def generate_launch_description():
 
     return LaunchDescription(
         [
+            ascamera_kiri,
+            ascamera_kanan,
             # rs2_cam_kiri,
             # rs2_cam_kanan,
-            vision_capture_kanan,
+            # vision_capture_kanan,
             lane_detection_kanan,
             aruco_detection_kanan,
-            vision_capture_kiri,
+            # vision_capture_kiri,
             lane_detection_kiri,
             aruco_detection_kiri,
 
@@ -698,9 +746,9 @@ def generate_launch_description():
 
             # =============================================================================
 
-            imu_serial,
-            beckhoff,
-            CANbus_HAL,
+            # imu_serial,
+            # beckhoff,
+            # CANbus_HAL,
 
             # =============================================================================
 
