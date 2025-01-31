@@ -284,8 +284,8 @@ def generate_launch_description():
         name='beckhoff',
         output='screen',
         parameters=[{
-            "if_name": "enp5s0",
-            "po2so_config": BECKHOFF_NO_CONFIG,
+            "if_name": "enp4s0f3u1c2",
+            "po2so_config": 4,
             "dac_velocity_maximum": 3.0
         }],
         respawn=True,
@@ -760,7 +760,7 @@ def generate_launch_description():
             # =============================================================================
 
             # joy_node,
-            # keyboard_input,
+            keyboard_input,
 
             # =============================================================================
 
