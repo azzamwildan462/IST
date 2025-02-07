@@ -22,7 +22,7 @@ include_directories(
 )
 
 add_executable(beckhoff src/beckhoff.cpp)
-add_executable(CANbus_HAL src/CANbus_HAL.cpp)
+add_executable(CANbus_HAL src/jhctech_291.c src/CANbus_HAL.cpp)
 add_executable(serial_imu src/serial_imu.cpp)
 add_executable(keyboard_input src/keyboard_input.cpp)
 

@@ -8,6 +8,15 @@ void Master::manual_motion(float vx, float vy, float wz)
     (void)vy;
 
     /**
+     * Ketika dalam mode steer manual,
+     * Maka aktuasi posisi eps sama dengan nilai sensor encoder eps
+     */
+    if (!(global_fsm == FSM_GLOBAL_OP_3 || global_fsm == FSM_GLOBAL_OP_5))
+    {
+        wz = fb_steering_angle;
+    }
+
+    /**
      * Menghitung kecepatan mobil
      * Braking system aktif ketika vx < 0, sisanya kontrol kecepatan
      */

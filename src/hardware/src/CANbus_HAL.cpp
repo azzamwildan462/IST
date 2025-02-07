@@ -6,12 +6,13 @@
 #include "std_msgs/msg/string.hpp"
 #include "std_msgs/msg/u_int16.hpp"
 #include "std_msgs/msg/u_int8.hpp"
+#include "std_msgs/msg/float32_multi_array.hpp"
+#include "std_msgs/msg/float32.hpp"
 
 #include <cerrno>
 #include <cstdio>
 #include <cstring>
 #include <fcntl.h>
-#include <ros2_utils/global_definitions.hpp>
 #include <stdint.h>
 #include <unistd.h>
 
@@ -20,6 +21,16 @@
 #include <net/if.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
+
+#include <termios.h>
+#include "hardware/jhctech_291.h"
+
+#define COB_ID_CAR_ENCODER 0x388
+#define COB_ID_CAR_BATTERY 0x109
+#define COB_ID_CAR_FB_ACCELERATOR 0x101
+#define COB_ID_CAR_FB_TRANSMISSION 0x18C
+#define COB_ID_EPS_ACTUATION 0x321
+#define COB_ID_EPS_ENCODER 0x231
 
 class CANbus_HAL : public rclcpp::Node
 {
@@ -30,6 +41,9 @@ public:
     rclcpp::Publisher<std_msgs::msg::UInt8>::SharedPtr pub_fb_tps_accelerator;
     rclcpp::Publisher<std_msgs::msg::UInt8>::SharedPtr pub_fb_transmission;
     rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr pub_error_code;
+    rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr pub_eps_encoder;
+    rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr sub_master_actuator;
+    rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_master_global_fsm;
 
     HelpLogger logger;
     int error_code = 0;
@@ -38,6 +52,8 @@ public:
     // =======================================================
     std::string if_name;
     int bitrate = 125000;
+    bool use_socket_can = true;
+    int jhctech_can_id = -1; // Jika -1, masuk default, 1 untuk EPS, 2 untuk mobil
 
     int socket_can = -1;
 
@@ -45,6 +61,10 @@ public:
     int16_t encoder = 0;
     uint8_t fb_tps_accelerator = 0;
     uint8_t fb_transmission = 0;
+    float eps_actuation = 0;
+    uint8_t eps_flag = 0;
+    float eps_encoder_fb = 0;
+    int16_t master_global_fsm = 0;
 
     CANbus_HAL()
         : Node("CANbus_HAL")
@@ -55,6 +75,12 @@ public:
         this->declare_parameter("bitrate", 125000);
         this->get_parameter("bitrate", bitrate);
 
+        this->declare_parameter("use_socket_can", true);
+        this->get_parameter("use_socket_can", use_socket_can);
+
+        this->declare_parameter("jhctech_can_id", -1);
+        this->get_parameter("jhctech_can_id", jhctech_can_id);
+
         //----Timer
         tim_50hz = this->create_wall_timer(std::chrono::milliseconds(1), std::bind(&CANbus_HAL::callback_routine, this));
 
@@ -64,6 +90,13 @@ public:
         pub_fb_tps_accelerator = this->create_publisher<std_msgs::msg::UInt8>("/can/fb_tps_accelerator", 1);
         pub_fb_transmission = this->create_publisher<std_msgs::msg::UInt8>("/can/fb_transmission", 1);
         pub_error_code = this->create_publisher<std_msgs::msg::Int16>("/can/error_code", 1);
+        pub_eps_encoder = this->create_publisher<std_msgs::msg::Float32>("/can/eps_encoder", 1);
+
+        //----Subscriber
+        sub_master_actuator = this->create_subscription<std_msgs::msg::Float32MultiArray>(
+            "/master/actuator", 1, std::bind(&CANbus_HAL::callback_sub_master_actuator, this, std::placeholders::_1));
+        sub_master_global_fsm = this->create_subscription<std_msgs::msg::Int16>(
+            "/master/actuator", 1, std::bind(&CANbus_HAL::callback_sub_master_global_fsm, this, std::placeholders::_1));
 
         if (!logger.init())
         {
@@ -71,23 +104,96 @@ public:
             rclcpp::shutdown();
         }
 
-        char cmd[100];
-        sprintf(cmd, "sudo ip link set %s up type can bitrate %d", if_name.c_str(), bitrate);
-        system(cmd);
-
-        socket_can = can_init(if_name.c_str());
-        if (socket_can < 0)
+        if (use_socket_can)
         {
-            RCLCPP_ERROR(this->get_logger(), "Failed to initialize CAN interface");
-            rclcpp::shutdown();
+            char cmd[100];
+            sprintf(cmd, "sudo ip link set %s up type can bitrate %d", if_name.c_str(), bitrate);
+            system(cmd);
+
+            socket_can = can_init(if_name.c_str());
+            if (socket_can < 0)
+            {
+                RCLCPP_ERROR(this->get_logger(), "Failed to initialize CAN interface");
+                rclcpp::shutdown();
+            }
+        }
+        else
+        {
+            char char_ptr_if_name[100];
+            sprintf(char_ptr_if_name, "%s", if_name.c_str());
+            socket_can = jhctech_Open(char_ptr_if_name);
+            if (socket_can < 0)
+            {
+                RCLCPP_ERROR(this->get_logger(), "Failed to initialize CAN interface");
+                rclcpp::shutdown();
+            }
+
+            int ret_buffer = set_can_jhctech_bitrate_id(bitrate);
+            if (ret_buffer < 0)
+            {
+                RCLCPP_ERROR(this->get_logger(), "Failed to initialize CAN Bitrate");
+                rclcpp::shutdown();
+            }
         }
 
         logger.info("CANbus_HAL init success");
     }
 
+    void callback_sub_master_global_fsm(const std_msgs::msg::Int16::SharedPtr msg)
+    {
+        master_global_fsm = msg->data;
+    }
+
+    void callback_sub_master_actuator(const std_msgs::msg::Float32MultiArray::SharedPtr msg)
+    {
+        eps_actuation = msg->data[1];
+    }
+
     void callback_routine()
     {
-        parse_can_frame();
+        eps_flag = 0;
+        if (master_global_fsm == 3 || master_global_fsm == 5)
+        {
+            eps_flag = 1;
+        }
+
+        if (use_socket_can)
+        {
+            struct can_frame frame;
+            frame.can_id = COB_ID_EPS_ACTUATION;
+            frame.can_dlc = 5;
+
+            memcpy(&frame.data[0], &eps_flag, 1);
+            memcpy(&frame.data[1], &eps_actuation, 4);
+
+            if (write(socket_can, &frame, sizeof(struct can_frame)) != sizeof(struct can_frame))
+            {
+                logger.warn("SOCKET CAN SEND FAILED\n");
+            }
+
+            parse_can_frame(); // Ini blocking
+        }
+        else
+        {
+            uint8_t data_send_buffer[4] = {0};
+
+            memcpy(data_send_buffer, &eps_flag, 1);
+            memcpy(data_send_buffer + 1, &eps_actuation, 4);
+
+            int eps_jhctech_can_id = jhctech_can_id;
+            if (jhctech_can_id == -1)
+            {
+                eps_jhctech_can_id = 1;
+            }
+
+            long ret = jhctech_SendDataFrame(socket_can, 't', eps_jhctech_can_id, COB_ID_EPS_ACTUATION, data_send_buffer, 5);
+            if (ret < 0)
+            {
+                logger.warn("CAN%d SEND FAILED\n", eps_jhctech_can_id);
+            }
+
+            parse_can_jhctech(); // Ini blocking
+        }
 
         std_msgs::msg::Int16 msg_battery;
         msg_battery.data = battery;
@@ -108,6 +214,68 @@ public:
         std_msgs::msg::Int16 msg_error_code;
         msg_error_code.data = error_code;
         pub_error_code->publish(msg_error_code);
+
+        std_msgs::msg::Float32 msg_eps_encoder;
+        msg_eps_encoder.data = eps_encoder_fb;
+        pub_eps_encoder->publish(msg_eps_encoder);
+    }
+
+    void parse_can_jhctech()
+    {
+        static uint8_t can_data_buffer[1024] = {0}; // Raw serial data
+        static Canbus_msg *can_data = NULL;
+
+        {
+            int ret_buffer = jhctech_GetComMessage(socket_can, can_data_buffer, 1024);
+            uint32_t errorCode = 0;
+
+            if (0 != (errorCode = jhctech_CheckUartError(can_data_buffer, ret_buffer)))
+            {
+                logger.error("UART errorCode is 0x%08x", errorCode);
+            }
+            if (0 != (errorCode = jhctech_CheckCan0Error(can_data_buffer, ret_buffer)))
+            {
+                logger.error("CAN0 errorCode is 0x%08x", errorCode);
+            }
+            if (0 != (errorCode = jhctech_CheckCan1Error(can_data_buffer, ret_buffer)))
+            {
+                logger.error("CAN1 errorCode is 0x%08x", errorCode);
+            }
+        }
+
+        {
+            int ret_buffer = jhctech_Receive(&can_data, can_data_buffer);
+            (void)ret_buffer;
+
+            while (can_data != NULL)
+            {
+                if (can_data->canId == COB_ID_CAR_ENCODER)
+                {
+                    encoder = (can_data->data[3] | (can_data->data[2] << 8));
+                }
+                else if (can_data->canId == COB_ID_CAR_BATTERY)
+                {
+                    battery = can_data->data[1] + 1;
+                }
+                else if (can_data->canId == COB_ID_CAR_FB_ACCELERATOR)
+                {
+                    fb_tps_accelerator = can_data->data[2];
+                }
+                else if (can_data->canId == COB_ID_CAR_FB_TRANSMISSION)
+                {
+                    /**
+                     * F-N-R = 1-3-5
+                     */
+                    fb_transmission = can_data->data[5];
+                }
+                else if (can_data->canId == COB_ID_EPS_ENCODER)
+                {
+                    memcpy(&eps_encoder_fb, &can_data->data[0], 4);
+                }
+
+                can_data = can_data->Next;
+            }
+        }
     }
 
     void parse_can_frame()
@@ -158,24 +326,28 @@ public:
         }
 
         // Check if the response is from the expected node
-        if (frame.can_id == 0x388)
+        if (frame.can_id == COB_ID_CAR_ENCODER)
         {
-            encoder = frame.data[3] | (frame.data[2] << 8);
+            encoder = (frame.data[3] | (frame.data[2] << 8));
         }
-        else if (frame.can_id == 0x109)
+        else if (frame.can_id == COB_ID_CAR_BATTERY)
         {
             battery = frame.data[1] + 1;
         }
-        else if (frame.can_id == 0x101)
+        else if (frame.can_id == COB_ID_CAR_FB_ACCELERATOR)
         {
             fb_tps_accelerator = frame.data[2];
         }
-        else if (frame.can_id == 0x18C)
+        else if (frame.can_id == COB_ID_CAR_FB_TRANSMISSION)
         {
             /**
              * F-N-R = 1-3-5
              */
             fb_transmission = frame.data[5];
+        }
+        else if (frame.can_id == COB_ID_EPS_ENCODER)
+        {
+            memcpy(&eps_encoder_fb, &frame.data[0], 4);
         }
     }
 
@@ -205,6 +377,51 @@ public:
         fcntl(s, F_SETFL, flags);
 
         return 0;
+    }
+
+    int set_can_jhctech_bitrate_id(int bitrate)
+    {
+        int ret_buffer = 0;
+        uint8_t baud = 0;
+        switch (bitrate)
+        {
+        case 10000:
+            baud = 0;
+            break;
+        case 20000:
+            baud = 1;
+            break;
+        case 50000:
+            baud = 2;
+            break;
+        case 100000:
+            baud = 3;
+            break;
+        case 125000:
+            baud = 4;
+            break;
+        case 250000:
+            baud = 5;
+            break;
+        case 500000:
+            baud = 6;
+            break;
+        case 800000:
+            baud = 7;
+            break;
+        case 1000000:
+            baud = 8;
+            break;
+        default:
+            ret_buffer = -1;
+            break;
+        }
+
+        ret_buffer = jhctech_SetBaudRate(socket_can, 1, baud);
+        sleep(1);
+        ret_buffer = jhctech_SetBaudRate(socket_can, 2, baud);
+
+        return ret_buffer;
     }
 
     int8_t can_init(const char *interface)
@@ -241,7 +458,7 @@ int main(int argc, char **argv)
 
     auto node_CANbus_HAL = std::make_shared<CANbus_HAL>();
 
-    rclcpp::executors::SingleThreadedExecutor executor;
+    rclcpp::executors::MultiThreadedExecutor executor;
     executor.add_node(node_CANbus_HAL);
     executor.spin();
 

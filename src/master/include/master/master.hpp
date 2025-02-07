@@ -1,11 +1,11 @@
 #ifndef MASTER_HPP
 #define MASTER_HPP
 
+#include "rclcpp/rclcpp.hpp"
 #include "geometry_msgs/msg/point.hpp"
 #include "geometry_msgs/msg/pose_with_covariance_stamped.hpp"
 #include "geometry_msgs/msg/quaternion.hpp"
 #include "nav_msgs/msg/odometry.hpp"
-#include "rclcpp/rclcpp.hpp"
 #include "ros2_interface/msg/point_array.hpp"
 #include "ros2_utils/global_definitions.hpp"
 #include "ros2_utils/help_logger.hpp"
@@ -45,6 +45,7 @@ public:
     rclcpp::Publisher<std_msgs::msg::Float32MultiArray>::SharedPtr pub_actuator;
     rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr pub_transmission_master;
     rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr pub_pose_offset;
+    rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr sub_CAN_eps_encoder;
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr sub_beckhoff_sensor;
     rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr sub_obs_find;
     rclcpp::Subscription<ros2_interface::msg::PointArray>::SharedPtr sub_lane_kiri;
@@ -148,6 +149,7 @@ public:
     int16_t transmission_joy_master = 0;
 
     rclcpp::Time current_time;
+    rclcpp::Time last_time_CANbus;
     rclcpp::Time last_time_beckhoff;
     rclcpp::Time last_time_lidar;
     rclcpp::Time last_time_cam_kiri;
@@ -169,6 +171,7 @@ public:
     // ===============================================================================================
     void callback_tim_50hz();
     void callback_sub_joy(const sensor_msgs::msg::Joy::SharedPtr msg);
+    void callback_sub_CAN_eps_encoder(const std_msgs::msg::Float32::SharedPtr msg);
     void callback_sub_beckhoff_sensor(const std_msgs::msg::Float32MultiArray::SharedPtr msg);
     void callback_sub_lane_kiri(const ros2_interface::msg::PointArray::SharedPtr msg);
     void callback_sub_lane_tengah(const ros2_interface::msg::PointArray::SharedPtr msg);

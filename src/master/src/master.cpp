@@ -20,8 +20,10 @@ Master::Master()
 
     sub_obs_find = this->create_subscription<std_msgs::msg::Float32>(
         "/obstacle_filter/obs_find", 1, std::bind(&Master::callback_sub_obs_find, this, std::placeholders::_1));
+    sub_CAN_eps_encoder = this->create_subscription<std_msgs::msg::Float32>(
+        "/can/eps_encoder", 1, std::bind(&Master::callback_sub_CAN_eps_encoder, this, std::placeholders::_1));
     sub_beckhoff_sensor = this->create_subscription<std_msgs::msg::Float32MultiArray>(
-        "/beckhoff/sensors", 1, std::bind(&Master::callback_sub_beckhoff_sensor, this, std::placeholders::_1));
+        "/beckhoff/analog_input", 1, std::bind(&Master::callback_sub_beckhoff_sensor, this, std::placeholders::_1));
     sub_lane_kiri = this->create_subscription<ros2_interface::msg::PointArray>(
         "/lane_detection/point_kiri", 1, std::bind(&Master::callback_sub_lane_kiri, this, std::placeholders::_1));
     sub_lane_kanan = this->create_subscription<ros2_interface::msg::PointArray>(
@@ -212,10 +214,15 @@ void Master::callback_sub_joy(const sensor_msgs::msg::Joy::SharedPtr msg)
     }
 }
 
+void Master::callback_sub_CAN_eps_encoder(const std_msgs::msg::Float32::SharedPtr msg)
+{
+    last_time_CANbus = rclcpp::Clock(RCL_SYSTEM_TIME).now();
+    fb_steering_angle = msg->data;
+}
 void Master::callback_sub_beckhoff_sensor(const std_msgs::msg::Float32MultiArray::SharedPtr msg)
 {
     last_time_beckhoff = rclcpp::Clock(RCL_SYSTEM_TIME).now();
-    fb_steering_angle = msg->data[0];
+    // fb_steering_angle = msg->data[0];
 }
 
 void Master::callback_sub_obs_find(const std_msgs::msg::Float32::SharedPtr msg)

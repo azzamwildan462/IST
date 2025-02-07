@@ -34,12 +34,14 @@ CameraSrv::CameraSrv(ICameraStatus *cameraStatus, const std::string &filepath) :
     int ret = 0;
     LOG(INFO) << "Angstrong camera server" << std::endl;
     ret = AS_SDK_Init();
-    if (ret != 0) {
+    if (ret != 0)
+    {
         LOG(ERROR) << "sdk init failed" << std::endl;
     }
     char sdkVersion[64] = {0};
     ret = AS_SDK_GetSwVersion(sdkVersion, sizeof(sdkVersion));
-    if (ret != 0) {
+    if (ret != 0)
+    {
         LOG(ERROR) << "get sdk version failed" << std::endl;
     }
     LOG(INFO) << "Angstrong camera sdk version:" << sdkVersion << std::endl;
@@ -51,7 +53,8 @@ CameraSrv::~CameraSrv()
 {
     LOG(INFO) << "Angstrong camera server exit" << std::endl;
     int ret = AS_SDK_Deinit();
-    if (ret != 0) {
+    if (ret != 0)
+    {
         LOG(ERROR) << "sdk deinit failed" << std::endl;
     }
 }
@@ -74,25 +77,30 @@ void CameraSrv::stop()
     int dev_idx = 0;
 
     ret = AS_SDK_StopListener();
-    if (ret == 0) {
+    if (ret == 0)
+    {
         LOG(INFO) << "stop listener monitor" << std::endl;
     }
 
     LOG(INFO) << "stop and close the camera" << std::endl;
-    for (auto it = m_devsList.begin(); it != m_devsList.end(); ) {
+    for (auto it = m_devsList.begin(); it != m_devsList.end();)
+    {
         AS_CAM_PTR dev = (AS_CAM_PTR)(*it);
         LOG(INFO) << "close camera idx " << dev_idx << std::endl;
 
         ret = AS_SDK_StopStream(dev);
-        if (ret < 0) {
+        if (ret < 0)
+        {
             LOG(ERROR) << "stop stream, ret: " << ret << std::endl;
         }
         ret = AS_SDK_CloseCamera(dev);
-        if (ret < 0) {
+        if (ret < 0)
+        {
             LOG(ERROR) << "close camera, ret: " << ret << std::endl;
         }
         ret = AS_SDK_DestoryCamHandle(dev);
-        if (ret == 0) {
+        if (ret == 0)
+        {
             LOG(INFO) << "destory camera success" << std::endl;
         }
         m_devsList.erase(it++);
@@ -113,43 +121,56 @@ void CameraSrv::onAttached(AS_CAM_ATTR_S *attr, void *privateData)
     std::lock_guard<std::timed_mutex> lock(server->m_mutex);
 
     bool exist = false;
-    for (const auto &camera : server->m_devsList) {
+    for (const auto &camera : server->m_devsList)
+    {
         AS_CAM_ATTR_S attr_t;
         memset(&attr_t, 0, sizeof(AS_CAM_ATTR_S));
         ret = AS_SDK_GetCameraAttrs(camera, attr_t);
-        if ((ret == 0) && ((attr->type == AS_CAMERA_ATTR_LNX_USB))) {
-            if ((attr->attr.usbAttrs.bnum == attr_t.attr.usbAttrs.bnum)
-                && (strcmp(attr->attr.usbAttrs.port_numbers, attr_t.attr.usbAttrs.port_numbers) == 0)) {
+        if ((ret == 0) && ((attr->type == AS_CAMERA_ATTR_LNX_USB)))
+        {
+            if ((attr->attr.usbAttrs.bnum == attr_t.attr.usbAttrs.bnum) && (strcmp(attr->attr.usbAttrs.port_numbers, attr_t.attr.usbAttrs.port_numbers) == 0))
+            {
                 LOG(WARN) << "this camera exist" << std::endl;
                 exist = true;
                 break;
             }
-        } else if ((ret == 0) && (attr->type == AS_CAMERA_ATTR_NET)) {
-            if (strcmp(attr->attr.netAttrs.ip_addr, attr_t.attr.netAttrs.ip_addr) == 0) {
+        }
+        else if ((ret == 0) && (attr->type == AS_CAMERA_ATTR_NET))
+        {
+            if (strcmp(attr->attr.netAttrs.ip_addr, attr_t.attr.netAttrs.ip_addr) == 0)
+            {
                 LOG(WARN) << "this camera exist" << std::endl;
                 exist = true;
                 break;
             }
-        } else if ((ret == 0) && (attr->type == AS_CAMERA_ATTR_WIN_USB)) {
-            if (strcmp(attr->attr.winAttrs.symbol_link, attr_t.attr.winAttrs.symbol_link) == 0) {
+        }
+        else if ((ret == 0) && (attr->type == AS_CAMERA_ATTR_WIN_USB))
+        {
+            if (strcmp(attr->attr.winAttrs.symbol_link, attr_t.attr.winAttrs.symbol_link) == 0)
+            {
                 LOG(WARN) << "this camera exist" << std::endl;
                 exist = true;
                 break;
             }
-        } else {
+        }
+        else
+        {
             LOG(ERROR) << "error camera attr" << std::endl;
             return;
         }
     }
-    if (exist) {
+    if (exist)
+    {
         LOG(WARN) << "this device exist, ignore this event, attached end" << std::endl;
+        rclcpp::shutdown();
         return;
     }
 
     LOG(INFO) << "this is a new attach device, create and open it" << std::endl;
     AS_CAM_PTR newdev;
     ret = AS_SDK_CreateCamHandle(newdev, attr);
-    if (ret == 0) {
+    if (ret == 0)
+    {
         server->m_devsList.push_back(newdev);
 
         // get model type
@@ -158,44 +179,52 @@ void CameraSrv::onAttached(AS_CAM_ATTR_S *attr, void *privateData)
         LOG(INFO) << "get model type " << cam_type << std::endl;
 
         std::string file_path;
-        if (server->getConfigFile(newdev, file_path, cam_type) != 0) {
+        if (server->getConfigFile(newdev, file_path, cam_type) != 0)
+        {
             LOG(ERROR) << "cannot find config file" << std::endl;
             return;
         }
 
         server->m_camera_status->onCameraAttached(newdev, stream_param, cam_type);
-        if (stream_param.open) {
+        if (stream_param.open)
+        {
             AS_CAM_Stream_Cb_s streamCallback;
             streamCallback.callback = server->onNewFrame;
             streamCallback.privateData = privateData;
 
             ret = AS_SDK_OpenCamera(newdev, file_path.c_str());
-            if (ret < 0) {
+            if (ret < 0)
+            {
                 LOG(ERROR) << "open camera, ret: " << ret << std::endl;
                 return;
             }
             server->m_camera_status->onCameraOpen(newdev);
             ret = AS_SDK_RegisterStreamCallback(newdev, &streamCallback);
-            if (ret != 0) {
+            if (ret != 0)
+            {
                 LOG(ERROR) << "register stream callback failed" << std::endl;
             }
 
-            if (cam_type == AS_SDK_CAM_MODEL_KUNLUN_A) {
+            if (cam_type == AS_SDK_CAM_MODEL_KUNLUN_A)
+            {
                 // Register merge stream callback
                 AS_CAM_Merge_Cb_s mergeStreamCallback;
                 mergeStreamCallback.callback = onNewMergeFrame;
                 mergeStreamCallback.privateData = privateData;
 
                 ret = AS_SDK_RegisterMergeFrameCallback(newdev, &mergeStreamCallback);
-                if (ret != 0) {
+                if (ret != 0)
+                {
                     LOG(ERROR) << "Register merge stream callback failed" << std::endl;
                     return;
                 }
             }
 
-            if (stream_param.start) {
+            if (stream_param.start)
+            {
                 ret = AS_SDK_StartStream(newdev, stream_param.image_flag);
-                if (ret < 0) {
+                if (ret < 0)
+                {
                     LOG(ERROR) << "start stream, ret: " << ret << std::endl;
                     return;
                 }
@@ -212,71 +241,92 @@ void CameraSrv::onDetached(AS_CAM_ATTR_S *attr, void *privateData)
     LOG(INFO) << "detached" << std::endl;
     CameraSrv *server = static_cast<CameraSrv *>(privateData);
     std::lock_guard<std::timed_mutex> lock(server->m_mutex);
-    for (auto it = server->m_devsList.begin(); it != server->m_devsList.end(); it++) {
+    for (auto it = server->m_devsList.begin(); it != server->m_devsList.end(); it++)
+    {
         AS_CAM_PTR dev = (AS_CAM_PTR)(*it);
         AS_CAM_ATTR_S t_attr;
         ret = AS_SDK_GetCameraAttrs(dev, t_attr);
-        if (ret < 0) {
+        if (ret < 0)
+        {
             LOG(ERROR) << "get camera attribute failed" << std::endl;
             return;
         }
 
-        if (t_attr.type == AS_CAMERA_ATTR_LNX_USB) {
-            if ((t_attr.attr.usbAttrs.bnum == attr->attr.usbAttrs.bnum)
-                && (t_attr.attr.usbAttrs.dnum == attr->attr.usbAttrs.dnum)) {
+        if (t_attr.type == AS_CAMERA_ATTR_LNX_USB)
+        {
+            if ((t_attr.attr.usbAttrs.bnum == attr->attr.usbAttrs.bnum) && (t_attr.attr.usbAttrs.dnum == attr->attr.usbAttrs.dnum))
+            {
                 LOG(INFO) << "close and delete it from the list" << std::endl;
                 server->m_camera_status->onCameraStop(dev);
                 ret = AS_SDK_StopStream(dev, 0);
-                if (ret != 0) {
+                if (ret != 0)
+                {
                     LOG(INFO) << "stop stream failed" << std::endl;
-                } else {
+                }
+                else
+                {
                     LOG(INFO) << "stop stream success" << std::endl;
                 }
                 server->m_camera_status->onCameraClose(dev);
                 ret = AS_SDK_CloseCamera(dev);
-                if (ret != 0) {
+                if (ret != 0)
+                {
                     LOG(INFO) << "close camera failed" << std::endl;
-                } else {
+                }
+                else
+                {
                     LOG(INFO) << "close camera success" << std::endl;
                 }
                 server->m_camera_status->onCameraDetached(dev);
                 ret = AS_SDK_DestoryCamHandle(dev);
-                if (ret == 0) {
+                if (ret == 0)
+                {
                     LOG(INFO) << "destory camera success" << std::endl;
                 }
                 server->m_devsList.erase(it);
                 break;
             }
-        } else if (t_attr.type == AS_CAMERA_ATTR_NET) {
-            if (strcmp(t_attr.attr.netAttrs.ip_addr, attr->attr.netAttrs.ip_addr) == 0) {
+        }
+        else if (t_attr.type == AS_CAMERA_ATTR_NET)
+        {
+            if (strcmp(t_attr.attr.netAttrs.ip_addr, attr->attr.netAttrs.ip_addr) == 0)
+            {
                 LOG(INFO) << "close and delete it from the list" << std::endl;
                 server->m_camera_status->onCameraStop(dev);
                 ret = AS_SDK_StopStream(dev, 0);
-                if (ret != 0) {
+                if (ret != 0)
+                {
                     LOG(INFO) << "stop stream failed" << std::endl;
-                } else {
+                }
+                else
+                {
                     LOG(INFO) << "stop stream success" << std::endl;
                 }
                 server->m_camera_status->onCameraClose(dev);
                 ret = AS_SDK_CloseCamera(dev);
-                if (ret != 0) {
+                if (ret != 0)
+                {
                     LOG(INFO) << "close camera failed" << std::endl;
-                } else {
+                }
+                else
+                {
                     LOG(INFO) << "close camera success" << std::endl;
                 }
                 server->m_camera_status->onCameraDetached(dev);
                 ret = AS_SDK_DestoryCamHandle(dev);
-                if (ret == 0) {
+                if (ret == 0)
+                {
                     LOG(INFO) << "destory camera success" << std::endl;
                 }
                 server->m_devsList.erase(it);
                 break;
             }
-        } else {
+        }
+        else
+        {
             LOG(ERROR) << "camera attr type error" << std::endl;
             return;
         }
-
     }
     LOG(INFO) << "detached end" << std::endl;
 }
@@ -297,7 +347,8 @@ int CameraSrv::getConfigFile(AS_CAM_PTR pCamera, std::string &configfile, AS_SDK
 {
     int ret = 0;
     std::string name_key;
-    switch (cam_type) {
+    switch (cam_type)
+    {
     case AS_SDK_CAM_MODEL_KONDYOR:
     case AS_SDK_CAM_MODEL_KONDYOR_NET:
         name_key = "kondyor_";
@@ -346,9 +397,11 @@ int CameraSrv::getConfigFile(AS_CAM_PTR pCamera, std::string &configfile, AS_SDK
     std::vector<std::string> files;
     scanDir(m_configPath, files);
     ret = -1;
-    for (auto it = files.begin(); it != files.end(); it++) {
+    for (auto it = files.begin(); it != files.end(); it++)
+    {
         std::string filename = (*it).substr((*it).find_last_of("/"));
-        if (filename.find(name_key) < filename.size()) {
+        if (filename.find(name_key) < filename.size())
+        {
             LOG(INFO) << "get file: " << *it << std::endl;
             configfile = (*it);
             ret = 0;
@@ -356,7 +409,8 @@ int CameraSrv::getConfigFile(AS_CAM_PTR pCamera, std::string &configfile, AS_SDK
         }
     }
 
-    if (ret != 0) {
+    if (ret != 0)
+    {
         LOG(ERROR) << "cannot find config file" << std::endl;
         return -1;
     }
@@ -369,19 +423,24 @@ int CameraSrv::scanDir(const std::string &dir, std::vector<std::string> &file)
     int ret = 0;
     DIR *directory;
     struct dirent *ent;
-    if (!(directory = opendir(dir.c_str()))) {
+    if (!(directory = opendir(dir.c_str())))
+    {
         std::cout << "can't not open dir:" << dir << std::endl;
         return -1;
     }
-    while ((ent = readdir(directory)) != nullptr) {
-        if (strncmp(ent->d_name, ".", 1) == 0) {
+    while ((ent = readdir(directory)) != nullptr)
+    {
+        if (strncmp(ent->d_name, ".", 1) == 0)
+        {
             continue;
         }
-        if (ent->d_type == DT_REG) {
+        if (ent->d_type == DT_REG)
+        {
             std::string filepath(dir + "/" + ent->d_name);
             file.push_back(filepath);
         }
-        if (ent->d_type == DT_DIR) {
+        if (ent->d_type == DT_DIR)
+        {
             std::string childpath;
             childpath.append(dir);
             childpath.append("/");
@@ -393,4 +452,3 @@ int CameraSrv::scanDir(const std::string &dir, std::vector<std::string> &file)
     closedir(directory);
     return ret;
 }
-

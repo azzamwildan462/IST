@@ -314,7 +314,8 @@ def generate_launch_description():
         name='CANbus_HAL',
         output='screen',
         parameters=[{
-            "if_name": "can0",
+            "if_name": "/dev/serial/by-id/usb-STMicroelectronics_STM32_Virtual_ComPort_203631654D4D-if00",
+            "use_socket_can": False,
         }],
         respawn=True,
         prefix='nice -n -20 chrt -f 98'
@@ -380,8 +381,8 @@ def generate_launch_description():
         respawn=True,
         output='both',
         parameters=[
-            {"usb_bus_no": -1},
-            {"usb_path": "/dev/v4l/by-path/pci-0000:00:14.0-usb-0:2:1.0-video-index0"},
+            {"usb_bus_no": 3},
+            {"usb_path": "2"},
             {"confiPath": os.path.join(ws_path,"src/ascamera/configurationfiles")},
             {"color_pcl": False},
             {"pub_tfTree": True},
@@ -402,8 +403,8 @@ def generate_launch_description():
         respawn=True,
         output='both',
         parameters=[
-            {"usb_bus_no": -1},
-            {"usb_path": "/dev/v4l/by-path/pci-0000:00:14.0-usb-0:1:1.0-video-index0"},
+            {"usb_bus_no": 3},
+            {"usb_path": "4"},
             {"confiPath": os.path.join(ws_path,"src/ascamera/configurationfiles")},
             {"color_pcl": False},
             {"pub_tfTree": True},
@@ -447,7 +448,7 @@ def generate_launch_description():
             "setpoint_y": 240,
             "camera_namespace": "cam_kanan",
             "right_to_left_scan": False,
-            "absolute_image_topic": "/ascamera_kanan/ascamera_kanan/rgb1/image",
+            "absolute_image_topic": "/ascamera_kanan/ascamera_kanan/rgb0/image",
         }
         ],
         respawn=True,
@@ -472,6 +473,7 @@ def generate_launch_description():
             "aruco_in_counter_threshold": 30,
             "aruco_out_counter_threshold": 20,
             "camera_namespace": "cam_kanan",
+            "absolute_image_topic": "/ascamera_kanan/ascamera_kanan/rgb0/image",
         }
         ],
         respawn=True,
@@ -533,6 +535,7 @@ def generate_launch_description():
             "aruco_in_counter_threshold": 30,
             "aruco_out_counter_threshold": 20,
             "camera_namespace": "cam_kiri",
+            "absolute_image_topic": "/ascamera_kiri/ascamera_kiri/rgb0/image",
         }
         ],
         respawn=True,
@@ -732,9 +735,10 @@ def generate_launch_description():
             # rs2_cam_kiri,
             # rs2_cam_kanan,
             # vision_capture_kanan,
+            # vision_capture_kiri,
+
             lane_detection_kanan,
             aruco_detection_kanan,
-            # vision_capture_kiri,
             lane_detection_kiri,
             aruco_detection_kiri,
 
@@ -762,9 +766,9 @@ def generate_launch_description():
 
             # =============================================================================
 
-            # imu_serial,
+            imu_serial,
             # beckhoff,
-            # CANbus_HAL,
+            CANbus_HAL,
 
             # =============================================================================
 
@@ -776,11 +780,11 @@ def generate_launch_description():
             # =============================================================================
 
             # joy_node,
-            keyboard_input,
+            # keyboard_input,
 
             # =============================================================================
 
-            telemetry,
+            # telemetry,
 
             # =============================================================================
             

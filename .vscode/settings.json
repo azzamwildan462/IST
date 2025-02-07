@@ -78,7 +78,8 @@
         "*.ipp": "cpp",
         "any": "cpp",
         "coroutine": "cpp",
-        "source_location": "cpp"
+        "source_location": "cpp",
+        "jhctech_291.h": "c"
     },
     "ros.distro": "noetic",
     "C_Cpp.default.compilerPath": "/usr/bin/g++",
