@@ -27,6 +27,7 @@ public:
     rclcpp::Publisher<std_msgs::msg::Float32MultiArray>::SharedPtr pub_hasil_kalkulasi;
     rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr pub_aruco_detected;
     rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr pub_error_code;
+    rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr pub_aruco_nearest_marker_id;
 
     rclcpp::Service<ros2_interface::srv::Params>::SharedPtr srv_params;
 
@@ -206,6 +207,7 @@ public:
         pub_point_garis = this->create_publisher<ros2_interface::msg::PointArray>("point_garis", 1);
         pub_hasil_kalkulasi = this->create_publisher<std_msgs::msg::Float32MultiArray>("hasil_kalkulasi", 1);
         pub_aruco_detected = this->create_publisher<std_msgs::msg::Bool>("aruco_detected", 1);
+        pub_aruco_nearest_marker_id = this->create_publisher<std_msgs::msg::Int16>("aruco_nearest_marker_id", 1);
 
         pub_frame_display = this->create_publisher<sensor_msgs::msg::Image>("frame_display", 1);
         pub_frame_binary = this->create_publisher<sensor_msgs::msg::Image>("frame_binary", 1);
@@ -401,9 +403,9 @@ public:
         //================================================================================================
 
         // Find the nearest aruco from setpoint
+        int nearest_marker_id = -1;
         if (markerIds.size() > 0)
         {
-            int nearest_marker_id = -1;
             float nearest_marker_distance = FLT_MAX;
             for (size_t i = 0; i < markerIds.size(); i++)
             {
@@ -464,6 +466,10 @@ public:
 
         auto msg_frame_display = cv_bridge::CvImage(std_msgs::msg::Header(), "bgr8", frame_bgr_copy).toImageMsg();
         pub_frame_display->publish(*msg_frame_display);
+
+        std_msgs::msg::Int16 msg_aruco_nearest_marker_id;
+        msg_aruco_nearest_marker_id.data = (int16_t)nearest_marker_id;
+        pub_aruco_nearest_marker_id->publish(msg_aruco_nearest_marker_id);
     }
 
     void aruco_detection_gray()

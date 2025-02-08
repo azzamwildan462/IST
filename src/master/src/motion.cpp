@@ -11,7 +11,7 @@ void Master::manual_motion(float vx, float vy, float wz)
      * Ketika dalam mode steer manual,
      * Maka aktuasi posisi eps sama dengan nilai sensor encoder eps
      */
-    if (!(global_fsm == FSM_GLOBAL_OP_3 || global_fsm == FSM_GLOBAL_OP_5))
+    if (!(global_fsm.value == FSM_GLOBAL_OP_3 || global_fsm.value == FSM_GLOBAL_OP_5))
     {
         wz = fb_steering_angle;
     }
@@ -145,8 +145,6 @@ void Master::manual_motion(float vx, float vy, float wz)
     else
     {
         actuation_vx = pid_vx.calculate(vx_buffer - fb_encoder_meter);
-        // logger.info("motion: %.2f %.2f -> %.2f -> %.2f", vx_buffer, fb_encoder_meter, (vx_buffer - fb_encoder_meter), actuation_vx);
-        // actuation_vx = vx_buffer; // Sementara untuk testing
         actuation_ay = 0;
         actuation_wz = wz_buffer;
     }

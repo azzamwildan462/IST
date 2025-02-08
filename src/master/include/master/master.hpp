@@ -72,6 +72,8 @@ public:
     rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_key_pressed;
     rclcpp::Subscription<std_msgs::msg::UInt16>::SharedPtr sub_ui_control_btn;
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr sub_ui_control_velocity_and_steering;
+    rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_aruco_marker_id_kanan;
+    rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_aruco_marker_id_kiri;
 
     // Configs
     // ===============================================================================================
@@ -136,6 +138,8 @@ public:
 
     bool aruco_kiri_detected = false;
     bool aruco_kanan_detected = false;
+    int16_t aruco_kiri_marker_id = -1;
+    int16_t aruco_kanan_marker_id = -1;
 
     float fb_encoder_meter = 0;
     float fb_final_pose_xyo[3];
@@ -197,6 +201,8 @@ public:
     void callback_sub_key_pressed(const std_msgs::msg::Int16::SharedPtr msg);
     void callback_sub_ui_control_btn(const std_msgs::msg::UInt16::SharedPtr msg);
     void callback_sub_ui_control_velocity_and_steering(const std_msgs::msg::Float32MultiArray::SharedPtr msg);
+    void callback_sub_aruco_marker_id_kanan(const std_msgs::msg::Int16::SharedPtr msg);
+    void callback_sub_aruco_marker_id_kiri(const std_msgs::msg::Int16::SharedPtr msg);
 
     // Process
     // ===============================================================================================

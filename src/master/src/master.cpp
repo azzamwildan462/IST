@@ -70,6 +70,10 @@ Master::Master()
         "/master/ui_control_btn", 1, std::bind(&Master::callback_sub_ui_control_btn, this, std::placeholders::_1));
     sub_ui_control_velocity_and_steering = this->create_subscription<std_msgs::msg::Float32MultiArray>(
         "/master/ui_target_velocity_and_steering", 1, std::bind(&Master::callback_sub_ui_control_velocity_and_steering, this, std::placeholders::_1));
+    sub_aruco_marker_id_kanan = this->create_subscription<std_msgs::msg::Int16>(
+        "/lane_kanan/aruco_nearest_marker_id", 1, std::bind(&Master::callback_sub_aruco_marker_id_kanan, this, std::placeholders::_1));
+    sub_aruco_marker_id_kiri = this->create_subscription<std_msgs::msg::Int16>(
+        "/lane_kiri/aruco_nearest_marker_id", 1, std::bind(&Master::callback_sub_aruco_marker_id_kiri, this, std::placeholders::_1));
 
     if (use_ekf_odometry)
         sub_odometry = this->create_subscription<nav_msgs::msg::Odometry>(
@@ -184,6 +188,16 @@ void Master::callback_sub_key_pressed(const std_msgs::msg::Int16::SharedPtr msg)
     }
 }
 
+void Master::callback_sub_aruco_marker_id_kanan(const std_msgs::msg::Int16::SharedPtr msg)
+{
+    aruco_kanan_marker_id = msg->data;
+}
+
+void Master::callback_sub_aruco_marker_id_kiri(const std_msgs::msg::Int16::SharedPtr msg)
+{
+    aruco_kiri_marker_id = msg->data;
+}
+
 void Master::callback_sub_encoder_meter(const std_msgs::msg::Float32::SharedPtr msg)
 {
     fb_encoder_meter = msg->data;
@@ -222,7 +236,7 @@ void Master::callback_sub_CAN_eps_encoder(const std_msgs::msg::Float32::SharedPt
 void Master::callback_sub_beckhoff_sensor(const std_msgs::msg::Float32MultiArray::SharedPtr msg)
 {
     last_time_beckhoff = rclcpp::Clock(RCL_SYSTEM_TIME).now();
-    // fb_steering_angle = msg->data[0];
+    (void)msg;
 }
 
 void Master::callback_sub_obs_find(const std_msgs::msg::Float32::SharedPtr msg)
