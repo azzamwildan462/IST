@@ -46,7 +46,7 @@ class Telemetry(Node):
         self.INFLUXDB_ORG = self.get_parameter("INFLUXDB_ORG").get_parameter_value().string_value
         self.INFLUXDB_BUCKET = self.get_parameter("INFLUXDB_BUCKET").get_parameter_value().string_value
         self.ROBOT_NAME = self.get_parameter("ROBOT_NAME").get_parameter_value().string_value
-        self.publish_period = self.get_parameter("publish_period").value()
+        self.publish_period = self.get_parameter("publish_period").get_parameter_value().integer_value
 
         # Subscriber
         # ----------
@@ -119,7 +119,7 @@ class Telemetry(Node):
             
             point = point.time(self.time_robot_started)
 
-            self.db_write_api.write(bucket=self.INFLUXDB_BUCKET, org="ITS", record=point)
+            self.db_write_api.write(bucket=self.INFLUXDB_BUCKET, org=self.INFLUXDB_ORG, record=point)
         except Exception as e:
             logger.error(e)
             self.error_counter += 1
@@ -135,7 +135,7 @@ class Telemetry(Node):
             
             point = point.time(datetime.utcnow())
 
-            self.db_write_api.write(bucket=self.INFLUXDB_BUCKET, org="ITS", record=point)
+            self.db_write_api.write(bucket=self.INFLUXDB_BUCKET, org=self.INFLUXDB_ORG, record=point)
         except Exception as e:
             logger.error(e)
             self.error_counter += 1

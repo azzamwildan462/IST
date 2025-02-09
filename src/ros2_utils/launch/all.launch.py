@@ -241,11 +241,11 @@ def generate_launch_description():
         executable="telemetry.py",
         name="telemetry",
         parameters=[{
-            "INFLUXDB_URL": "http://10.199.13.56:8086",
-            "INFLUXDB_USERNAME": "raisa",
-            "INFLUXDB_PASSWORD": "itssurabaya",
-            "INFLUXDB_ORG": "ITS",
-            "INFLUXDB_BUCKET": "raisa_fix",
+            "INFLUXDB_URL": "http://172.30.37.21:8086",
+            "INFLUXDB_USERNAME": "awm462",
+            "INFLUXDB_PASSWORD": "wildan462",
+            "INFLUXDB_ORG": "awmawm",
+            "INFLUXDB_BUCKET": "awmawm",
             "ROBOT_NAME": "ist_1",
         }],
         output="screen",
@@ -730,26 +730,26 @@ def generate_launch_description():
 
     return LaunchDescription(
         [
-            ascamera_kiri,
-            ascamera_kanan,
+            # ascamera_kiri,
+            # ascamera_kanan,
             # rs2_cam_kiri,
             # rs2_cam_kanan,
             # vision_capture_kanan,
             # vision_capture_kiri,
 
-            lane_detection_kanan,
-            aruco_detection_kanan,
-            lane_detection_kiri,
-            aruco_detection_kiri,
+            # lane_detection_kanan,
+            # aruco_detection_kanan,
+            # lane_detection_kiri,
+            # aruco_detection_kiri,
 
             # =============================================================================
 
-            pose_estimator,
-            tf_map_empty,
-            tf_base_link_to_body_link,
-            tf_base_link_to_lidar1_link,
-            tf_base_link_to_lidar2_link,
-            tf_base_link_to_imu_link,
+            # pose_estimator,
+            # tf_map_empty,
+            # tf_base_link_to_body_link,
+            # tf_base_link_to_lidar1_link,
+            # tf_base_link_to_lidar2_link,
+            # tf_base_link_to_imu_link,
             
             # =============================================================================
 
@@ -766,16 +766,16 @@ def generate_launch_description():
 
             # =============================================================================
 
-            imu_serial,
+            # imu_serial,
             # beckhoff,
-            CANbus_HAL,
+            # CANbus_HAL,
 
             # =============================================================================
 
-            rosbridge_server, 
-            web_video_server,
-            master,
-            ui_server,
+            # rosbridge_server, 
+            # web_video_server,
+            # master,
+            # ui_server,
 
             # =============================================================================
 
@@ -784,7 +784,7 @@ def generate_launch_description():
 
             # =============================================================================
 
-            # telemetry,
+            telemetry,
 
             # =============================================================================
             
