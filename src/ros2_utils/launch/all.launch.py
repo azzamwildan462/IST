@@ -3,6 +3,7 @@ import os
 from launch import LaunchDescription
 from launch_ros.actions import Node
 from launch.actions import EmitEvent, RegisterEventHandler, TimerAction, DeclareLaunchArgument
+from launch.actions import SetEnvironmentVariable
 
 from ament_index_python.packages import get_package_share_directory
 
@@ -33,6 +34,9 @@ print("ws_path: ", ws_path)
 print("path_config: ", path_config)
 
 def generate_launch_description():
+    SetEnvironmentVariable(name='RMW_IMPLEMENTATION', value='rmw_cyclonedds_cpp'),
+    SetEnvironmentVariable(name='CYCLONEDDS_URI', value='file://' + path_config + 'cyclonedds.xml'),
+
     rosbridge_server = Node(
         package='rosbridge_server',
         executable='rosbridge_websocket',
@@ -40,6 +44,15 @@ def generate_launch_description():
         output='screen',
         respawn=True,
     )
+
+    rosapi_node = Node(
+        package='rosapi',
+        executable='rosapi_node',
+        name='rosapi_node',
+        output='screen',
+        respawn=True,
+    )
+
 
     web_video_server = Node(
         package='web_video_server',
@@ -730,7 +743,7 @@ def generate_launch_description():
 
     return LaunchDescription(
         [
-            # ascamera_kiri,
+            ascamera_kiri,
             # ascamera_kanan,
             # rs2_cam_kiri,
             # rs2_cam_kanan,
@@ -739,8 +752,8 @@ def generate_launch_description():
 
             # lane_detection_kanan,
             # aruco_detection_kanan,
-            # lane_detection_kiri,
-            # aruco_detection_kiri,
+            lane_detection_kiri,
+            aruco_detection_kiri,
 
             # =============================================================================
 
@@ -772,10 +785,11 @@ def generate_launch_description():
 
             # =============================================================================
 
-            # rosbridge_server, 
-            # web_video_server,
-            # master,
-            # ui_server,
+            rosapi_node,
+            rosbridge_server, 
+            web_video_server,
+            master,
+            ui_server,
 
             # =============================================================================
 
@@ -784,7 +798,7 @@ def generate_launch_description():
 
             # =============================================================================
 
-            telemetry,
+            # telemetry,
 
             # =============================================================================
             
