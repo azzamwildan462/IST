@@ -39,9 +39,9 @@ Detection:
     high_l: 255
     high_s: 255
   lane_kiri:
-    low_h: 0
-    low_l: 255
-    low_s: 0
-    high_h: 255
+    low_h: 127
+    low_l: 51
+    low_s: 57
+    high_h: 194
     high_l: 255
     high_s: 255
