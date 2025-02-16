@@ -8,15 +8,6 @@ void Master::manual_motion(float vx, float vy, float wz)
     (void)vy;
 
     /**
-     * Ketika dalam mode steer manual,
-     * Maka aktuasi posisi eps sama dengan nilai sensor encoder eps
-     */
-    if (!(global_fsm.value == FSM_GLOBAL_OP_3 || global_fsm.value == FSM_GLOBAL_OP_5))
-    {
-        wz = fb_steering_angle;
-    }
-
-    /**
      * Menghitung kecepatan mobil
      * Braking system aktif ketika vx < 0, sisanya kontrol kecepatan
      */
@@ -31,7 +22,7 @@ void Master::manual_motion(float vx, float vy, float wz)
         state_control = 0;
         if (prev_state_control != 0)
             actuation_ax = 0;
-        // logger.info("Brake");
+
         actuation_ax += -profile_max_braking_jerk * 0.5 * dt * dt;
         if (actuation_ax < -profile_max_braking_acceleration)
         {
@@ -51,7 +42,7 @@ void Master::manual_motion(float vx, float vy, float wz)
         state_control = 1;
         if (prev_state_control != 1)
             actuation_ax = 0;
-        // logger.info("Accelerate after brake");
+
         actuation_ax += profile_max_braking_jerk * 0.5 * dt * dt;
         if (actuation_ax > profile_max_braking_acceleration)
         {
@@ -71,7 +62,7 @@ void Master::manual_motion(float vx, float vy, float wz)
         state_control = 2;
         if (prev_state_control != 2)
             actuation_ax = 0;
-        // logger.info("Normal acceleration");
+
         actuation_ax += profile_max_accelerate_jerk * 0.5 * dt * dt;
         if (actuation_ax > profile_max_acceleration)
         {
@@ -91,7 +82,7 @@ void Master::manual_motion(float vx, float vy, float wz)
         state_control = 3;
         if (prev_state_control != 3)
             actuation_ax = 0;
-        // logger.info("Normal deceleration");
+
         actuation_ax -= profile_max_decelerate_jerk * 0.5 * dt * dt;
         if (actuation_ax < -profile_max_decceleration)
         {

@@ -74,6 +74,8 @@ Master::Master()
         "/lane_kanan/aruco_nearest_marker_id", 1, std::bind(&Master::callback_sub_aruco_marker_id_kanan, this, std::placeholders::_1));
     sub_aruco_marker_id_kiri = this->create_subscription<std_msgs::msg::Int16>(
         "/lane_kiri/aruco_nearest_marker_id", 1, std::bind(&Master::callback_sub_aruco_marker_id_kiri, this, std::placeholders::_1));
+    sub_CAN_eps_mode_fb = this->create_subscription<std_msgs::msg::UInt8>(
+        "/can/eps_mode", 1, std::bind(&Master::callback_sub_CAN_eps_mode_fb, this, std::placeholders::_1));
 
     if (use_ekf_odometry)
         sub_odometry = this->create_subscription<nav_msgs::msg::Odometry>(
@@ -92,6 +94,11 @@ Master::Master()
 }
 Master::~Master()
 {
+}
+
+void Master::callback_sub_CAN_eps_mode_fb(const std_msgs::msg::UInt8::SharedPtr msg)
+{
+    fb_eps_mode = msg->data;
 }
 
 void Master::callback_sub_ui_control_btn(const std_msgs::msg::UInt16::SharedPtr msg)
@@ -380,11 +387,11 @@ void Master::callback_tim_50hz()
      * Keadaan ini memastikan semua sistem tidak ada error
      */
     case FSM_GLOBAL_PREOP:
-        // if (error_code_beckhoff + error_code_cam_kiri + error_code_cam_kanan + error_code_lidar + error_code_pose_estimator + error_code_obstacle_filter + error_code_aruco_kiri + error_code_aruco_kanan + error_code_can == 0)
-        // {
-        //     local_fsm.value = 0;
-        //     global_fsm.value = FSM_GLOBAL_SAFEOP;
-        // }
+        if (error_code_beckhoff + error_code_cam_kiri + error_code_cam_kanan + error_code_lidar + error_code_pose_estimator + error_code_obstacle_filter + error_code_aruco_kiri + error_code_aruco_kanan + error_code_can == 0)
+        {
+            local_fsm.value = 0;
+            global_fsm.value = FSM_GLOBAL_SAFEOP;
+        }
 
         if (fabs(target_velocity_joy_x) > 0.1 || fabs(target_velocity_joy_y) > 0.1 || fabs(target_velocity_joy_wz) > 0.1)
         {
@@ -401,10 +408,10 @@ void Master::callback_tim_50hz()
      * Memastikan semua data bisa diterima
      */
     case FSM_GLOBAL_SAFEOP:
-        // if (error_code_beckhoff + error_code_cam_kiri + error_code_cam_kanan + error_code_lidar + error_code_pose_estimator + error_code_obstacle_filter + error_code_aruco_kiri + error_code_aruco_kanan + error_code_can > 0)
-        // {
-        //     global_fsm.value = FSM_GLOBAL_PREOP;
-        // }
+        if (error_code_beckhoff + error_code_cam_kiri + error_code_cam_kanan + error_code_lidar + error_code_pose_estimator + error_code_obstacle_filter + error_code_aruco_kiri + error_code_aruco_kanan + error_code_can > 0)
+        {
+            global_fsm.value = FSM_GLOBAL_PREOP;
+        }
 
         {
             rclcpp::Duration dt_pose_estimator = current_time - last_time_pose_estimator;
@@ -415,9 +422,10 @@ void Master::callback_tim_50hz()
             rclcpp::Duration dt_lidar = current_time - last_time_lidar;
             rclcpp::Duration dt_aruco_kiri = current_time - last_time_aruco_kiri;
             rclcpp::Duration dt_aruco_kanan = current_time - last_time_aruco_kanan;
+            rclcpp::Duration dt_CANbus = current_time - last_time_CANbus;
 
             // Jika sudah berhasil menerima semua data yang diperlukan
-            if (dt_pose_estimator.seconds() < 1 && dt_cam_kiri.seconds() < 1 && dt_cam_kanan.seconds() < 1 && dt_obstacle_filter.seconds() < 1 && dt_beckhoff.seconds() < 1 && dt_lidar.seconds() < 1 && dt_aruco_kiri.seconds() < 1 && dt_aruco_kanan.seconds() < 1)
+            if (dt_pose_estimator.seconds() < 1 && dt_cam_kiri.seconds() < 1 && dt_cam_kanan.seconds() < 1 && dt_obstacle_filter.seconds() < 1 && dt_beckhoff.seconds() < 1 && dt_lidar.seconds() < 1 && dt_aruco_kiri.seconds() < 1 && dt_aruco_kanan.seconds() < 1 && dt_CANbus.seconds() < 1)
             {
                 target_velocity_joy_x = 0;
                 target_velocity_joy_y = 0;
@@ -443,10 +451,10 @@ void Master::callback_tim_50hz()
      * Sistem beroperasi secara otomatis
      */
     case FSM_GLOBAL_OP_3:
-        // if (error_code_beckhoff + error_code_cam_kiri + error_code_cam_kanan + error_code_lidar + error_code_pose_estimator + error_code_obstacle_filter + error_code_aruco_kiri + error_code_aruco_kanan + error_code_can > 0)
-        // {
-        //     global_fsm.value = FSM_GLOBAL_PREOP;
-        // }
+        if (error_code_beckhoff + error_code_cam_kiri + error_code_cam_kanan + error_code_lidar + error_code_pose_estimator + error_code_obstacle_filter + error_code_aruco_kiri + error_code_aruco_kanan + error_code_can > 0)
+        {
+            global_fsm.value = FSM_GLOBAL_PREOP;
+        }
         process_local_fsm();
         break;
 

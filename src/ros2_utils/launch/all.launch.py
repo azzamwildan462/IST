@@ -743,7 +743,7 @@ def generate_launch_description():
 
     return LaunchDescription(
         [
-            ascamera_kiri,
+            # ascamera_kiri,
             # ascamera_kanan,
             # rs2_cam_kiri,
             # rs2_cam_kanan,
@@ -752,8 +752,8 @@ def generate_launch_description():
 
             # lane_detection_kanan,
             # aruco_detection_kanan,
-            lane_detection_kiri,
-            aruco_detection_kiri,
+            # lane_detection_kiri,
+            # aruco_detection_kiri,
 
             # =============================================================================
 
@@ -781,7 +781,7 @@ def generate_launch_description():
 
             # imu_serial,
             # beckhoff,
-            # CANbus_HAL,
+            CANbus_HAL,
 
             # =============================================================================
 

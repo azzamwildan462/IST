@@ -18,6 +18,7 @@
 #include "std_msgs/msg/float32_multi_array.hpp"
 #include "std_msgs/msg/int16.hpp"
 #include "std_msgs/msg/u_int16.hpp"
+#include "std_msgs/msg/u_int8.hpp"
 #include "tf2/LinearMath/Quaternion.h"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 
@@ -74,6 +75,7 @@ public:
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr sub_ui_control_velocity_and_steering;
     rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_aruco_marker_id_kanan;
     rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_aruco_marker_id_kiri;
+    rclcpp::Subscription<std_msgs::msg::UInt8>::SharedPtr sub_CAN_eps_mode_fb;
 
     // Configs
     // ===============================================================================================
@@ -145,6 +147,7 @@ public:
     float fb_final_pose_xyo[3];
     float fb_final_vel_dxdydo[3];
     float fb_steering_angle = 0;
+    uint8_t fb_eps_mode = 0;
 
     float dt = 0.02;
 
@@ -203,6 +206,7 @@ public:
     void callback_sub_ui_control_velocity_and_steering(const std_msgs::msg::Float32MultiArray::SharedPtr msg);
     void callback_sub_aruco_marker_id_kanan(const std_msgs::msg::Int16::SharedPtr msg);
     void callback_sub_aruco_marker_id_kiri(const std_msgs::msg::Int16::SharedPtr msg);
+    void callback_sub_CAN_eps_mode_fb(const std_msgs::msg::UInt8::SharedPtr msg);
 
     // Process
     // ===============================================================================================

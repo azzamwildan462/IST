@@ -32,6 +32,9 @@
 #define COB_ID_EPS_ACTUATION 0x321
 #define COB_ID_EPS_ENCODER 0x231
 
+#define EPS_ENCODER_MAX_COUNTER 1000
+#define EPS_ENCODER_MAX_RAD 1.5708
+
 class CANbus_HAL : public rclcpp::Node
 {
 public:
@@ -40,6 +43,7 @@ public:
     rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr pub_encoder;
     rclcpp::Publisher<std_msgs::msg::UInt8>::SharedPtr pub_fb_tps_accelerator;
     rclcpp::Publisher<std_msgs::msg::UInt8>::SharedPtr pub_fb_transmission;
+    rclcpp::Publisher<std_msgs::msg::UInt8>::SharedPtr pub_fb_eps_mode;
     rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr pub_error_code;
     rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr pub_eps_encoder;
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr sub_master_actuator;
@@ -64,6 +68,7 @@ public:
     float eps_actuation = 0;
     uint8_t eps_flag = 0;
     float eps_encoder_fb = 0;
+    uint8_t eps_mode_fb = 0;
     int16_t master_global_fsm = 0;
 
     CANbus_HAL()
@@ -81,9 +86,6 @@ public:
         this->declare_parameter("jhctech_can_id", -1);
         this->get_parameter("jhctech_can_id", jhctech_can_id);
 
-        //----Timer
-        tim_50hz = this->create_wall_timer(std::chrono::milliseconds(1), std::bind(&CANbus_HAL::callback_routine, this));
-
         //----Publiher
         pub_battery = this->create_publisher<std_msgs::msg::Int16>("/can/battery", 1);
         pub_encoder = this->create_publisher<std_msgs::msg::Int32>("/can/encoder", 1);
@@ -91,12 +93,13 @@ public:
         pub_fb_transmission = this->create_publisher<std_msgs::msg::UInt8>("/can/fb_transmission", 1);
         pub_error_code = this->create_publisher<std_msgs::msg::Int16>("/can/error_code", 1);
         pub_eps_encoder = this->create_publisher<std_msgs::msg::Float32>("/can/eps_encoder", 1);
+        pub_fb_eps_mode = this->create_publisher<std_msgs::msg::UInt8>("/can/eps_mode", 1);
 
         //----Subscriber
         sub_master_actuator = this->create_subscription<std_msgs::msg::Float32MultiArray>(
             "/master/actuator", 1, std::bind(&CANbus_HAL::callback_sub_master_actuator, this, std::placeholders::_1));
         sub_master_global_fsm = this->create_subscription<std_msgs::msg::Int16>(
-            "/master/actuator", 1, std::bind(&CANbus_HAL::callback_sub_master_global_fsm, this, std::placeholders::_1));
+            "/master/global_fsm", 1, std::bind(&CANbus_HAL::callback_sub_master_global_fsm, this, std::placeholders::_1));
 
         if (!logger.init())
         {
@@ -137,6 +140,9 @@ public:
         }
 
         logger.info("CANbus_HAL init success");
+
+        //----Timer
+        tim_50hz = this->create_wall_timer(std::chrono::milliseconds(1), std::bind(&CANbus_HAL::callback_routine, this));
     }
 
     void callback_sub_master_global_fsm(const std_msgs::msg::Int16::SharedPtr msg)
@@ -175,7 +181,7 @@ public:
         }
         else
         {
-            uint8_t data_send_buffer[4] = {0};
+            uint8_t data_send_buffer[5] = {0};
 
             memcpy(data_send_buffer, &eps_flag, 1);
             memcpy(data_send_buffer + 1, &eps_actuation, 4);
@@ -189,7 +195,7 @@ public:
             long ret = jhctech_SendDataFrame(socket_can, 't', eps_jhctech_can_id, COB_ID_EPS_ACTUATION, data_send_buffer, 5);
             if (ret < 0)
             {
-                logger.warn("CAN%d SEND FAILED\n", eps_jhctech_can_id);
+                logger.warn("CAN%d SEND FAILED", eps_jhctech_can_id);
             }
 
             parse_can_jhctech(); // Ini blocking
@@ -218,6 +224,10 @@ public:
         std_msgs::msg::Float32 msg_eps_encoder;
         msg_eps_encoder.data = eps_encoder_fb;
         pub_eps_encoder->publish(msg_eps_encoder);
+
+        std_msgs::msg::UInt8 msg_fb_eps_mode;
+        msg_fb_eps_mode.data = eps_mode_fb;
+        pub_fb_eps_mode->publish(msg_fb_eps_mode);
     }
 
     void parse_can_jhctech()
@@ -270,7 +280,14 @@ public:
                 }
                 else if (can_data->canId == COB_ID_EPS_ENCODER)
                 {
-                    memcpy(&eps_encoder_fb, &can_data->data[0], 4);
+                    eps_mode_fb = can_data->data[0];
+
+                    static const float ENC_CNTR2RAD = EPS_ENCODER_MAX_RAD / EPS_ENCODER_MAX_COUNTER;
+
+                    int16_t fb_eps_encoder_buffer = 0;
+                    memcpy(&fb_eps_encoder_buffer, &can_data->data[1], 2);
+
+                    eps_encoder_fb = fb_eps_encoder_buffer * ENC_CNTR2RAD;
                 }
 
                 can_data = can_data->Next;
@@ -347,7 +364,14 @@ public:
         }
         else if (frame.can_id == COB_ID_EPS_ENCODER)
         {
-            memcpy(&eps_encoder_fb, &frame.data[0], 4);
+            eps_mode_fb = frame.data[0];
+
+            static const float ENC_CNTR2RAD = EPS_ENCODER_MAX_RAD / EPS_ENCODER_MAX_COUNTER;
+
+            int16_t fb_eps_encoder_buffer = 0;
+            memcpy(&fb_eps_encoder_buffer, &frame.data[1], 2);
+
+            eps_encoder_fb = fb_eps_encoder_buffer * ENC_CNTR2RAD;
         }
     }
 
