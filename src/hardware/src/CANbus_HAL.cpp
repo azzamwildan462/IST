@@ -32,7 +32,7 @@
 #define COB_ID_EPS_ACTUATION 0x321
 #define COB_ID_EPS_ENCODER 0x231
 
-#define EPS_ENCODER_MAX_COUNTER 1000
+#define EPS_ENCODER_MAX_COUNTER 10000
 #define EPS_ENCODER_MAX_RAD 1.5708
 
 class CANbus_HAL : public rclcpp::Node
@@ -95,6 +95,9 @@ public:
         pub_eps_encoder = this->create_publisher<std_msgs::msg::Float32>("/can/eps_encoder", 1);
         pub_fb_eps_mode = this->create_publisher<std_msgs::msg::UInt8>("/can/eps_mode", 1);
 
+        //----Timer
+        tim_50hz = this->create_wall_timer(std::chrono::milliseconds(1), std::bind(&CANbus_HAL::callback_routine, this));
+
         //----Subscriber
         sub_master_actuator = this->create_subscription<std_msgs::msg::Float32MultiArray>(
             "/master/actuator", 1, std::bind(&CANbus_HAL::callback_sub_master_actuator, this, std::placeholders::_1));
@@ -140,9 +143,6 @@ public:
         }
 
         logger.info("CANbus_HAL init success");
-
-        //----Timer
-        tim_50hz = this->create_wall_timer(std::chrono::milliseconds(1), std::bind(&CANbus_HAL::callback_routine, this));
     }
 
     void callback_sub_master_global_fsm(const std_msgs::msg::Int16::SharedPtr msg)
@@ -157,20 +157,23 @@ public:
 
     void callback_routine()
     {
-        eps_flag = 0;
-        if (master_global_fsm == 3 || master_global_fsm == 5)
+        eps_flag = 1;
+        if (master_global_fsm == 3 || master_global_fsm == 5 || master_global_fsm == 6)
         {
-            eps_flag = 1;
+            eps_flag = 2;
         }
 
         if (use_socket_can)
         {
             struct can_frame frame;
             frame.can_id = COB_ID_EPS_ACTUATION;
-            frame.can_dlc = 5;
+            frame.can_dlc = 3;
+
+            static const float ENC_RAD2CNTR = EPS_ENCODER_MAX_COUNTER / EPS_ENCODER_MAX_RAD;
+            int16_t eps_actuation_cntr = eps_actuation * ENC_RAD2CNTR;
 
             memcpy(&frame.data[0], &eps_flag, 1);
-            memcpy(&frame.data[1], &eps_actuation, 4);
+            memcpy(&frame.data[1], &eps_actuation_cntr, 2);
 
             if (write(socket_can, &frame, sizeof(struct can_frame)) != sizeof(struct can_frame))
             {
@@ -181,10 +184,13 @@ public:
         }
         else
         {
-            uint8_t data_send_buffer[5] = {0};
+            uint8_t data_send_buffer[3] = {0};
+
+            static const float ENC_RAD2CNTR = EPS_ENCODER_MAX_COUNTER / EPS_ENCODER_MAX_RAD;
+            int16_t eps_actuation_cntr = eps_actuation * ENC_RAD2CNTR;
 
             memcpy(data_send_buffer, &eps_flag, 1);
-            memcpy(data_send_buffer + 1, &eps_actuation, 4);
+            memcpy(data_send_buffer + 1, &eps_actuation_cntr, 2);
 
             int eps_jhctech_can_id = jhctech_can_id;
             if (jhctech_can_id == -1)
@@ -192,7 +198,7 @@ public:
                 eps_jhctech_can_id = 1;
             }
 
-            long ret = jhctech_SendDataFrame(socket_can, 't', eps_jhctech_can_id, COB_ID_EPS_ACTUATION, data_send_buffer, 5);
+            long ret = jhctech_SendDataFrame(socket_can, 't', eps_jhctech_can_id, COB_ID_EPS_ACTUATION, data_send_buffer, 3);
             if (ret < 0)
             {
                 logger.warn("CAN%d SEND FAILED", eps_jhctech_can_id);
@@ -259,6 +265,7 @@ public:
 
             while (can_data != NULL)
             {
+                // logger.info("Id: %x", can_data->canId);
                 if (can_data->canId == COB_ID_CAR_ENCODER)
                 {
                     encoder = (can_data->data[3] | (can_data->data[2] << 8));
@@ -280,6 +287,7 @@ public:
                 }
                 else if (can_data->canId == COB_ID_EPS_ENCODER)
                 {
+                    // logger.warn("MASUK");
                     eps_mode_fb = can_data->data[0];
 
                     static const float ENC_CNTR2RAD = EPS_ENCODER_MAX_RAD / EPS_ENCODER_MAX_COUNTER;

@@ -478,10 +478,6 @@ public:
             (void)ec_SDOwrite(brake_slave_id, ADDRESS_MODES_OF_OPERATION, 0x00, FALSE, sizeof(brake_mode), &brake_mode, EC_TIMEOUTRXM);
             (void)ec_SDOwrite(brake_slave_id, ADDRESS_TARGET_VELOCITY, 0x00, FALSE, sizeof(output_velocity_brake), &output_velocity_brake, EC_TIMEOUTRXM);
         }
-        else
-        {
-            return;
-        }
 
         ec_send_processdata();
         int wkc = ec_receive_processdata(EC_TIMEOUTRET);

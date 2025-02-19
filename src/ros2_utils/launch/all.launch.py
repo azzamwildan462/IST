@@ -313,7 +313,7 @@ def generate_launch_description():
         name='beckhoff',
         output='screen',
         parameters=[{
-            "if_name": "enp4s0f3u1c2",
+            "if_name": "enp5s0",
             "po2so_config": 4,
             "dac_velocity_maximum": 3.0
         }],
@@ -757,12 +757,12 @@ def generate_launch_description():
 
             # =============================================================================
 
-            # pose_estimator,
-            # tf_map_empty,
-            # tf_base_link_to_body_link,
-            # tf_base_link_to_lidar1_link,
-            # tf_base_link_to_lidar2_link,
-            # tf_base_link_to_imu_link,
+            pose_estimator,
+            tf_map_empty,
+            tf_base_link_to_body_link,
+            tf_base_link_to_lidar1_link,
+            tf_base_link_to_lidar2_link,
+            tf_base_link_to_imu_link,
             
             # =============================================================================
 
@@ -779,8 +779,8 @@ def generate_launch_description():
 
             # =============================================================================
 
-            # imu_serial,
-            # beckhoff,
+            imu_serial,
+            beckhoff,
             CANbus_HAL,
 
             # =============================================================================
