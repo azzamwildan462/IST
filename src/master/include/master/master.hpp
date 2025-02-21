@@ -19,6 +19,7 @@
 #include "std_msgs/msg/int16.hpp"
 #include "std_msgs/msg/u_int16.hpp"
 #include "std_msgs/msg/u_int8.hpp"
+#include "std_msgs/msg/u_int8_multi_array.hpp"
 #include "tf2/LinearMath/Quaternion.h"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 
@@ -34,6 +35,11 @@
 #define FSM_LOCAL_FOLLOW_LANE 1
 #define FSM_LOCAL_MENUNGGU_STATION_1 2
 #define FSM_LOCAL_MENUNGGU_STATION_2 3
+
+#define TRANSMISSION_AUTO 0
+#define TRANSMISSION_NEUTRAL 1
+#define TRANSMISSION_FORWARD 3
+#define TRANSMISSION_REVERSE 5
 
 class Master : public rclcpp::Node
 {
@@ -76,6 +82,7 @@ public:
     rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_aruco_marker_id_kanan;
     rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_aruco_marker_id_kiri;
     rclcpp::Subscription<std_msgs::msg::UInt8>::SharedPtr sub_CAN_eps_mode_fb;
+    rclcpp::Subscription<std_msgs::msg::UInt8MultiArray>::SharedPtr sub_beckhoff_digital_input;
 
     // Configs
     // ===============================================================================================
@@ -149,6 +156,12 @@ public:
     float fb_steering_angle = 0;
     uint8_t fb_eps_mode = 0;
 
+    /**
+     * Start Stop button bit 0
+     * Transmisi R-N-F bit 1-2-3
+     */
+    uint8_t fb_beckhoff_digital_input[2] = {0};
+
     float dt = 0.02;
 
     float obs_find = 0;
@@ -207,6 +220,7 @@ public:
     void callback_sub_aruco_marker_id_kanan(const std_msgs::msg::Int16::SharedPtr msg);
     void callback_sub_aruco_marker_id_kiri(const std_msgs::msg::Int16::SharedPtr msg);
     void callback_sub_CAN_eps_mode_fb(const std_msgs::msg::UInt8::SharedPtr msg);
+    void callback_sub_beckhoff_digital_input(const std_msgs::msg::UInt8MultiArray::SharedPtr msg);
 
     // Process
     // ===============================================================================================

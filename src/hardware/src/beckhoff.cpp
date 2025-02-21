@@ -4,6 +4,7 @@
 #include "std_msgs/msg/float32_multi_array.hpp"
 #include "std_msgs/msg/int16.hpp"
 #include "std_msgs/msg/string.hpp"
+#include "std_msgs/msg/u_int8_multi_array.hpp"
 
 #include <soem/ethercat.h>
 
@@ -18,6 +19,7 @@
 #define EL2889_ID 0x0b493052 // Digital output
 #define EL3068_ID 0x0bfc3052 // Analog input
 #define EL4004_ID 0x0fa43052 // Analog output
+#define EL1889_ID 0x0b4f3052 // Digital input
 #define JIAYU_ID 0x00000001  // Motor driver
 
 #define ANALOG_OUT_SCALER 3276.8f
@@ -97,6 +99,13 @@ typedef struct
     int32_t touch_probe_pos2_pos_value;
     uint32_t digital_inputs;
 } if_brake_input_t;
+PACKED_END
+
+PACKED_BEGIN
+typedef struct
+{
+    uint16_t data;
+} digital_in_t;
 PACKED_END
 
 HelpLogger logger;
@@ -308,6 +317,7 @@ public:
     rclcpp::Publisher<std_msgs::msg::Float32MultiArray>::SharedPtr pub_sensors;
     rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr pub_error_code;
     rclcpp::Publisher<std_msgs::msg::Float32MultiArray>::SharedPtr pub_analog_input;
+    rclcpp::Publisher<std_msgs::msg::UInt8MultiArray>::SharedPtr pub_digital_input;
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr sub_master_actuator;
     rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_master_local_fsm;
     rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_master_global_fsm;
@@ -328,6 +338,7 @@ public:
     analog_output_t *analog_output;
     if_brake_output_t *if_brake_output;
     if_brake_input_t *if_brake_input;
+    digital_in_t *digital_in;
 
     // Vars
     // =======================================================
@@ -402,6 +413,7 @@ public:
         pub_sensors = this->create_publisher<std_msgs::msg::Float32MultiArray>("/beckhoff/sensors", 1);
         pub_error_code = this->create_publisher<std_msgs::msg::Int16>("/beckhoff/error_code", 1);
         pub_analog_input = this->create_publisher<std_msgs::msg::Float32MultiArray>("/beckhoff/analog_input", 1);
+        pub_digital_input = this->create_publisher<std_msgs::msg::UInt8MultiArray>("/beckhoff/digital_input", 1);
 
         //----Subscriber
         sub_master_actuator = this->create_subscription<std_msgs::msg::Float32MultiArray>(
@@ -712,6 +724,16 @@ public:
         msg_analog_input.data.push_back((float)analog_input->data_7 * ANALOG_INPUT_SCALER);
         msg_analog_input.data.push_back((float)analog_input->data_8 * ANALOG_INPUT_SCALER);
         pub_analog_input->publish(msg_analog_input);
+
+        // std_msgs::msg::UInt8MultiArray msg_digital_input;
+        // msg_digital_input.data.push_back(digital_in->data & 0xFF);
+        // msg_digital_input.data.push_back((digital_in->data >> 8) & 0xFF);
+        // pub_digital_input->publish(msg_digital_input);
+
+        std_msgs::msg::UInt8MultiArray msg_digital_input;
+        msg_digital_input.data.push_back(0);
+        msg_digital_input.data.push_back(0);
+        pub_digital_input->publish(msg_digital_input);
     }
 
     void test_digital_output()
@@ -900,6 +922,11 @@ public:
                             // if_brake_input = (if_brake_input_t*)ec_slave[slave].inputs;
                             // if_brake_output = (if_brake_output_t*)ec_slave[slave].outputs;
                             logger.info("JIAYU Found & Configured");
+                            break;
+
+                        case EL1889_ID:
+                            digital_in = (digital_in_t *)ec_slave[slave].inputs;
+                            logger.info("EL1889 Configured");
                             break;
                         }
                     }

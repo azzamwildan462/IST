@@ -263,6 +263,7 @@ function ui_control_controller() {
             full_manual.disabled = false;
             steer_manual.disabled = false;
             gas_manual.disabled = false;
+            kontrol_hardware.disabled = false;
 
             if (full_manual.checked) {
                 ui_control_btn &= ~(7 << 2);
@@ -275,6 +276,10 @@ function ui_control_controller() {
             else if (gas_manual.checked) {
                 ui_control_btn &= ~(7 << 2);
                 ui_control_btn |= (5 << 2);
+            }
+            else if (kontrol_hardware.checked) {
+                ui_control_btn &= ~(7 << 2);
+                ui_control_btn |= (2 << 2);
             }
 
             if (gas_manual.checked || full_manual.checked) {
@@ -309,6 +314,7 @@ function ui_control_controller() {
             full_manual.disabled = true;
             steer_manual.disabled = true;
             gas_manual.disabled = true;
+            kontrol_hardware.disabled = true;
             transmisi_forward.disabled = true;
             transmisi_neutral.disabled = true;
             transmisi_reverse.disabled = true;
@@ -324,6 +330,7 @@ function ui_control_controller() {
         full_manual.disabled = true;
         steer_manual.disabled = true;
         gas_manual.disabled = true;
+        kontrol_hardware.disabled = true;
         transmisi_forward.disabled = true;
         transmisi_neutral.disabled = true;
         transmisi_reverse.disabled = true;
@@ -343,6 +350,7 @@ const mode_manual = document.getElementById('mode-manual');
 const full_manual = document.getElementById('full-manual');
 const steer_manual = document.getElementById('steer-manual');
 const gas_manual = document.getElementById('gas-manual');
+const kontrol_hardware = document.getElementById('kontrol-hardware');
 const transmisi_forward = document.getElementById('transmisi-forward');
 const transmisi_neutral = document.getElementById('transmisi-neutral');
 const transmisi_reverse = document.getElementById('transmisi-reverse');

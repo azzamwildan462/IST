@@ -76,6 +76,8 @@ Master::Master()
         "/lane_kiri/aruco_nearest_marker_id", 1, std::bind(&Master::callback_sub_aruco_marker_id_kiri, this, std::placeholders::_1));
     sub_CAN_eps_mode_fb = this->create_subscription<std_msgs::msg::UInt8>(
         "/can/eps_mode", 1, std::bind(&Master::callback_sub_CAN_eps_mode_fb, this, std::placeholders::_1));
+    sub_beckhoff_digital_input = this->create_subscription<std_msgs::msg::UInt8MultiArray>(
+        "/beckhoff/digital_input", 1, std::bind(&Master::callback_sub_beckhoff_digital_input, this, std::placeholders::_1));
 
     if (use_ekf_odometry)
         sub_odometry = this->create_subscription<nav_msgs::msg::Odometry>(
@@ -96,6 +98,15 @@ Master::~Master()
 {
 }
 
+void Master::callback_sub_beckhoff_digital_input(const std_msgs::msg::UInt8MultiArray::SharedPtr msg)
+{
+    last_time_beckhoff = rclcpp::Clock(RCL_SYSTEM_TIME).now();
+
+    // Active low
+    fb_beckhoff_digital_input[0] = ~msg->data[0];
+    fb_beckhoff_digital_input[1] = ~msg->data[1];
+}
+
 void Master::callback_sub_CAN_eps_mode_fb(const std_msgs::msg::UInt8::SharedPtr msg)
 {
     fb_eps_mode = msg->data;
@@ -110,7 +121,9 @@ void Master::callback_sub_ui_control_btn(const std_msgs::msg::UInt16::SharedPtr 
         global_fsm.value = FSM_GLOBAL_INIT;
     else
         global_fsm.value = (data & 0b11100) >> 2;
-    transmission_joy_master = (data & 0b11100000) >> 5;
+
+    if (global_fsm.value != FSM_GLOBAL_SAFEOP)
+        transmission_joy_master = (data & 0b11100000) >> 5;
 }
 
 void Master::callback_sub_ui_control_velocity_and_steering(const std_msgs::msg::Float32MultiArray::SharedPtr msg)
@@ -149,16 +162,16 @@ void Master::callback_sub_key_pressed(const std_msgs::msg::Int16::SharedPtr msg)
         break;
 
     case 'e':
-        transmission_joy_master = 3;
+        transmission_joy_master = TRANSMISSION_FORWARD;
         break;
     case 'd':
-        transmission_joy_master = 1;
+        transmission_joy_master = TRANSMISSION_NEUTRAL;
         break;
     case 'c':
-        transmission_joy_master = 5;
+        transmission_joy_master = TRANSMISSION_REVERSE;
         break;
     case 's':
-        transmission_joy_master = 0;
+        transmission_joy_master = TRANSMISSION_AUTO;
         break;
 
     case 'o':
@@ -219,19 +232,19 @@ void Master::callback_sub_joy(const sensor_msgs::msg::Joy::SharedPtr msg)
 
     if (msg->buttons[0] > 0)
     {
-        transmission_joy_master = 5;
+        transmission_joy_master = TRANSMISSION_REVERSE;
     }
     else if (msg->buttons[1] > 0)
     {
-        transmission_joy_master = 1;
+        transmission_joy_master = TRANSMISSION_NEUTRAL;
     }
     else if (msg->buttons[2] > 0)
     {
-        transmission_joy_master = 0;
+        transmission_joy_master = TRANSMISSION_AUTO;
     }
     else if (msg->buttons[3] > 0)
     {
-        transmission_joy_master = 3;
+        transmission_joy_master = TRANSMISSION_FORWARD;
     }
 }
 
@@ -413,6 +426,25 @@ void Master::callback_tim_50hz()
             global_fsm.value = FSM_GLOBAL_PREOP;
         }
 
+        if ((fb_beckhoff_digital_input[0] & 0b100) == 0b100)
+        {
+            transmission_joy_master = TRANSMISSION_NEUTRAL;
+        }
+        else if ((fb_beckhoff_digital_input[0] & 0b10) == 0b10)
+        {
+            transmission_joy_master = TRANSMISSION_REVERSE;
+        }
+        else if ((fb_beckhoff_digital_input[0] & 0b1000) == 0b1000)
+        {
+            transmission_joy_master = TRANSMISSION_FORWARD;
+        }
+        /* Sebenarny ini gk ada */
+        else
+        {
+            transmission_joy_master = TRANSMISSION_AUTO;
+        }
+
+        if ((fb_beckhoff_digital_input[0] & 0b01) == 1)
         {
             rclcpp::Duration dt_pose_estimator = current_time - last_time_pose_estimator;
             rclcpp::Duration dt_cam_kiri = current_time - last_time_cam_kiri;
@@ -454,7 +486,15 @@ void Master::callback_tim_50hz()
         if (error_code_beckhoff + error_code_cam_kiri + error_code_cam_kanan + error_code_lidar + error_code_pose_estimator + error_code_obstacle_filter + error_code_aruco_kiri + error_code_aruco_kanan + error_code_can > 0)
         {
             global_fsm.value = FSM_GLOBAL_PREOP;
+            break;
         }
+
+        if ((fb_beckhoff_digital_input[0] & 0b01) == 0)
+        {
+            global_fsm.value = FSM_GLOBAL_SAFEOP;
+            break;
+        }
+
         process_local_fsm();
         break;
 

@@ -457,11 +457,13 @@ def generate_launch_description():
             "point_to_velocity_ratio": 0.003,
             "point_to_velocity_angle_threshold": 0.56,
             "metode_perhitungan": 1,
-            "setpoint_x": 120,
+            "setpoint_x": 420,
             "setpoint_y": 240,
             "camera_namespace": "cam_kanan",
             "right_to_left_scan": False,
             "absolute_image_topic": "/ascamera_kanan/ascamera_kanan/rgb0/image",
+            "erode_size": 5,
+            "dilate_size": 5,
         }
         ],
         respawn=True,
@@ -519,11 +521,13 @@ def generate_launch_description():
             "point_to_velocity_ratio": 0.005,
             "point_to_velocity_angle_threshold": 0.6,
             "metode_perhitungan": 1,
-            "setpoint_x": 320,
+            "setpoint_x": 160,
             "setpoint_y": 240,
             "camera_namespace": "cam_kiri",
             "right_to_left_scan": True,
             "absolute_image_topic": "/ascamera_kiri/ascamera_kiri/rgb0/image",
+            "erode_size": 5,
+            "dilate_size": 5,
         }
         ],
         respawn=True,
@@ -743,17 +747,17 @@ def generate_launch_description():
 
     return LaunchDescription(
         [
-            # ascamera_kiri,
-            # ascamera_kanan,
+            ascamera_kiri,
+            ascamera_kanan,
             # rs2_cam_kiri,
             # rs2_cam_kanan,
             # vision_capture_kanan,
             # vision_capture_kiri,
 
-            # lane_detection_kanan,
-            # aruco_detection_kanan,
-            # lane_detection_kiri,
-            # aruco_detection_kiri,
+            lane_detection_kanan,
+            aruco_detection_kanan,
+            lane_detection_kiri,
+            aruco_detection_kiri,
 
             # =============================================================================
 
