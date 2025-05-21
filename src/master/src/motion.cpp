@@ -1,5 +1,10 @@
 #include "master/master.hpp"
 
+float Master::pythagoras(float x1, float y1, float x2, float y2)
+{
+    return sqrtf((x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2));
+}
+
 void Master::manual_motion(float vx, float vy, float wz)
 {
     static float vx_buffer = 0; // Throttle velocity
@@ -101,9 +106,9 @@ void Master::manual_motion(float vx, float vy, float wz)
      * Semakin cepat mobil, semakin lambat perputaran steer
      */
     static const float min_velocity = 2.0 / 3.6;              // 2 km/h
-    static const float max_velocity = 7.0 / 3.6;              // 7 km/h
-    static const float min_steering_rate = 7 * M_PI / 180.0;  // 7 deg/s
-    static const float max_steering_rate = 36 * M_PI / 180.0; // 21 deg/s
+    static const float max_velocity = 6.0 / 3.6;              // 7 km/h
+    static const float min_steering_rate = 15 * M_PI / 180.0; // 7 deg/s
+    static const float max_steering_rate = 60 * M_PI / 180.0; // 21 deg/s
     static const float gradient_steering_rate = (min_steering_rate - max_steering_rate) / (max_velocity - min_velocity);
 
     float steering_rate = fmaxf(min_steering_rate,
@@ -131,13 +136,13 @@ void Master::manual_motion(float vx, float vy, float wz)
     {
         actuation_vx = vx_buffer;
         actuation_ay = 0;
-        actuation_wz = wz_buffer;
+        actuation_wz = offset_sudut_steering + wz_buffer;
     }
     else
     {
         actuation_vx = pid_vx.calculate(vx_buffer - fb_encoder_meter);
         actuation_ay = 0;
-        actuation_wz = wz_buffer;
+        actuation_wz = offset_sudut_steering + wz_buffer;
     }
 
     target_velocity = fmaxf(0, vx_buffer);
@@ -145,108 +150,13 @@ void Master::manual_motion(float vx, float vy, float wz)
     // logger.info("%.2f %.2f || %.2f %.2f || %.2f %.2f || %.2f %.2f", vx, wz, actuation_ax, steering_rate, vx_buffer, wz_buffer, actuation_vx, actuation_wz);
 }
 
-void Master::follow_lane_2_cam(float vx, float vy, float wz)
+void Master::lane2velocity_steering(float *pvelocity, float *psteering, float *pconfidence)
 {
-    static float target_max_velocity = 0;
-
-    (void)vy;
-    (void)wz;
-
-    /**
-     * Panic state!
-     * Ketika tidak atau kurang mendeteksi garis
-     */
-    if (lane_kiri_single_cam.points.size() < 4 && lane_kanan_single_cam.points.size() < 4)
-    {
-        manual_motion(-profile_max_braking, 0, 0);
-        return;
-    }
-
-    float out_steer = cam_kiri_pid_output * 0.5 + cam_kanan_pid_output * 0.5;
-    float velocity_gain = cam_kiri_velocity_gain * 0.5 + cam_kanan_velocity_gain * 0.5;
-
-    target_max_velocity = target_max_velocity * 0.2 + fmaxf(vx, profile_max_velocity) * velocity_gain * 0.8;
-
-    /**
-     * Menghitung efek obstacle
-     * Semakin besar emergency, semakin cepat robot untuk berhenti
-     */
-    float obstacle_emergency = obstacle_influence(2);
-    if (obstacle_emergency > 0.2)
-    {
-        // logger.info("Emergency brake ada obstacle %.2f", obstacle_emergency);
-        manual_motion(-profile_max_braking * obstacle_emergency, 0, 0);
-        return;
-    }
-
-    manual_motion(target_max_velocity, 0, out_steer);
-}
-
-void Master::follow_lane_2_cam_gas_manual(float vx, float vy, float wz)
-{
-    (void)vy;
-    (void)wz;
-
-    /**
-     * Panic state!
-     * Ketika tidak atau kurang mendeteksi garis
-     */
-    if (lane_kiri_single_cam.points.size() < 4 && lane_kanan_single_cam.points.size() < 4)
-    {
-        manual_motion(-profile_max_braking, 0, 0);
-        return;
-    }
-
-    float out_steer = cam_kiri_pid_output * 0.5 + cam_kanan_pid_output * 0.5;
-
-    manual_motion(vx, 0, out_steer);
-}
-
-void Master::follow_lane_2_cam_steer_manual(float vx, float vy, float wz)
-{
-    static float target_max_velocity = 0;
-
-    (void)vy;
-
-    /**
-     * Panic state!
-     * Ketika tidak atau kurang mendeteksi garis
-     */
-    if (lane_kiri_single_cam.points.size() < 4 && lane_kanan_single_cam.points.size() < 4)
-    {
-        manual_motion(-profile_max_braking, 0, 0);
-        return;
-    }
-
-    float velocity_gain = cam_kiri_velocity_gain * 0.5 + cam_kanan_velocity_gain * 0.5;
-
-    target_max_velocity = target_max_velocity * 0.2 + fmaxf(vx, profile_max_velocity) * velocity_gain * 0.8;
-
-    /**
-     * Menghitung efek obstacle
-     * Semakin besar emergency, semakin cepat robot untuk berhenti
-     */
-    float obstacle_emergency = obstacle_influence(2);
-    if (obstacle_emergency > 0.2)
-    {
-        // logger.info("Emergency brake ada obstacle %.2f", obstacle_emergency);
-        manual_motion(-profile_max_braking * obstacle_emergency, 0, 0);
-        return;
-    }
-
-    manual_motion(target_max_velocity, 0, wz);
-}
-
-void Master::follow_lane(float vx, float vy, float wz)
-{
-    static const float pixel_to_world = 0.053;
     static const float gain_kemiringan_terhadap_steering = 0.8;
-    static const float steer2lane_sf = 0.99; // Smooth factor
-    static float target_steering_angle = 0;  // Ini adalah arah hadap roda
+    static float target_steering_angle = 0; // Ini adalah arah hadap roda
     static float target_max_velocity = 0;
-
-    (void)vy;
-    (void)wz;
+    static const float lookahead_distance = 1.5;
+    static const float max_error_steering_mean = M_PI_2;
 
     /**
      * Panic state!
@@ -254,34 +164,34 @@ void Master::follow_lane(float vx, float vy, float wz)
      */
     if (lane_tengah.points.size() < 4)
     {
-        target_steering_angle += target_steering_angle * (1 - steer2lane_sf) + 0 * steer2lane_sf;
-        manual_motion(-profile_max_braking, 0, 0);
+        *pvelocity = -1;
+        *psteering = 0;
+        *pconfidence = 0;
         return;
     }
 
     /**
      * Mencari target max velocity
+     * dan menghitung rata rata kemiringan lane
      */
-    float min_y_point = FLT_MAX;
-    float max_y_point = -FLT_MAX;
+    float kemiringan_lane_buffer = 0;
+    uint16_t kemiringan_lane_count = 0;
+    uint16_t it_counter = 0;
+    float prev_x = 0;
+    float prev_y = 0;
+    float buffer_y = lane_tengah.points[lane_tengah.points.size() - 1].y;
     for (size_t i = 0; i < lane_tengah.points.size(); i++)
     {
-        if (lane_tengah.points[i].y < min_y_point)
+        if (it_counter++ > 5)
         {
-            min_y_point = lane_tengah.points[i].y;
+            float dx = prev_x - lane_tengah.points[i].x;
+            float dy = (buffer_y - prev_y) - (buffer_y - lane_tengah.points[i].y);
+            kemiringan_lane_buffer += (atan2f(dy, dx) - 1.57);
+            kemiringan_lane_count++;
+            prev_x = lane_tengah.points[i].x;
+            prev_y = lane_tengah.points[i].y;
+            it_counter = 0;
         }
-
-        if (lane_tengah.points[i].y > max_y_point)
-        {
-            max_y_point = lane_tengah.points[i].y;
-        }
-    }
-
-    target_max_velocity = fabs(max_y_point - min_y_point) * pixel_to_world;
-
-    if (target_max_velocity > fmaxf(profile_max_velocity, vx))
-    {
-        target_max_velocity = fmaxf(profile_max_velocity, vx);
     }
 
     /**
@@ -296,28 +206,355 @@ void Master::follow_lane(float vx, float vy, float wz)
     float dy = point_y_terjauh - point_y_terdekat;
     float kemiringan_lane = (atan2f(dy, dx) - 1.57) * gain_kemiringan_terhadap_steering;
 
-    target_steering_angle += target_steering_angle * steer2lane_sf + kemiringan_lane * (1 - steer2lane_sf);
+    target_steering_angle = atan2(2 * wheelbase * sinf(kemiringan_lane), lookahead_distance);
 
-    if (kemiringan_lane > 0 && target_steering_angle > kemiringan_lane)
+    if (target_steering_angle < -1.2)
+        target_steering_angle = -1.2;
+    else if (target_steering_angle > 1.2)
+        target_steering_angle = 1.2;
+
+    target_max_velocity = profile_max_velocity * (1 - lookahead_distance * fabs(target_steering_angle));
+
+    if (target_max_velocity > FLT_EPSILON && target_max_velocity < 0.48)
+        target_max_velocity = 0.48;
+    else if (target_max_velocity > FLT_EPSILON && target_max_velocity < 1.2)
+        target_max_velocity = 1.2;
+
+    if (target_max_velocity > profile_max_velocity)
     {
-        target_steering_angle = kemiringan_lane;
-    }
-    else if (kemiringan_lane < 0 && target_steering_angle < kemiringan_lane)
-    {
-        target_steering_angle = kemiringan_lane;
+        target_max_velocity = profile_max_velocity;
     }
 
     /**
-     * Menghitung efek obstacle
-     * Semakin besar emergency, semakin cepat robot untuk berhenti
+     * Menghitung confidence
      */
-    float obstacle_emergency = obstacle_influence(0.5);
-    if (obstacle_emergency > 0.2)
+    float error_steering_mean = 0;
+    float steering_mean = 0;
+    if (kemiringan_lane_count > 0)
     {
-        target_max_velocity = fmaxf(0, target_max_velocity - obstacle_emergency);
+        steering_mean = kemiringan_lane_buffer / kemiringan_lane_count;
+    }
+    error_steering_mean = steering_mean - kemiringan_lane;
+
+    while (error_steering_mean < -M_PI)
+        error_steering_mean += 2 * M_PI;
+    while (error_steering_mean > M_PI)
+        error_steering_mean -= 2 * M_PI;
+
+    float confidence = 1 - fabs(error_steering_mean) / max_error_steering_mean;
+    if (confidence < 0)
+        confidence = 0;
+    else if (confidence > 0.8)
+        confidence = 1;
+
+    /**
+     * Pointer assignment
+     */
+    *pvelocity = target_max_velocity;
+    *psteering = target_steering_angle;
+    *pconfidence = confidence;
+}
+
+void Master::wp2velocity_steering(float lookahead_distance, float *pvelocity, float *psteering, bool is_loop)
+{
+    if (waypoints.size() == 0)
+    {
+        *pvelocity = -1;
+        *psteering = 0;
+        return;
     }
 
-    manual_motion(target_max_velocity, 0, target_steering_angle);
+    static uint32_t index_sekarang = 0;
+    static uint32_t index_lookahead = 0;
+    float obs_scan_r = 2;
+    static const float threshold_error_sangat_besar = 1.5;
+    static const float thresholad_error_kecil = 0.4;
+    static const int16_t error_kecil_window_index_search = 5;
+    static const float offset_fb_velocity = 1;
+
+    /* Mencari index sekarang pada waypoints */
+    float error_index_sekarang = pythagoras(fb_final_pose_xyo[0], fb_final_pose_xyo[1], waypoints[index_sekarang].x, waypoints[index_sekarang].y);
+    if (error_index_sekarang > threshold_error_sangat_besar)
+    {
+        float min_error = FLT_MAX;
+        uint32_t index_terdekat = 0;
+        for (size_t i = 0; i < waypoints.size(); i++)
+        {
+            float error = pythagoras(fb_final_pose_xyo[0], fb_final_pose_xyo[1], waypoints[i].x, waypoints[i].y);
+            if (error < min_error)
+            {
+                min_error = error;
+                index_terdekat = i;
+            }
+        }
+        index_sekarang = index_terdekat;
+    }
+    else if (error_index_sekarang > thresholad_error_kecil)
+    {
+        float min_error = FLT_MAX;
+        uint32_t index_terdekat = 0;
+        for (size_t i = index_sekarang - error_kecil_window_index_search; i < index_sekarang + error_kecil_window_index_search * 2; i++)
+        {
+            float error = pythagoras(fb_final_pose_xyo[0], fb_final_pose_xyo[1], waypoints[i].x, waypoints[i].y);
+            if (error < min_error)
+            {
+                min_error = error;
+                index_terdekat = i;
+            }
+        }
+        index_sekarang = index_terdekat;
+    }
+
+    /* Menentukan efek terminal */
+    float max_velocity = profile_max_velocity;
+    for (size_t i = 0; i < terminals.terminals.size(); i++)
+    {
+        float jarak_robot_terminal = pythagoras(fb_final_pose_xyo[0], fb_final_pose_xyo[1], terminals.terminals[i].target_pose_x, terminals.terminals[i].target_pose_y);
+        if (jarak_robot_terminal < terminals.terminals[i].radius_area)
+        {
+            lookahead_distance = terminals.terminals[i].target_lookahead_distance;
+            obs_scan_r = terminals.terminals[i].obs_scan_r;
+            break;
+        }
+    }
+
+    /* Mencari waypoint sesuai lookahead_distance */
+    index_lookahead = index_sekarang;
+    if (!is_loop)
+    {
+        for (size_t i = index_sekarang; i < waypoints.size(); i++)
+        {
+            float error = pythagoras(fb_final_pose_xyo[0], fb_final_pose_xyo[1], waypoints[i].x, waypoints[i].y);
+            if (error > lookahead_distance)
+            {
+                index_lookahead = i;
+                break;
+            }
+        }
+    }
+    else
+    {
+        for (size_t i = index_sekarang; i < waypoints.size() * 2; i++)
+        {
+            size_t index_used = i;
+
+            if (i >= waypoints.size())
+            {
+                index_used -= waypoints.size();
+            }
+
+            float error = pythagoras(fb_final_pose_xyo[0], fb_final_pose_xyo[1], waypoints[index_used].x, waypoints[index_used].y);
+            if (error > lookahead_distance)
+            {
+                index_lookahead = index_used;
+                break;
+            }
+        }
+    }
+
+    /* Jika sudah mencapai waypoint terakhir */
+    if (index_lookahead == waypoints.size() - 1)
+    {
+        if (is_loop)
+        {
+            index_lookahead = 0;
+        }
+        else
+        {
+            *pvelocity = -1;
+            *psteering = 0;
+            return;
+        }
+    }
+
+    /* Safety tambahan */
+    if (index_lookahead == index_sekarang)
+    {
+        *pvelocity = -1;
+        *psteering = 0;
+        return;
+    }
+
+    /* Menghitung target velocity */
+    float dx = waypoints[index_lookahead].x - fb_final_pose_xyo[0];
+    float dy = waypoints[index_lookahead].y - fb_final_pose_xyo[1];
+    float target_velocity = waypoints[index_lookahead].fb_velocity + offset_fb_velocity;
+
+    if (target_velocity > FLT_EPSILON && target_velocity < 0.48)
+        target_velocity = fmaxf(0.48, target_velocity);
+
+    if (target_velocity > max_velocity)
+        target_velocity = max_velocity;
+
+    /* Menghitung target steering angle */
+    float direction = atan2(dy, dx) - fb_final_pose_xyo[2];
+    float target_steering_angle = atan2(2 * wheelbase * sinf(direction), lookahead_distance);
+    while (target_steering_angle > M_PI)
+        target_steering_angle -= 2 * M_PI;
+    while (target_steering_angle < -M_PI)
+        target_steering_angle += 2 * M_PI;
+
+    // logger.info("%.2f %.2f", target_velocity, target_steering_angle);
+
+    /* Menghitung obstacle */
+    if (enable_obs_detection)
+    {
+        std_msgs::msg::Float32 msg_obs_find;
+        msg_obs_find.data = local_obstacle_influence(obs_scan_r, 8.0);
+        pub_obs_find->publish(msg_obs_find);
+        if (msg_obs_find.data > 0.05)
+        {
+            target_velocity = fmaxf(-profile_max_braking, target_velocity - msg_obs_find.data);
+
+            if (target_velocity > FLT_EPSILON && target_velocity < 0.48)
+                target_velocity = -1;
+
+            if (target_velocity > max_velocity)
+                target_velocity = max_velocity;
+        }
+    }
+
+    *pvelocity = target_velocity;
+    *psteering = target_steering_angle;
+}
+
+void Master::follow_lane(float vx, float vy, float wz)
+{
+    (void)vx;
+    (void)vy;
+    (void)wz;
+
+    float target_velocity = -1;
+    float target_steering_angle = 0;
+    float confidence = 0;
+    lane2velocity_steering(&target_velocity, &target_steering_angle, &confidence);
+
+    /* Menghitung obstacle */
+    if (enable_obs_detection)
+    {
+        float obstacle_emergency = obstacle_influence(0.5);
+        if (obstacle_emergency > 0.2)
+        {
+            target_velocity = fmaxf(-profile_max_braking, target_velocity - obstacle_emergency);
+        }
+    }
+
+    manual_motion(target_velocity, 0, target_steering_angle);
+}
+
+void Master::follow_lane_gas_manual(float vx, float vy, float wz)
+{
+    (void)vy;
+    (void)wz;
+
+    float target_velocity = -1;
+    float target_steering_angle = 0;
+    float confidence = 0;
+    lane2velocity_steering(&target_velocity, &target_steering_angle, &confidence);
+
+    manual_motion(vx, 0, target_steering_angle);
+}
+
+void Master::follow_lane_steer_manual(float vx, float vy, float wz)
+{
+    (void)vx;
+    (void)vy;
+
+    float target_velocity = -1;
+    float target_steering_angle = 0;
+    float confidence = 0;
+    lane2velocity_steering(&target_velocity, &target_steering_angle, &confidence);
+
+    manual_motion(target_velocity, 0, wz);
+}
+
+void Master::follow_waypoints(float vx, float vy, float wz, float lookahead_distance, bool is_loop)
+{
+    (void)vx;
+    (void)vy;
+    (void)wz;
+
+    float target_velocity = -1;
+    float target_steering_angle = 0;
+    wp2velocity_steering(lookahead_distance, &target_velocity, &target_steering_angle, is_loop);
+
+    if ((fb_beckhoff_digital_input & IN_MASK_BUMPER) != IN_MASK_BUMPER)
+        manual_motion(-profile_max_braking, target_velocity_joy_y, target_velocity_joy_wz);
+    else
+        manual_motion(target_velocity, 0, target_steering_angle);
+}
+
+void Master::follow_waypoints_gas_manual(float vx, float vy, float wz, float lookahead_distance, bool is_loop)
+{
+    (void)vy;
+    (void)wz;
+
+    float target_velocity = -1;
+    float target_steering_angle = 0;
+    wp2velocity_steering(lookahead_distance, &target_velocity, &target_steering_angle, is_loop);
+
+    manual_motion(vx, 0, target_steering_angle);
+}
+void Master::follow_waypoints_steer_manual(float vx, float vy, float wz, float lookahead_distance, bool is_loop)
+{
+    follow_waypoints(vx, vy, wz, lookahead_distance, is_loop);
+}
+
+void Master::fusion_follow_lane_waypoints(float vx, float vy, float wz, float lookahead_distance, bool is_loop)
+{
+    (void)vx;
+    (void)vy;
+    (void)wz;
+
+    float target_velocity_follow_wp = -1;
+    float target_steering_angle_follow_wp = 0;
+    wp2velocity_steering(lookahead_distance, &target_velocity_follow_wp, &target_steering_angle_follow_wp, is_loop);
+
+    float target_velocity_follow_lane = -1;
+    float target_steering_angle_follow_lane = 0;
+    float confidence_follow_lane = 0;
+    lane2velocity_steering(&target_velocity_follow_lane, &target_steering_angle_follow_lane, &confidence_follow_lane);
+
+    float target_velocity = target_velocity_follow_wp * 0.2 + target_velocity_follow_lane * 0.8;
+    float target_steering_angle = target_steering_angle_follow_wp * (1 - confidence_follow_lane) + target_steering_angle_follow_lane * confidence_follow_lane;
+
+    /* Menghitung obstacle */
+    if (enable_obs_detection)
+    {
+        float obstacle_emergency = obstacle_influence(0.5);
+        if (obstacle_emergency > 0.2)
+        {
+            target_velocity = fmaxf(-profile_max_braking, target_velocity - obstacle_emergency);
+        }
+    }
+
+    manual_motion(target_velocity, 0, target_steering_angle);
+}
+void Master::fusion_follow_lane_waypoints_gas_manual(float vx, float vy, float wz, float lookahead_distance, bool is_loop)
+{
+    (void)vy;
+    (void)wz;
+
+    float target_velocity_follow_wp = -1;
+    float target_steering_angle_follow_wp = 0;
+    wp2velocity_steering(lookahead_distance, &target_velocity_follow_wp, &target_steering_angle_follow_wp, is_loop);
+
+    float target_velocity_follow_lane = -1;
+    float target_steering_angle_follow_lane = 0;
+    float confidence_follow_lane = 0;
+    lane2velocity_steering(&target_velocity_follow_lane, &target_steering_angle_follow_lane, &confidence_follow_lane);
+
+    float target_steering_angle = target_steering_angle_follow_wp * (1 - confidence_follow_lane) + target_steering_angle_follow_lane * confidence_follow_lane;
+
+    manual_motion(vx, 0, target_steering_angle);
+}
+void Master::fusion_follow_lane_waypoints_steer_manual(float vx, float vy, float wz, float lookahead_distance, bool is_loop)
+{
+    (void)vx;
+    (void)vy;
+    (void)wz;
+    (void)lookahead_distance;
+    (void)is_loop;
 }
 
 float Master::obstacle_influence(float gain)
@@ -335,6 +572,68 @@ float Master::obstacle_influence(float gain)
         ret_buffer = ret_buffer * 0.1 + obs_find / max_obs_find_value * gain * 0.9;
     else
         ret_buffer = ret_buffer * 0.85 + obs_find / max_obs_find_value * gain * 0.15;
+
+    return ret_buffer;
+}
+
+float Master::local_obstacle_influence(float obs_scan_r, float gain)
+{
+    static float ret_buffer = 0;
+    static float obs_find_local = 0;
+    static const float max_obs_find_value_local = 100;
+    static const float x_min = 0;
+    static const float y_min = -0.5;
+    // static const float x_max = 1;
+    static const float y_max = 0.5;
+
+    sensor_msgs::msg::LaserScan lidar_depan_points_local;
+
+    mutex_lidar_depan_points.lock();
+    lidar_depan_points_local = lidar_depan_points;
+    mutex_lidar_depan_points.unlock();
+
+    float obs_scan_r_decimal = 1 / obs_scan_r;
+    obs_find_local = 0;
+    for (size_t i = 0; i < lidar_depan_points_local.ranges.size(); ++i)
+    {
+        float range = lidar_depan_points_local.ranges[i];
+        if (std::isfinite(range) && range >= lidar_depan_points_local.range_min && range <= lidar_depan_points_local.range_max)
+        {
+            float angle = lidar_depan_points_local.angle_min + i * lidar_depan_points_local.angle_increment;
+            angle *= -1;
+            float delta_a = 0 - angle;
+            while (delta_a > M_PI)
+                delta_a -= 2 * M_PI;
+            while (delta_a < -M_PI)
+                delta_a += 2 * M_PI;
+
+            // Ketika masuk lingkaran scan
+            if (std::fabs(delta_a) < 1.57 && range < 6)
+            {
+                float point_x = range * cosf(angle);
+                float point_y = range * sinf(angle);
+
+                // Ketika masuk scan box
+                if (point_x > x_min && point_x < obs_scan_r && point_y > y_min && point_y < y_max)
+                {
+                    obs_find_local += obs_scan_r_decimal * (obs_scan_r - range);
+                }
+            }
+        }
+    }
+    // logger.info("====== obs_find_local: %.2f (%.2f)", obs_find_local, ret_buffer);
+
+    /**
+     * Jika ada obstacle, maka efek obs_find_local semakin besar
+     * Hal itu membuat robot untuk berhenti lebih cepat
+     *
+     * Jika obstacle menghilang, maka efek obs_find_local semakin kecil
+     * Hal itu membuat robot untuk jalan lebih lama
+     */
+    if (obs_find_local > ret_buffer)
+        ret_buffer = ret_buffer * 0.1 + obs_find_local / max_obs_find_value_local * gain * 0.9;
+    else
+        ret_buffer = ret_buffer * 0.85 + obs_find_local / max_obs_find_value_local * gain * 0.15;
 
     return ret_buffer;
 }

@@ -7,9 +7,11 @@
 #include "ros2_utils/help_logger.hpp"
 #include "sensor_msgs/msg/laser_scan.hpp"
 #include "sensor_msgs/msg/point_cloud2.hpp"
+#include "sensor_msgs/msg/point_cloud.hpp"
 #include "std_msgs/msg/float32.hpp"
 #include "std_msgs/msg/int16.hpp"
 #include "std_msgs/msg/string.hpp"
+#include "std_msgs/msg/float32_multi_array.hpp"
 #include "tf2/LinearMath/Quaternion.h"
 #include <pcl/filters/extract_indices.h>
 #include <pcl/point_cloud.h>
@@ -18,13 +20,16 @@
 
 using namespace std::chrono_literals;
 
-class ObstacleFilter : public rclcpp::Node {
+class ObstacleFilter : public rclcpp::Node
+{
 public:
     rclcpp::TimerBase::SharedPtr tim_50hz;
     rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr sub_lidar_points;
     rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr sub_lidar_laserscan;
+    rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr sub_master_actuator;
     rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr pub_obs_find;
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_filtered_lidar_points;
+    rclcpp::Publisher<sensor_msgs::msg::PointCloud>::SharedPtr pub_filtered_lidar_points_pcl1;
     rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr pub_error_code;
 
     //-----Transform listener
@@ -43,9 +48,15 @@ public:
     std::string lidar_topic = "/scan";
     bool publish_filtered_lidar = false;
     bool use_pointcloud2 = false;
+    float scan_box_x_min = 0.0;
+    float scan_box_y_min = -0.5;
+    float scan_box_x_max = 2.5;
+    float scan_box_y_max = 0.5;
+    bool use_scan_box = false;
 
     //----Variables
     int16_t error_code = 0;
+    float target_steering_angle = 0;
 
     // Transform
     // ---------
@@ -93,6 +104,21 @@ public:
         this->declare_parameter("use_pointcloud2", false);
         this->get_parameter("use_pointcloud2", use_pointcloud2);
 
+        this->declare_parameter("scan_box_x_min", 0.0);
+        this->get_parameter("scan_box_x_min", scan_box_x_min);
+
+        this->declare_parameter("scan_box_x_max", 2.5);
+        this->get_parameter("scan_box_x_max", scan_box_x_max);
+
+        this->declare_parameter("scan_box_y_min", -0.5);
+        this->get_parameter("scan_box_y_min", scan_box_y_min);
+
+        this->declare_parameter("scan_box_y_max", 0.5);
+        this->get_parameter("scan_box_y_max", scan_box_y_max);
+
+        this->declare_parameter("use_scan_box", false);
+        this->get_parameter("use_scan_box", use_scan_box);
+
         scan_yaw_target = scan_yaw_start * 0.5 + scan_yaw_end * 0.5;
         scan_range_decimal = 1 / scan_r_max;
 
@@ -103,7 +129,8 @@ public:
 
         scan_yaw_minmax = fabsf(scan_yaw_end - scan_yaw_start) * 0.5;
 
-        if (!logger.init()) {
+        if (!logger.init())
+        {
             RCLCPP_ERROR(this->get_logger(), "Failed to initialize logger");
             rclcpp::shutdown();
         }
@@ -112,16 +139,22 @@ public:
         tim_50hz = this->create_wall_timer(std::chrono::milliseconds(20), std::bind(&ObstacleFilter::callback_tim_50hz, this));
 
         //----Subscriber
-        if (use_pointcloud2) {
+        if (use_pointcloud2)
+        {
             sub_lidar_points = this->create_subscription<sensor_msgs::msg::PointCloud2>(
                 lidar_topic, 1, std::bind(&ObstacleFilter::callback_sub_lidar_points, this, std::placeholders::_1));
-        } else {
+        }
+        else
+        {
             sub_lidar_laserscan = this->create_subscription<sensor_msgs::msg::LaserScan>(
                 lidar_topic, 1, std::bind(&ObstacleFilter::callback_sub_lidar_laserscan, this, std::placeholders::_1));
         }
+        sub_master_actuator = this->create_subscription<std_msgs::msg::Float32MultiArray>(
+            "/master/actuator", 1, std::bind(&ObstacleFilter::callback_sub_master_actuator, this, std::placeholders::_1));
         //----Publisher
         pub_obs_find = this->create_publisher<std_msgs::msg::Float32>("/obstacle_filter/obs_find", 1);
         pub_filtered_lidar_points = this->create_publisher<sensor_msgs::msg::PointCloud2>("/obstacle_filter/filtered_lidar", 1);
+        pub_filtered_lidar_points_pcl1 = this->create_publisher<sensor_msgs::msg::PointCloud>("/obstacle_filter/filtered_lidar_pcl", 1);
         pub_error_code = this->create_publisher<std_msgs::msg::Int16>("/obstacle_filter/error_code", 1);
 
         //-----Tranform listener
@@ -131,28 +164,44 @@ public:
         tf_lidar_base_buffer = std::make_unique<tf2_ros::Buffer>(this->get_clock());
         tf_lidar_base_listener = std::make_unique<tf2_ros::TransformListener>(*tf_lidar_base_buffer);
 
-        while (!tf_is_initialized) {
+        while (!tf_is_initialized)
+        {
             rclcpp::sleep_for(1s);
-            try {
+            try
+            {
                 // tf_lidar_map = tf_lidar_map_buffer->lookupTransform("map", "lidar1_link", tf2::TimePointZero);
                 tf_lidar_base = tf_lidar_base_buffer->lookupTransform("base_link", lidar_frame_id, tf2::TimePointZero);
                 tf_is_initialized = true;
-            } catch (tf2::TransformException& ex) {
+            }
+            catch (tf2::TransformException &ex)
+            {
                 logger.error("%s", ex.what());
                 tf_is_initialized = false;
             }
         }
 
-        logger.info("ObstacleFilter init success, lidar on %s (%d)", lidar_topic.c_str(),use_pointcloud2);
+        logger.info("ObstacleFilter init success, lidar on %s (%d)", lidar_topic.c_str(), use_pointcloud2);
+    }
+
+    void callback_sub_master_actuator(const std_msgs::msg::Float32MultiArray::SharedPtr msg)
+    {
+        target_steering_angle = msg->data[1];
     }
 
     void callback_sub_lidar_laserscan(const sensor_msgs::msg::LaserScan::SharedPtr msg)
     {
         // Process Laserscan
         float obs_find = 0;
-        for (size_t i = 0; i < msg->ranges.size(); ++i) {
+        float cos_steering_angle = cosf(target_steering_angle);
+        float sin_steering_angle = sinf(target_steering_angle);
+        float dynamic_scan_box_x_max = scan_box_x_max * cos_steering_angle - scan_box_y_min * sin_steering_angle;
+        float dynamic_scan_box_y_max = scan_box_x_max * sin_steering_angle + scan_box_y_min * cos_steering_angle;
+        sensor_msgs::msg::PointCloud msg_filtered_scan;
+        for (size_t i = 0; i < msg->ranges.size(); ++i)
+        {
             float range = msg->ranges[i];
-            if (std::isfinite(range) && range >= msg->range_min && range <= msg->range_max) {
+            if (std::isfinite(range) && range >= msg->range_min && range <= msg->range_max)
+            {
                 float angle = msg->angle_min + i * msg->angle_increment;
                 float delta_a = scan_yaw_target - angle;
                 while (delta_a > M_PI)
@@ -160,8 +209,29 @@ public:
                 while (delta_a < -M_PI)
                     delta_a += 2 * M_PI;
 
-                if (std::fabs(delta_a) < scan_yaw_minmax && range < scan_r_max) {
-                    obs_find += scan_range_decimal * (scan_r_max - range);
+                // Ketika masuk lingkaran scan
+                if (std::fabs(delta_a) < scan_yaw_minmax && range < scan_r_max)
+                {
+                    float point_x = range * cosf(angle);
+                    float point_y = range * sinf(angle);
+
+                    // Ketika masuk scan box
+                    if (use_scan_box && point_x > scan_box_x_min && point_x < dynamic_scan_box_x_max && point_y > scan_box_y_min && point_y < dynamic_scan_box_y_max)
+                    {
+                        geometry_msgs::msg::Point32 pt;
+                        pt.x = point_x;
+                        pt.y = point_y;
+                        msg_filtered_scan.points.push_back(pt);
+                        obs_find += scan_range_decimal * (scan_r_max - range);
+                    }
+                    else if (!use_scan_box)
+                    {
+                        geometry_msgs::msg::Point32 pt;
+                        pt.x = point_x;
+                        pt.y = point_y;
+                        msg_filtered_scan.points.push_back(pt);
+                        obs_find += scan_range_decimal * (scan_r_max - range);
+                    }
                 }
             }
         }
@@ -170,6 +240,11 @@ public:
         std_msgs::msg::Float32 msg_obs_find;
         msg_obs_find.data = obs_find;
         pub_obs_find->publish(msg_obs_find);
+
+        if (publish_filtered_lidar)
+        {
+            pub_filtered_lidar_points_pcl1->publish(msg_filtered_scan);
+        }
     }
 
     void callback_sub_lidar_points(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
@@ -186,9 +261,8 @@ public:
         //     tf_is_initialized = false;
         // }
 
-        logger.info("Lidar frame id: %s", msg->header.frame_id.c_str());
-
-        if (!tf_is_initialized) {
+        if (!tf_is_initialized)
+        {
             error_code = 1;
             return;
         }
@@ -197,16 +271,17 @@ public:
         pcl::fromROSMsg(*msg, points_lidar);
 
         // Transform the point cloud data to the map frame
-        if (points_lidar.empty()) {
+        if (points_lidar.empty())
+        {
             // points_lidar2map.clear();
             error_code = 2;
             points_lidar2base.clear();
-        } else {
+        }
+        else
+        {
             // pcl_ros::transformPointCloud(points_lidar, points_lidar2map, tf_lidar_map);
             pcl_ros::transformPointCloud(points_lidar, points_lidar2base, tf_lidar_base);
         }
-
-        logger.info("Lidar points: %d", points_lidar2base.size());
 
         // Crop all points within -0.35 < x < 0.35 and -0.35 < y < 0.35
         static pcl::CropBox<pcl::PointXYZ> crop_box;
@@ -216,11 +291,9 @@ public:
         crop_box.setNegative(true);
         crop_box.filter(points_lidar2base_filtered);
 
-        logger.info("Filtered lidar points: %d", points_lidar2base_filtered.size());
-
         // Publish the filtered point cloud
-        if (publish_filtered_lidar) {
-            logger.info("Publishing filtered lidar points");
+        if (publish_filtered_lidar)
+        {
             sensor_msgs::msg::PointCloud2 msg_filtered_lidar;
             pcl::toROSMsg(points_lidar2base_filtered, msg_filtered_lidar);
             msg_filtered_lidar.header = msg->header;
@@ -229,7 +302,8 @@ public:
 
         // Scan obstacle
         float obs_find = 0;
-        for (auto p : points_lidar2base_filtered.points) {
+        for (auto p : points_lidar2base_filtered.points)
+        {
             // Terhadap lidar
             float dx = p.x - tf_lidar_base.transform.translation.x;
             float dy = p.y - tf_lidar_base.transform.translation.y;
@@ -243,7 +317,8 @@ public:
             while (delta_a < -M_PI)
                 delta_a += 2 * M_PI;
 
-            if (fabsf(delta_a) < scan_yaw_minmax && r < scan_r_max) {
+            if (fabsf(delta_a) < scan_yaw_minmax && r < scan_r_max)
+            {
                 obs_find = obs_find + 1 * fmaxf(0.3, (1 - r / scan_r_max));
             }
         }
@@ -260,7 +335,7 @@ public:
         pub_error_code->publish(msg_error_code);
     }
 
-    void dbscan_clustering(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud, float epsilon, int minPts)
+    void dbscan_clustering(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud, float epsilon, int minPts)
     {
         // Initialize cluster labels (-1 for noise, 0 for unvisited)
         std::vector<int> labels(cloud->size(), 0);
@@ -270,14 +345,16 @@ public:
         pcl::search::KdTree<pcl::PointXYZ>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZ>);
         tree->setInputCloud(cloud);
 
-        for (size_t i = 0; i < cloud->size(); ++i) {
+        for (size_t i = 0; i < cloud->size(); ++i)
+        {
             if (labels[i] != 0)
                 continue; // Already processed or noise
 
             // Find neighbors within epsilon radius
             std::vector<int> neighbors;
             std::vector<float> distances;
-            if (tree->radiusSearch(cloud->points[i], epsilon, neighbors, distances) < minPts) {
+            if (tree->radiusSearch(cloud->points[i], epsilon, neighbors, distances) < minPts)
+            {
                 labels[i] = -1; // Mark as noise
                 continue;
             }
@@ -287,11 +364,13 @@ public:
             labels[i] = clusterID;
             std::vector<int> clusterQueue(neighbors);
 
-            while (!clusterQueue.empty()) {
+            while (!clusterQueue.empty())
+            {
                 int currentPoint = clusterQueue.back();
                 clusterQueue.pop_back();
 
-                if (labels[currentPoint] == -1) {
+                if (labels[currentPoint] == -1)
+                {
                     labels[currentPoint] = clusterID; // Noise becomes part of the cluster
                 }
 
@@ -302,7 +381,8 @@ public:
                 // Find neighbors for the current point
                 std::vector<int> subNeighbors;
                 std::vector<float> subDistances;
-                if (tree->radiusSearch(cloud->points[currentPoint], epsilon, subNeighbors, subDistances) >= minPts) {
+                if (tree->radiusSearch(cloud->points[currentPoint], epsilon, subNeighbors, subDistances) >= minPts)
+                {
                     clusterQueue.insert(clusterQueue.end(), subNeighbors.begin(), subNeighbors.end());
                 }
             }
@@ -310,10 +390,13 @@ public:
 
         // Print clusters
         logger.info("Number of clusters: %d", clusterID);
-        for (int i = 1; i <= clusterID; ++i) {
+        for (int i = 1; i <= clusterID; ++i)
+        {
             logger.info("Cluster %d points:", i);
-            for (size_t j = 0; j < labels.size(); ++j) {
-                if (labels[j] == i) {
+            for (size_t j = 0; j < labels.size(); ++j)
+            {
+                if (labels[j] == i)
+                {
                     logger.info("(%f, %f, %f)", cloud->points[j].x, cloud->points[j].y, cloud->points[j].z);
                 }
             }
@@ -321,7 +404,7 @@ public:
     }
 };
 
-int main(int argc, char** argv)
+int main(int argc, char **argv)
 {
     rclcpp::init(argc, argv);
 

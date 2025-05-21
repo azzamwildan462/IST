@@ -20,7 +20,10 @@ endforeach()
 
 
 set(msg_files
-    msg/PointArray.msg)
+    msg/PointArray.msg
+    msg/Terminal.msg
+    msg/TerminalArray.msg
+    )
 set(srv_files srv/Params.srv)
 
 rosidl_generate_interfaces(

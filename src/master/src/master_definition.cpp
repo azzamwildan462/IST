@@ -10,29 +10,144 @@ void Master::process_marker()
 
 void Master::process_local_fsm()
 {
+    local_fsm.reentry(999, 1);
+
+    static float stop_time_s = timeout_terminal_1;
+
     switch (local_fsm.value)
     {
+    case 999:
+        local_fsm.resetUptimeTimeout();
+        local_fsm.value = FSM_LOCAL_PRE_FOLLOW_LANE;
+        break;
+
     case FSM_LOCAL_PRE_FOLLOW_LANE:
-        manual_motion(0, 0, 0);
+        manual_motion(-1, 0, 0);
         time_start_follow_lane = current_time;
         local_fsm.value = FSM_LOCAL_FOLLOW_LANE;
         break;
 
     case FSM_LOCAL_FOLLOW_LANE:
-        follow_lane_2_cam(7, 0, 0.3);
 
-        if ((current_time - time_start_follow_lane).seconds() > 10 && aruco_kanan_detected)
+        if (metode_following == 0)
         {
-            local_fsm.value = FSM_LOCAL_MENUNGGU_STATION_1;
+            follow_waypoints(2, 0, 0.8, 3, true);
+        }
+        else if (metode_following == 1)
+        {
+            follow_lane(2, 0, 1.5);
+        }
+        else if (metode_following == 2)
+        {
+            fusion_follow_lane_waypoints(2, 0, 1.5, 1, true);
+        }
+
+        if ((current_time - time_start_follow_lane).seconds() > 10)
+        {
+            // if (aruco_nearest_marker_id == ARUCO_TERMINAL_1)
+            // {
+            //     local_fsm.resetUptimeTimeout();
+            //     local_fsm.value = FSM_LOCAL_MENUNGGU_STATION_1;
+            // }
+            // else if (aruco_nearest_marker_id == ARUCO_TERMINAL_2)
+            // {
+            //     local_fsm.resetUptimeTimeout();
+            //     local_fsm.value = FSM_LOCAL_MENUNGGU_STATION_2;
+            // }
+
+            for (size_t i = 0; i < terminals.terminals.size(); i++)
+            {
+                float jarak_robot_terminal = pythagoras(fb_final_pose_xyo[0], fb_final_pose_xyo[1], terminals.terminals[i].target_pose_x, terminals.terminals[i].target_pose_y);
+                if (jarak_robot_terminal < terminals.terminals[i].radius_area)
+                {
+                    if (terminals.terminals[i].type == TERMINAL_TYPE_STOP1)
+                    {
+                        local_fsm.resetUptimeTimeout();
+                        local_fsm.value = FSM_LOCAL_MENUNGGU_STATION_1;
+                        stop_time_s = terminals.terminals[i].stop_time_s;
+                    }
+                    else if (terminals.terminals[i].type == TERMINAL_TYPE_STOP2)
+                    {
+                        local_fsm.resetUptimeTimeout();
+                        local_fsm.value = FSM_LOCAL_MENUNGGU_STATION_2;
+                        stop_time_s = terminals.terminals[i].stop_time_s;
+                    }
+                    else if (terminals.terminals[i].type == TERMINAL_TYPE_STOP)
+                    {
+                        local_fsm.resetUptimeTimeout();
+                        local_fsm.value = FSM_LOCAL_MENUNGGU_STOP;
+                        stop_time_s = terminals.terminals[i].stop_time_s;
+                    }
+                    break;
+                }
+            }
         }
         break;
 
     case FSM_LOCAL_MENUNGGU_STATION_1:
-        manual_motion(-profile_max_braking, 0, 0);
+        if (metode_following == 0)
+        {
+            follow_waypoints_gas_manual(-1, 0, 0, 1, true);
+        }
+        else if (metode_following == 1)
+        {
+            follow_lane_gas_manual(-1, 0, 0);
+        }
+        else if (metode_following == 2)
+        {
+            fusion_follow_lane_waypoints_gas_manual(-1, 0, 0, 1, true);
+        }
+        // IN_NEXT_TERMINAL
+        if ((fb_beckhoff_digital_input & IN_NEXT_TERMINAL) == IN_NEXT_TERMINAL)
+        {
+            local_fsm.value = FSM_LOCAL_PRE_FOLLOW_LANE;
+        }
+
+        // local_fsm.timeout(FSM_LOCAL_PRE_FOLLOW_LANE, stop_time_s);
         break;
 
     case FSM_LOCAL_MENUNGGU_STATION_2:
-        manual_motion(-profile_max_braking, 0, 0);
+        if (metode_following == 0)
+        {
+            follow_waypoints_gas_manual(-1, 0, 0, 1, true);
+        }
+        else if (metode_following == 1)
+        {
+            follow_lane_gas_manual(-1, 0, 0);
+        }
+        else if (metode_following == 2)
+        {
+            fusion_follow_lane_waypoints_gas_manual(-1, 0, 0, 1, true);
+        }
+
+        if ((fb_beckhoff_digital_input & IN_NEXT_TERMINAL) == IN_NEXT_TERMINAL)
+        {
+            local_fsm.value = FSM_LOCAL_PRE_FOLLOW_LANE;
+        }
+
+        // local_fsm.timeout(FSM_LOCAL_PRE_FOLLOW_LANE, stop_time_s);
+        break;
+
+    case FSM_LOCAL_MENUNGGU_STOP:
+        if (metode_following == 0)
+        {
+            follow_waypoints_gas_manual(-1, 0, 0, 1, true);
+        }
+        else if (metode_following == 1)
+        {
+            follow_lane_gas_manual(-1, 0, 0);
+        }
+        else if (metode_following == 2)
+        {
+            fusion_follow_lane_waypoints_gas_manual(-1, 0, 0, 1, true);
+        }
+
+        if ((fb_beckhoff_digital_input & IN_NEXT_TERMINAL) == IN_NEXT_TERMINAL)
+        {
+            local_fsm.value = FSM_LOCAL_PRE_FOLLOW_LANE;
+        }
+
+        // local_fsm.timeout(FSM_LOCAL_PRE_FOLLOW_LANE, stop_time_s);
         break;
     }
 }
@@ -62,9 +177,263 @@ void Master::process_transmitter()
     std_msgs::msg::Int16 msg_transmission_master;
     msg_transmission_master.data = transmission_joy_master;
     pub_transmission_master->publish(msg_transmission_master);
+
+    static uint16_t divider_waypoint_pub_counter = 0;
+    if (divider_waypoint_pub_counter++ >= 25)
+    {
+        divider_waypoint_pub_counter = 0;
+
+        sensor_msgs::msg::PointCloud msg_waypoints;
+        for (auto i : waypoints)
+        {
+            geometry_msgs::msg::Point32 p;
+            p.x = i.x;
+            p.y = i.y;
+            p.z = 0;
+            msg_waypoints.points.push_back(p);
+        }
+        pub_waypoints->publish(msg_waypoints);
+
+        pub_terminals->publish(terminals);
+    }
 }
 
-//=================================================================================================
+void Master::process_load_terminals()
+{
+    std::ifstream fin;
+    std::string line;
+    std::vector<std::string> tokens;
+    bool is_terminal_loaded_normally = false;
+    try
+    {
+        fin.open(terminal_file_path, std::ios::in);
+        if (fin.is_open())
+        {
+            is_terminal_loaded_normally = true;
+            while (std::getline(fin, line))
+            {
+                if (line.find("type") != std::string::npos)
+                {
+                    continue;
+                }
+                boost::split(tokens, line, boost::is_any_of(","));
+
+                for (auto &token : tokens)
+                {
+                    boost::trim(token);
+                }
+
+                ros2_interface::msg::Terminal terminal;
+                terminal.type = std::stoi(tokens[0]);
+                terminal.id = std::stoi(tokens[1]);
+                terminal.target_pose_x = std::stof(tokens[2]);
+                terminal.target_pose_y = std::stof(tokens[3]);
+                terminal.target_pose_theta = std::stof(tokens[4]);
+                terminal.target_max_velocity_x = std::stof(tokens[5]);
+                terminal.target_max_velocity_y = std::stof(tokens[6]);
+                terminal.target_max_velocity_theta = std::stof(tokens[7]);
+                terminal.radius_area = std::stof(tokens[8]);
+                terminal.target_lookahead_distance = std::stof(tokens[9]);
+                terminal.obs_scan_r = std::stof(tokens[10]);
+                terminal.stop_time_s = std::stof(tokens[11]);
+
+                if (transform_map2odom)
+                {
+                    tf2::Transform tf_terminal_pose;
+                    tf_terminal_pose.setOrigin(tf2::Vector3(terminal.target_pose_x, terminal.target_pose_y, 0));
+                    tf2::Quaternion q;
+                    q.setRPY(0, 0, terminal.target_pose_theta);
+                    tf_terminal_pose.setRotation(q);
+
+                    tf2::Transform tf_transformed = manual_map2odom_tf * tf_terminal_pose;
+
+                    terminal.target_pose_x = tf_transformed.getOrigin().getX();
+                    terminal.target_pose_y = tf_transformed.getOrigin().getY();
+
+                    tf2::Matrix3x3 m(tf_transformed.getRotation());
+                    double roll, pitch, yaw;
+                    m.getRPY(roll, pitch, yaw);
+                    terminal.target_pose_theta = yaw;
+                }
+
+                terminals.terminals.push_back(terminal);
+
+                tokens.clear();
+            }
+            fin.close();
+
+            logger.info("Terminal file loaded");
+        }
+
+        if (fin.fail() && !fin.is_open() && !is_terminal_loaded_normally)
+        {
+            logger.warn("Failed to load terminal file, Recreate the terminal file");
+            process_save_terminals();
+        }
+    }
+    catch (const std::exception &e)
+    {
+        logger.error("Failed to load terminal file: %s, Recreate the terminal file", e.what());
+        process_save_terminals();
+    }
+}
+
+void Master::process_save_terminals()
+{
+    std::ofstream fout;
+
+    try
+    {
+        fout.open(terminal_file_path, std::ios::out);
+        if (fout.is_open())
+        {
+            fout << "type, id, x, y, theta, max_vx, max_vy, max_vtheta, radius_area, lookahead_distance, obs_scan_r" << std::endl;
+            for (auto terminal : terminals.terminals)
+            {
+                int terminal_type_integer = terminal.type;
+                int terminal_id_integer = terminal.id;
+                fout << terminal_type_integer << ", " << terminal_id_integer << ", " << terminal.target_pose_x << ", " << terminal.target_pose_y << ", " << terminal.target_pose_theta << ", " << terminal.target_max_velocity_x << ", " << terminal.target_max_velocity_y << ", " << terminal.target_max_velocity_theta << ", " << terminal.radius_area << ", " << terminal.target_lookahead_distance << ", " << terminal.obs_scan_r << ", " << terminal.stop_time_s << std::endl;
+            }
+            fout.close();
+
+            logger.info("Terminal file saved");
+        }
+    }
+    catch (const std::exception &e)
+    {
+        logger.warn("Failed to open terminal file, Recreate the terminal file");
+    }
+}
+
+void Master::process_load_waypoints()
+{
+    waypoints.clear();
+
+    if (!boost::filesystem::exists(waypoint_file_path))
+    {
+        logger.error("File %s does not exist. Create a new file.", waypoint_file_path.c_str());
+        std::ofstream file(waypoint_file_path);
+        file << "x,y,fb_velocity,fb_steering" << std::endl;
+        file.close();
+    }
+
+    std::ifstream file;
+
+    file.open(waypoint_file_path);
+    if (file.is_open())
+    {
+        file.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+        while (file.good())
+        {
+            if (file.peek() == EOF)
+            {
+                break;
+            }
+            waypoint_t wp;
+            file >> wp.x;
+            file.ignore(std::numeric_limits<std::streamsize>::max(), ',');
+            file >> wp.y;
+            file.ignore(std::numeric_limits<std::streamsize>::max(), ',');
+            file >> wp.fb_velocity;
+            file.ignore(std::numeric_limits<std::streamsize>::max(), ',');
+            file >> wp.fb_steering;
+            file.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+
+            if (transform_map2odom)
+            {
+                tf2::Transform tf_wp;
+                tf_wp.setOrigin(tf2::Vector3(wp.x, wp.y, 0));
+                tf2::Quaternion q;
+                q.setRPY(0, 0, 0);
+                tf_wp.setRotation(q);
+
+                tf2::Transform tf_transformed = manual_map2odom_tf * tf_wp;
+                wp.x = tf_transformed.getOrigin().getX();
+                wp.y = tf_transformed.getOrigin().getY();
+            }
+
+            waypoints.push_back(wp);
+        }
+        file.close();
+        logger.info("Read %d waypoints from file %s.", waypoints.size(), waypoint_file_path.c_str());
+    }
+}
+
+void Master::process_save_waypoints()
+{
+    std::ofstream file;
+    file.open(waypoint_file_path);
+
+    if (file.is_open())
+    {
+        file << "x,y,fb_velocity,fb_steering" << std::endl;
+        for (auto i : waypoints)
+        {
+            file << i.x << "," << i.y << "," << i.fb_velocity << "," << i.fb_steering << std::endl;
+        }
+        file.close();
+        logger.info("Saved %d waypoints to file %s.", waypoints.size(), waypoint_file_path.c_str());
+    }
+    else
+    {
+        logger.error("Failed to save waypoints to file %s.", waypoint_file_path.c_str());
+    }
+}
+
+void Master::process_record_route()
+{
+    static float prev_x = fb_final_pose_xyo[0];
+    static float prev_y = fb_final_pose_xyo[1];
+
+    float dx = fb_final_pose_xyo[0] - prev_x;
+    float dy = fb_final_pose_xyo[1] - prev_y;
+    float d = sqrt(dx * dx + dy * dy);
+
+    if (d > 0.2)
+    {
+        waypoint_t wp;
+        wp.x = fb_final_pose_xyo[0];
+        wp.y = fb_final_pose_xyo[1];
+        wp.fb_velocity = fb_encoder_meter;
+        wp.fb_steering = fb_steering_angle;
+        waypoints.push_back(wp);
+        prev_x = wp.x;
+        prev_y = wp.y;
+        // logger.info("Recorded waypoint %.2f %.2f %.2f %.2f", wp.x, wp.y, wp.fb_velocity, wp.fb_steering);
+    }
+}
+
+void Master::process_add_terminal()
+{
+    static float prev_x = -9999;
+    static float prev_y = -9999;
+
+    float dx = fb_final_pose_xyo[0] - prev_x;
+    float dy = fb_final_pose_xyo[1] - prev_y;
+    float d = sqrt(dx * dx + dy * dy);
+
+    /* Prevent double klik atau semacamnya */
+    if (d > 0.2)
+    {
+        ros2_interface::msg::Terminal terminal;
+        terminal.type = TERMINAL_TYPE_STOP;
+        terminal.id = terminals.terminals.size();
+        terminal.target_pose_x = fb_final_pose_xyo[0];
+        terminal.target_pose_y = fb_final_pose_xyo[1];
+        terminal.target_pose_theta = fb_final_pose_xyo[2];
+        terminal.target_max_velocity_x = 0.9;
+        terminal.target_max_velocity_y = 0.9;
+        terminal.target_max_velocity_theta = 0.2; // gk dipakai
+        terminal.radius_area = 3;
+        terminal.target_lookahead_distance = 3;
+        terminal.obs_scan_r = 2;
+        terminal.stop_time_s = 10;
+        terminals.terminals.push_back(terminal);
+        logger.info("Add Terminal Success");
+    }
+}
+
+//==================================================================================================
 
 geometry_msgs::msg::Point
 Master::get_point(double x, double y, double z)

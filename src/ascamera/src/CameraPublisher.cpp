@@ -1378,6 +1378,7 @@ void CameraPublisher::tfPublisher(AS_CAM_PTR pCamera, AS_CAM_Parameter_s &stPara
 
 int CameraPublisher::setResolution(AS_CAM_PTR pCamera, LAUNCH_CONFI_PARAM_S para)
 {
+    LOG(INFO) << "===========================================================================" << std::endl;
     int ret = 0;
     if ((para.set_depth_width != -1) && (para.set_depth_height != -1) && (para.set_fps != -1))
     {
@@ -1396,6 +1397,7 @@ int CameraPublisher::setResolution(AS_CAM_PTR pCamera, LAUNCH_CONFI_PARAM_S para
     }
     if ((para.set_rgb_width != -1) && (para.set_rgb_height != -1) && (para.set_fps != -1))
     {
+        LOG(INFO) << "===========================================================================" << std::endl;
         AS_STREAM_Param_s rgbInfo;
         rgbInfo.width = para.set_rgb_width;
         rgbInfo.height = para.set_rgb_height;

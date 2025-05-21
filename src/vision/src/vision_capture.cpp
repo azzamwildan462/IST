@@ -171,6 +171,7 @@ public:
             {
                 logger.error("Failed to capture frame");
                 error_code = 11;
+                continue;
             }
 
             // Hardcode sementara, image dari file

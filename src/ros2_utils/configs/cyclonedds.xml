@@ -4,11 +4,24 @@
             <NetworkInterfaceAddress>127.0.0.1</NetworkInterfaceAddress>
             <AllowMulticast>false</AllowMulticast>
             <MaxMessageSize>65536</MaxMessageSize>
+            <MaxSamplesPerRead>128</MaxSamplesPerRead>
             <EnableMulticastReceive>false</EnableMulticastReceive>
         </General>
+        <Transport>
+            <!-- Increase UDP buffer sizes to allow more data to be transmitted at once -->
+            <UDP>
+                <SendBufferSize>10485760</SendBufferSize>  <!-- 10 MB -->
+                <RecvBufferSize>10485760</RecvBufferSize>  <!-- 10 MB -->
+            </UDP>
+            <!-- Enable Shared Memory for Faster Local Communication -->
+            <SHM>
+                <Enable>true</Enable>
+                <LogLevel>Warn</LogLevel>
+            </SHM>
+        </Transport>
         <Discovery>
             <ParticipantIndex>auto</ParticipantIndex>
-            <MaxAutoParticipantIndex>128</MaxAutoParticipantIndex>
+            <MaxAutoParticipantIndex>50</MaxAutoParticipantIndex>
         </Discovery>
     </Domain>
 </CycloneDDS>

@@ -7,6 +7,7 @@ endif()
 
 # find dependencies
 set(var_dependencies
+    std_srvs
     ament_cmake
     rclcpp
     std_msgs
@@ -14,16 +15,20 @@ set(var_dependencies
     ros2_utils
     ros2_interface
     tf2_geometry_msgs
+    rtabmap_msgs
     tf2_ros)
     
 foreach(var_dependency ${var_dependencies})
   find_package(${var_dependency} REQUIRED)
 endforeach()
 
+find_package(Boost REQUIRED COMPONENTS filesystem)
+
 include_directories(include)
 
 add_executable(master src/master.cpp src/master_definition.cpp src/motion.cpp)
 ament_target_dependencies(master ${var_dependencies})
+target_link_libraries(master Boost::filesystem)
 
 install(TARGETS
   master

@@ -51,7 +51,7 @@ class Telemetry(Node):
         # Subscriber
         # ----------
         self.sub_distance_travelled = self.create_subscription(Float32, "/distance_travelled", self.callback_sub_distance_travelled, 10)
-        self.sub_odom = self.create_subscription(Odometry, "/odom", self.callback_sub_odom, 10)
+        self.sub_odom = self.create_subscription(Odometry, "/slam/odometry/filtered", self.callback_sub_odom, 10)
         self.sub_battery = self.create_subscription(Int16, "/can/battery", self.callback_sub_battery, 10)
 
         # ROS2 Timer

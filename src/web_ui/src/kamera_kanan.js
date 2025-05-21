@@ -29,13 +29,13 @@ ros.on("close", function () {
 
 // DOM 
 const frame_kamera = document.getElementById("frame_kamera");
-frame_kamera.src = "http://" + window.location.hostname + ":8080/stream?topic=/lane_kanan/frame_display"
+frame_kamera.src = "http://" + window.location.hostname + ":8080/stream?topic=/lane_kanan/frame_display&type=ros_compressed&quality=30"
 
 const frame_binary = document.getElementById("frame_binary");
-frame_binary.src = "http://" + window.location.hostname + ":8080/stream?topic=/lane_kanan/frame_binary"
+frame_binary.src = "http://" + window.location.hostname + ":8080/stream?topic=/lane_kanan/frame_binary&type=ros_compressed&quality=30"
 
 const frame_aruco = document.getElementById("frame_aruco");
-frame_aruco.src = "http://" + window.location.hostname + ":8080/stream?topic=/aruco_kanan/frame_display"
+frame_aruco.src = "http://" + window.location.hostname + ":8080/stream?topic=/aruco_kanan/frame_display&type=ros_compressed&quality=30"
 
 const low_h_slider = document.getElementById("low_h_slider");
 low_h_slider.value = 0;

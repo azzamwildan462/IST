@@ -4,6 +4,45 @@
 Master::Master()
     : Node("master")
 {
+    this->declare_parameter("offset_sudut_steering", 0.0);
+    this->get_parameter("offset_sudut_steering", offset_sudut_steering);
+
+    this->declare_parameter("use_ekf_odometry", false);
+    this->get_parameter("use_ekf_odometry", use_ekf_odometry);
+
+    this->declare_parameter<std::vector<double>>("pid_terms", {0.0070, 0.000000, 0, 0.02, -0.04, 0.4, -0.0005, 0.0005});
+    this->get_parameter("pid_terms", pid_terms);
+
+    this->declare_parameter("waypoint_file_path", "/home/robot/waypoints.yaml");
+    this->get_parameter("waypoint_file_path", waypoint_file_path);
+
+    this->declare_parameter("terminal_file_path", "/home/robot/terminal.yaml");
+    this->get_parameter("terminal_file_path", terminal_file_path);
+
+    this->declare_parameter("wheelbase", 0.75);
+    this->get_parameter("wheelbase", wheelbase);
+
+    this->declare_parameter("metode_following", 0);
+    this->get_parameter("metode_following", metode_following);
+
+    this->declare_parameter("enable_obs_detection", false);
+    this->get_parameter("enable_obs_detection", enable_obs_detection);
+
+    this->declare_parameter("timeout_terminal_1", 10.0);
+    this->get_parameter("timeout_terminal_1", timeout_terminal_1);
+
+    this->declare_parameter("timeout_terminal_2", 10.0);
+    this->get_parameter("timeout_terminal_2", timeout_terminal_2);
+
+    this->declare_parameter("profile_max_velocity", 1.0);
+    this->get_parameter("profile_max_velocity", profile_max_velocity);
+
+    this->declare_parameter("transform_map2odom", false);
+    this->get_parameter("transform_map2odom", transform_map2odom);
+
+    this->declare_parameter("toribay_ready_threshold", 0.5);
+    this->get_parameter("toribay_ready_threshold", toribay_ready_threshold);
+
     if (!logger.init())
     {
         RCLCPP_ERROR(this->get_logger(), "Failed to initialize logger");
@@ -17,6 +56,9 @@ Master::Master()
     pub_actuator = this->create_publisher<std_msgs::msg::Float32MultiArray>("/master/actuator", 1);
     pub_transmission_master = this->create_publisher<std_msgs::msg::Int16>("/master/transmission", 1);
     pub_pose_offset = this->create_publisher<nav_msgs::msg::Odometry>("/master/pose_offset", 1);
+    pub_waypoints = this->create_publisher<sensor_msgs::msg::PointCloud>("/master/waypoints", 1);
+    pub_terminals = this->create_publisher<ros2_interface::msg::TerminalArray>("/master/terminals", 1);
+    pub_obs_find = this->create_publisher<std_msgs::msg::Float32>("/master/obs_find", 1);
 
     sub_obs_find = this->create_subscription<std_msgs::msg::Float32>(
         "/obstacle_filter/obs_find", 1, std::bind(&Master::callback_sub_obs_find, this, std::placeholders::_1));
@@ -30,34 +72,16 @@ Master::Master()
         "/lane_detection/point_kanan", 1, std::bind(&Master::callback_sub_lane_kanan, this, std::placeholders::_1));
     sub_lane_tengah = this->create_subscription<ros2_interface::msg::PointArray>(
         "/lane_detection/point_tengah", 1, std::bind(&Master::callback_sub_lane_tengah, this, std::placeholders::_1));
-    sub_lane_kiri_single_cam = this->create_subscription<ros2_interface::msg::PointArray>(
-        "/lane_kiri/point_garis", 1, std::bind(&Master::callback_sub_lane_kiri_single_cam, this, std::placeholders::_1));
-    sub_lane_kanan_single_cam = this->create_subscription<ros2_interface::msg::PointArray>(
-        "/lane_kanan/point_garis", 1, std::bind(&Master::callback_sub_lane_kanan_single_cam, this, std::placeholders::_1));
-    sub_aruco_kiri_detected = this->create_subscription<std_msgs::msg::Bool>(
-        "/lane_kiri/aruco_detected", 1, std::bind(&Master::callback_sub_aruco_kiri_detected, this, std::placeholders::_1));
-    sub_aruco_kanan_detected = this->create_subscription<std_msgs::msg::Bool>(
-        "/lane_kanan/aruco_detected", 1, std::bind(&Master::callback_sub_aruco_kanan_detected, this, std::placeholders::_1));
-    sub_hasil_perhitungan_kiri = this->create_subscription<std_msgs::msg::Float32MultiArray>(
-        "/lane_kiri/hasil_kalkulasi", 1, std::bind(&Master::callback_sub_hasil_perhitungan_kiri, this, std::placeholders::_1));
-    sub_hasil_perhitungan_kanan = this->create_subscription<std_msgs::msg::Float32MultiArray>(
-        "/lane_kanan/hasil_kalkulasi", 1, std::bind(&Master::callback_sub_hasil_perhitungan_kanan, this, std::placeholders::_1));
     sub_error_code_beckhoff = this->create_subscription<std_msgs::msg::Int16>(
         "/beckhoff/error_code", 1, std::bind(&Master::callback_sub_error_code_beckhoff, this, std::placeholders::_1));
-    sub_error_code_lidar = this->create_subscription<std_msgs::msg::Int16>(
-        "/lidar/error_code", 1, std::bind(&Master::callback_sub_error_code_lidar, this, std::placeholders::_1));
-    sub_error_code_cam_kiri = this->create_subscription<std_msgs::msg::Int16>(
-        "/lane_kiri/error_code", 1, std::bind(&Master::callback_sub_error_code_cam_kiri, this, std::placeholders::_1));
-    sub_error_code_cam_kanan = this->create_subscription<std_msgs::msg::Int16>(
-        "/lane_kanan/error_code", 1, std::bind(&Master::callback_sub_error_code_cam_kanan, this, std::placeholders::_1));
     sub_error_code_pose_estimator = this->create_subscription<std_msgs::msg::Int16>(
         "/slam/error_code", 1, std::bind(&Master::callback_sub_error_code_pose_estimator, this, std::placeholders::_1));
+    sub_error_code_lane_detection = this->create_subscription<std_msgs::msg::Int16>(
+        "/lane_detection/error_code", 1, std::bind(&Master::callback_error_code_lane_detection, this, std::placeholders::_1));
+    sub_error_code_aruco_detection = this->create_subscription<std_msgs::msg::Int16>(
+        "/aruco_detection/error_code", 1, std::bind(&Master::callback_error_code_aruco_detection, this, std::placeholders::_1));
     sub_error_code_obstacle_filter = this->create_subscription<std_msgs::msg::Int16>(
         "/obstacle_filter/error_code", 1, std::bind(&Master::callback_sub_error_code_obstacle_filter, this, std::placeholders::_1));
-    sub_error_code_aruco_kiri = this->create_subscription<std_msgs::msg::Int16>(
-        "/lane_kiri/error_code", 1, std::bind(&Master::callback_sub_error_code_aruco_kiri, this, std::placeholders::_1));
-    sub_error_code_aruco_kanan = this->create_subscription<std_msgs::msg::Int16>(
-        "/lane_kanan/error_code", 1, std::bind(&Master::callback_sub_error_code_aruco_kanan, this, std::placeholders::_1));
     sub_joy = this->create_subscription<sensor_msgs::msg::Joy>(
         "/joy", 1, std::bind(&Master::callback_sub_joy, this, std::placeholders::_1));
     sub_error_code_can = this->create_subscription<std_msgs::msg::Int16>(
@@ -70,14 +94,31 @@ Master::Master()
         "/master/ui_control_btn", 1, std::bind(&Master::callback_sub_ui_control_btn, this, std::placeholders::_1));
     sub_ui_control_velocity_and_steering = this->create_subscription<std_msgs::msg::Float32MultiArray>(
         "/master/ui_target_velocity_and_steering", 1, std::bind(&Master::callback_sub_ui_control_velocity_and_steering, this, std::placeholders::_1));
-    sub_aruco_marker_id_kanan = this->create_subscription<std_msgs::msg::Int16>(
-        "/lane_kanan/aruco_nearest_marker_id", 1, std::bind(&Master::callback_sub_aruco_marker_id_kanan, this, std::placeholders::_1));
-    sub_aruco_marker_id_kiri = this->create_subscription<std_msgs::msg::Int16>(
-        "/lane_kiri/aruco_nearest_marker_id", 1, std::bind(&Master::callback_sub_aruco_marker_id_kiri, this, std::placeholders::_1));
     sub_CAN_eps_mode_fb = this->create_subscription<std_msgs::msg::UInt8>(
         "/can/eps_mode", 1, std::bind(&Master::callback_sub_CAN_eps_mode_fb, this, std::placeholders::_1));
     sub_beckhoff_digital_input = this->create_subscription<std_msgs::msg::UInt8MultiArray>(
         "/beckhoff/digital_input", 1, std::bind(&Master::callback_sub_beckhoff_digital_input, this, std::placeholders::_1));
+    sub_aruco_nearest_marker_id = this->create_subscription<std_msgs::msg::Int16>(
+        "/aruco_detection/aruco_nearest_marker_id", 1, std::bind(&Master::callback_sub_aruco_nearest_marker_id, this, std::placeholders::_1));
+    sub_lidar_depan_scan = this->create_subscription<sensor_msgs::msg::LaserScan>(
+        "/scan", 1, std::bind(&Master::callback_sub_lidar_depan_scan, this, std::placeholders::_1));
+    sub_lidar_belakang_scan = this->create_subscription<sensor_msgs::msg::LaserScan>(
+        "/lidar2/scan", 1, std::bind(&Master::callback_sub_lidar_belakang_scan, this, std::placeholders::_1));
+    sub_rtabmap_info = this->create_subscription<rtabmap_msgs::msg::Info>(
+        "/slam/info", 1, std::bind(&Master::callback_sub_rtabmap_info, this, std::placeholders::_1));
+    sub_map = this->create_subscription<nav_msgs::msg::OccupancyGrid>(
+        "/slam/map", 1, std::bind(&Master::callback_sub_map, this, std::placeholders::_1));
+    sub_localization_pose = this->create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>(
+        "/slam/localization_pose", 1, std::bind(&Master::callback_sub_localization_pose, this, std::placeholders::_1));
+
+    srv_set_record_route_mode = this->create_service<std_srvs::srv::SetBool>(
+        "/master/set_record_route_mode", std::bind(&Master::callback_srv_set_record_route_mode, this, std::placeholders::_1, std::placeholders::_2));
+
+    srv_set_terminal = this->create_service<std_srvs::srv::SetBool>(
+        "/master/set_terminal", std::bind(&Master::callback_srv_set_terminal, this, std::placeholders::_1, std::placeholders::_2));
+
+    srv_rm_terminal = this->create_service<std_srvs::srv::SetBool>(
+        "/master/rm_terminal", std::bind(&Master::callback_srv_rm_terminal, this, std::placeholders::_1, std::placeholders::_2));
 
     if (use_ekf_odometry)
         sub_odometry = this->create_subscription<nav_msgs::msg::Odometry>(
@@ -89,22 +130,180 @@ Master::Master()
     //----Timer
     tim_50hz = this->create_wall_timer(std::chrono::milliseconds(20), std::bind(&Master::callback_tim_50hz, this));
 
-    pid_vx.init(0.0030, 0.000000, 0, dt, -0.04, 0.4, -0.0005, 0.0005);
+    // pid_vx.init(0.0030, 0.000000, 0, dt, -0.04, 0.4, -0.0005, 0.0005);
+    pid_vx.init(pid_terms[0], pid_terms[1], pid_terms[2], pid_terms[3], pid_terms[4], pid_terms[5], pid_terms[6], pid_terms[7]);
 
     logger.info("Master init success");
-    global_fsm.value = FSM_GLOBAL_PREOP;
+    global_fsm.value = FSM_GLOBAL_INIT;
 }
 Master::~Master()
 {
+}
+
+void Master::callback_sub_localization_pose(const geometry_msgs::msg::PoseWithCovarianceStamped msg)
+{
+    (void)msg;
+    is_pose_corrected = true;
+}
+
+void Master::callback_sub_map(const nav_msgs::msg::OccupancyGrid::SharedPtr msg)
+{
+    map2odom_offset_x = msg->info.origin.position.x;
+    map2odom_offset_y = msg->info.origin.position.y;
+
+    // get_angle from quartenion
+    tf2::Quaternion q(msg->info.origin.orientation.x, msg->info.origin.orientation.y, msg->info.origin.orientation.z, msg->info.origin.orientation.w);
+    tf2::Matrix3x3 m(q);
+    double roll, pitch, yaw;
+    m.getRPY(roll, pitch, yaw);
+    map2odom_offset_theta = yaw;
+
+    manual_map2odom_tf.setOrigin(tf2::Vector3(map2odom_offset_x, map2odom_offset_y, 0));
+    manual_map2odom_tf.setRotation(q);
+}
+
+void Master::callback_sub_rtabmap_info(const rtabmap_msgs::msg::Info::SharedPtr msg)
+{
+    if (msg->loop_closure_id > 0 || msg->proximity_detection_id > 0 || msg->landmark_id > 0 || msg->ref_id > 0)
+    {
+        is_rtabmap_ready = true;
+    }
+}
+
+void Master::callback_sub_lidar_depan_scan(const sensor_msgs::msg::LaserScan::SharedPtr msg)
+{
+    mutex_lidar_depan_points.lock();
+    lidar_depan_points = *msg;
+    mutex_lidar_depan_points.unlock();
+}
+
+void Master::callback_sub_lidar_belakang_scan(const sensor_msgs::msg::LaserScan::SharedPtr msg)
+{
+    lidar_belakang_points = *msg;
+
+    static float ret_buffer = 0;
+    static float toribay_find_local = 0;
+    static const float max_toribay_find_value_local = 100;
+    static const float x_min = 0;
+    static const float y_min = -0.5;
+    static const float y_max = 0.5;
+    float toribay_scan_r = 1.5;
+
+    float toribay_scan_r_decimal = 1 / toribay_scan_r;
+    toribay_find_local = 0;
+    for (size_t i = 0; i < lidar_belakang_points.ranges.size(); ++i)
+    {
+        float range = lidar_belakang_points.ranges[i];
+        if (std::isfinite(range) && range >= lidar_belakang_points.range_min && range <= lidar_belakang_points.range_max)
+        {
+            float angle = lidar_belakang_points.angle_min + i * lidar_belakang_points.angle_increment;
+            angle *= -1;
+            float delta_a = 0 - angle;
+            while (delta_a > M_PI)
+                delta_a -= 2 * M_PI;
+            while (delta_a < -M_PI)
+                delta_a += 2 * M_PI;
+
+            // Ketika masuk lingkaran scan
+            if (std::fabs(delta_a) < 1.57 && range < 6)
+            {
+                float point_x = range * cosf(angle);
+                float point_y = range * sinf(angle);
+
+                // Ketika masuk scan box
+                if (point_x > x_min && point_x < toribay_scan_r && point_y > y_min && point_y < y_max)
+                {
+                    toribay_find_local += toribay_scan_r_decimal * (toribay_scan_r - range);
+                }
+            }
+        }
+    }
+
+    if (toribay_find_local > toribay_ready_threshold)
+    {
+        is_toribay_ready = true;
+    }
+    else
+    {
+        is_toribay_ready = false;
+    }
+}
+
+void Master::callback_sub_aruco_nearest_marker_id(const std_msgs::msg::Int16::SharedPtr msg)
+{
+    aruco_nearest_marker_id = msg->data;
+}
+
+void Master::callback_error_code_lane_detection(const std_msgs::msg::Int16::SharedPtr msg)
+{
+    last_time_error_code_lane_detection = rclcpp::Clock(RCL_SYSTEM_TIME).now();
+    error_code_lane_detection = msg->data;
+}
+
+void Master::callback_error_code_aruco_detection(const std_msgs::msg::Int16::SharedPtr msg)
+{
+    last_time_error_code_aruco_detection = rclcpp::Clock(RCL_SYSTEM_TIME).now();
+    error_code_aruco_detection = msg->data;
+}
+
+void Master::callback_srv_rm_terminal(const std_srvs::srv::SetBool::Request::SharedPtr request, std_srvs::srv::SetBool::Response::SharedPtr response)
+{
+    response->success = false;
+    if (request->data)
+    {
+        terminals.terminals.clear();
+        response->message = "Success pop terminal";
+        response->success = true;
+    }
+    else
+    {
+        terminals.terminals.pop_back();
+        response->message = "Success clear terminals";
+        response->success = true;
+    }
+}
+void Master::callback_srv_set_terminal(const std_srvs::srv::SetBool::Request::SharedPtr request, std_srvs::srv::SetBool::Response::SharedPtr response)
+{
+    response->success = false;
+    if (request->data)
+    {
+        process_add_terminal();
+        response->message = "Success add terminal";
+        response->success = true;
+    }
+    else
+    {
+        process_save_terminals();
+        response->message = "Success save terminals";
+        response->success = true;
+    }
+}
+void Master::callback_srv_set_record_route_mode(const std_srvs::srv::SetBool::Request::SharedPtr request, std_srvs::srv::SetBool::Response::SharedPtr response)
+{
+    response->success = false;
+    if (request->data)
+    {
+        waypoints.clear();
+        global_fsm.value = FSM_GLOBAL_RECORD_ROUTE;
+        response->message = "Record route mode enabled";
+        response->success = true;
+    }
+    else
+    {
+        global_fsm.value = FSM_GLOBAL_INIT;
+        response->message = "Record route mode disabled";
+        response->success = true;
+    }
 }
 
 void Master::callback_sub_beckhoff_digital_input(const std_msgs::msg::UInt8MultiArray::SharedPtr msg)
 {
     last_time_beckhoff = rclcpp::Clock(RCL_SYSTEM_TIME).now();
 
-    // Active low
-    fb_beckhoff_digital_input[0] = ~msg->data[0];
-    fb_beckhoff_digital_input[1] = ~msg->data[1];
+    fb_beckhoff_digital_input = msg->data[0];
+    fb_beckhoff_digital_input |= (msg->data[1] << 8);
+    fb_beckhoff_digital_input |= (msg->data[2] << 16);
+    fb_beckhoff_digital_input |= (msg->data[3] << 24);
 }
 
 void Master::callback_sub_CAN_eps_mode_fb(const std_msgs::msg::UInt8::SharedPtr msg)
@@ -118,12 +317,12 @@ void Master::callback_sub_ui_control_btn(const std_msgs::msg::UInt16::SharedPtr 
     uint16_t data = msg->data;
 
     if ((data & 0b10) == 0)
-        global_fsm.value = FSM_GLOBAL_INIT;
+        global_fsm.value = FSM_GLOBAL_OP_3;
     else
         global_fsm.value = (data & 0b11100) >> 2;
 
-    if (global_fsm.value != FSM_GLOBAL_SAFEOP)
-        transmission_joy_master = (data & 0b11100000) >> 5;
+    // if (global_fsm.value != FSM_GLOBAL_SAFEOP)
+    transmission_joy_master = (data & 0b11100000) >> 5;
 }
 
 void Master::callback_sub_ui_control_velocity_and_steering(const std_msgs::msg::Float32MultiArray::SharedPtr msg)
@@ -208,16 +407,6 @@ void Master::callback_sub_key_pressed(const std_msgs::msg::Int16::SharedPtr msg)
     }
 }
 
-void Master::callback_sub_aruco_marker_id_kanan(const std_msgs::msg::Int16::SharedPtr msg)
-{
-    aruco_kanan_marker_id = msg->data;
-}
-
-void Master::callback_sub_aruco_marker_id_kiri(const std_msgs::msg::Int16::SharedPtr msg)
-{
-    aruco_kiri_marker_id = msg->data;
-}
-
 void Master::callback_sub_encoder_meter(const std_msgs::msg::Float32::SharedPtr msg)
 {
     fb_encoder_meter = msg->data;
@@ -280,34 +469,6 @@ void Master::callback_sub_lane_kanan(const ros2_interface::msg::PointArray::Shar
     lane_kanan = *msg;
 }
 
-void Master::callback_sub_lane_kiri_single_cam(const ros2_interface::msg::PointArray::SharedPtr msg)
-{
-    lane_kiri_single_cam = *msg;
-}
-
-void Master::callback_sub_lane_kanan_single_cam(const ros2_interface::msg::PointArray::SharedPtr msg)
-{
-    lane_kanan_single_cam = *msg;
-}
-
-void Master::callback_sub_hasil_perhitungan_kiri(const std_msgs::msg::Float32MultiArray::SharedPtr msg)
-{
-    last_time_cam_kiri = rclcpp::Clock(RCL_SYSTEM_TIME).now();
-    cam_kiri_pid_output = msg->data[0];
-    cam_kiri_pid_setpoint = msg->data[1];
-    cam_kiri_pid_fb = msg->data[2];
-    cam_kiri_velocity_gain = msg->data[3];
-}
-
-void Master::callback_sub_hasil_perhitungan_kanan(const std_msgs::msg::Float32MultiArray::SharedPtr msg)
-{
-    last_time_cam_kanan = rclcpp::Clock(RCL_SYSTEM_TIME).now();
-    cam_kanan_pid_output = msg->data[0];
-    cam_kanan_pid_setpoint = msg->data[1];
-    cam_kanan_pid_fb = msg->data[2];
-    cam_kanan_velocity_gain = msg->data[3];
-}
-
 void Master::callback_sub_odometry(const nav_msgs::msg::Odometry::SharedPtr msg)
 {
     last_time_pose_estimator = rclcpp::Clock(RCL_SYSTEM_TIME).now();
@@ -320,41 +481,29 @@ void Master::callback_sub_odometry(const nav_msgs::msg::Odometry::SharedPtr msg)
     fb_final_pose_xyo[1] = msg->pose.pose.position.y;
     fb_final_pose_xyo[2] = yaw;
 
+    // if (transform_map2odom)
+    // {
+    //     tf2::Transform tf_final_pose;
+    //     tf_final_pose.setOrigin(tf2::Vector3(fb_final_pose_xyo[0], fb_final_pose_xyo[1], 0));
+    //     tf_final_pose.setRotation(q);
+    //     tf2::Transform tf_transformed = manual_map2odom_tf * tf_final_pose;
+
+    //     fb_final_pose_xyo[0] = tf_transformed.getOrigin().getX();
+    //     fb_final_pose_xyo[1] = tf_transformed.getOrigin().getY();
+
+    //     tf2::Matrix3x3 m(tf_transformed.getRotation());
+    //     m.getRPY(roll, pitch, yaw);
+    //     fb_final_pose_xyo[2] = yaw;
+    // }
+
     fb_final_vel_dxdydo[0] = msg->twist.twist.linear.x;
     fb_final_vel_dxdydo[1] = msg->twist.twist.linear.y;
     fb_final_vel_dxdydo[2] = msg->twist.twist.angular.z;
 }
 
-void Master::callback_sub_aruco_kiri_detected(const std_msgs::msg::Bool::SharedPtr msg)
-{
-    last_time_aruco_kiri = rclcpp::Clock(RCL_SYSTEM_TIME).now();
-    aruco_kiri_detected = msg->data;
-}
-
-void Master::callback_sub_aruco_kanan_detected(const std_msgs::msg::Bool::SharedPtr msg)
-{
-    last_time_aruco_kanan = rclcpp::Clock(RCL_SYSTEM_TIME).now();
-    aruco_kanan_detected = msg->data;
-}
-
 void Master::callback_sub_error_code_beckhoff(const std_msgs::msg::Int16::SharedPtr msg)
 {
     error_code_beckhoff = msg->data;
-}
-
-void Master::callback_sub_error_code_lidar(const std_msgs::msg::Int16::SharedPtr msg)
-{
-    error_code_lidar = msg->data;
-}
-
-void Master::callback_sub_error_code_cam_kiri(const std_msgs::msg::Int16::SharedPtr msg)
-{
-    error_code_cam_kiri = msg->data;
-}
-
-void Master::callback_sub_error_code_cam_kanan(const std_msgs::msg::Int16::SharedPtr msg)
-{
-    error_code_cam_kanan = msg->data;
 }
 
 void Master::callback_sub_error_code_pose_estimator(const std_msgs::msg::Int16::SharedPtr msg)
@@ -365,16 +514,6 @@ void Master::callback_sub_error_code_pose_estimator(const std_msgs::msg::Int16::
 void Master::callback_sub_error_code_obstacle_filter(const std_msgs::msg::Int16::SharedPtr msg)
 {
     error_code_obstacle_filter = msg->data;
-}
-
-void Master::callback_sub_error_code_aruco_kiri(const std_msgs::msg::Int16::SharedPtr msg)
-{
-    error_code_aruco_kiri = msg->data;
-}
-
-void Master::callback_sub_error_code_aruco_kanan(const std_msgs::msg::Int16::SharedPtr msg)
-{
-    error_code_aruco_kanan = msg->data;
 }
 
 void Master::callback_sub_error_code_can(const std_msgs::msg::Int16::SharedPtr msg)
@@ -388,31 +527,51 @@ void Master::callback_tim_50hz()
     {
         rclcpp::shutdown();
     }
+    process_marker();
 
     current_time = rclcpp::Clock(RCL_SYSTEM_TIME).now();
 
-    process_marker();
-
     switch (global_fsm.value)
     {
+    case FSM_GLOBAL_INIT:
+        if (global_fsm.prev_value == FSM_GLOBAL_RECORD_ROUTE)
+        {
+            process_save_waypoints();
+        }
+        else
+        {
+            process_load_waypoints();
+        }
+        process_load_terminals();
+        global_fsm.value = FSM_GLOBAL_PREOP;
+        break;
+
     /**
      * Pre-operation
      * Keadaan ini memastikan semua sistem tidak ada error
      */
     case FSM_GLOBAL_PREOP:
-        if (error_code_beckhoff + error_code_cam_kiri + error_code_cam_kanan + error_code_lidar + error_code_pose_estimator + error_code_obstacle_filter + error_code_aruco_kiri + error_code_aruco_kanan + error_code_can == 0)
+        if (error_code_beckhoff + error_code_pose_estimator + error_code_can == 0)
         {
             local_fsm.value = 0;
             global_fsm.value = FSM_GLOBAL_SAFEOP;
         }
 
+        local_fsm.value = 0;
+
         if (fabs(target_velocity_joy_x) > 0.1 || fabs(target_velocity_joy_y) > 0.1 || fabs(target_velocity_joy_wz) > 0.1)
         {
-            manual_motion(target_velocity_joy_x, target_velocity_joy_y, target_velocity_joy_wz);
+            if ((fb_beckhoff_digital_input & IN_MASK_BUMPER) != IN_MASK_BUMPER)
+                manual_motion(-profile_max_braking, target_velocity_joy_y, target_velocity_joy_wz);
+            else
+                manual_motion(target_velocity_joy_x, target_velocity_joy_y, target_velocity_joy_wz);
         }
         else
         {
-            manual_motion(-1, 0, 0);
+            if ((fb_beckhoff_digital_input & IN_MASK_BUMPER) != IN_MASK_BUMPER)
+                manual_motion(-profile_max_braking, target_velocity_joy_y, target_velocity_joy_wz);
+            else
+                manual_motion(-1, 0, 0);
         }
         break;
 
@@ -421,43 +580,37 @@ void Master::callback_tim_50hz()
      * Memastikan semua data bisa diterima
      */
     case FSM_GLOBAL_SAFEOP:
-        if (error_code_beckhoff + error_code_cam_kiri + error_code_cam_kanan + error_code_lidar + error_code_pose_estimator + error_code_obstacle_filter + error_code_aruco_kiri + error_code_aruco_kanan + error_code_can > 0)
+        if (error_code_beckhoff + error_code_pose_estimator + error_code_can > 0)
         {
             global_fsm.value = FSM_GLOBAL_PREOP;
         }
 
-        if ((fb_beckhoff_digital_input[0] & 0b100) == 0b100)
-        {
-            transmission_joy_master = TRANSMISSION_NEUTRAL;
-        }
-        else if ((fb_beckhoff_digital_input[0] & 0b10) == 0b10)
-        {
-            transmission_joy_master = TRANSMISSION_REVERSE;
-        }
-        else if ((fb_beckhoff_digital_input[0] & 0b1000) == 0b1000)
+        /* Handle transmisi dari hardware */
+        if ((fb_beckhoff_digital_input & IN_TR_FORWARD) == IN_TR_FORWARD)
         {
             transmission_joy_master = TRANSMISSION_FORWARD;
         }
-        /* Sebenarny ini gk ada */
-        else
+        else if ((fb_beckhoff_digital_input & IN_TR_REVERSE) == IN_TR_REVERSE)
+        {
+            transmission_joy_master = TRANSMISSION_REVERSE;
+        }
+        else if ((fb_beckhoff_digital_input & 0b011) == 0)
         {
             transmission_joy_master = TRANSMISSION_AUTO;
         }
 
-        if ((fb_beckhoff_digital_input[0] & 0b01) == 1)
+        local_fsm.value = 0;
+
+        // logger.info("fb_beckhoff_digital_input: %d %d", fb_beckhoff_digital_input, is_rtabmap_ready);
+        // logger.info("%d %d %d %d", (fb_beckhoff_digital_input & IN_START_OP3), is_rtabmap_ready, is_pose_corrected, ((fb_beckhoff_digital_input & IN_EPS_nFAULT) == IN_EPS_nFAULT));
+        if ((fb_beckhoff_digital_input & IN_START_OP3) == IN_START_OP3)
         {
             rclcpp::Duration dt_pose_estimator = current_time - last_time_pose_estimator;
-            rclcpp::Duration dt_cam_kiri = current_time - last_time_cam_kiri;
-            rclcpp::Duration dt_cam_kanan = current_time - last_time_cam_kanan;
-            rclcpp::Duration dt_obstacle_filter = current_time - last_time_obstacle_filter;
             rclcpp::Duration dt_beckhoff = current_time - last_time_beckhoff;
-            rclcpp::Duration dt_lidar = current_time - last_time_lidar;
-            rclcpp::Duration dt_aruco_kiri = current_time - last_time_aruco_kiri;
-            rclcpp::Duration dt_aruco_kanan = current_time - last_time_aruco_kanan;
             rclcpp::Duration dt_CANbus = current_time - last_time_CANbus;
 
             // Jika sudah berhasil menerima semua data yang diperlukan
-            if (dt_pose_estimator.seconds() < 1 && dt_cam_kiri.seconds() < 1 && dt_cam_kanan.seconds() < 1 && dt_obstacle_filter.seconds() < 1 && dt_beckhoff.seconds() < 1 && dt_lidar.seconds() < 1 && dt_aruco_kiri.seconds() < 1 && dt_aruco_kanan.seconds() < 1 && dt_CANbus.seconds() < 1)
+            if (dt_pose_estimator.seconds() < 1 && dt_beckhoff.seconds() < 1 && dt_CANbus.seconds() < 1 && is_rtabmap_ready && is_pose_corrected && ((fb_beckhoff_digital_input & IN_EPS_nFAULT) == IN_EPS_nFAULT))
             {
                 target_velocity_joy_x = 0;
                 target_velocity_joy_y = 0;
@@ -467,14 +620,29 @@ void Master::callback_tim_50hz()
                 time_start_operation = current_time;
             }
         }
+        else if ((fb_beckhoff_digital_input & IN_START_GAS_MANUAL) == IN_START_GAS_MANUAL)
+        {
+            global_fsm.value = FSM_GLOBAL_OP_5;
+        }
+
+        if (!prev_is_rtabmap_ready && is_rtabmap_ready)
+        {
+            global_fsm.value = FSM_GLOBAL_INIT;
+        }
 
         if (fabs(target_velocity_joy_x) > 0.1 || fabs(target_velocity_joy_y) > 0.1 || fabs(target_velocity_joy_wz) > 0.1)
         {
-            manual_motion(target_velocity_joy_x, target_velocity_joy_y, target_velocity_joy_wz);
+            if ((fb_beckhoff_digital_input & IN_MASK_BUMPER) != IN_MASK_BUMPER)
+                manual_motion(-profile_max_braking, target_velocity_joy_y, target_velocity_joy_wz);
+            else
+                manual_motion(target_velocity_joy_x, target_velocity_joy_y, target_velocity_joy_wz);
         }
         else
         {
-            manual_motion(-1, 0, 0);
+            if ((fb_beckhoff_digital_input & IN_MASK_BUMPER) != IN_MASK_BUMPER)
+                manual_motion(-profile_max_braking, target_velocity_joy_y, target_velocity_joy_wz);
+            else
+                manual_motion(-1, 0, 0);
         }
         break;
 
@@ -483,13 +651,13 @@ void Master::callback_tim_50hz()
      * Sistem beroperasi secara otomatis
      */
     case FSM_GLOBAL_OP_3:
-        if (error_code_beckhoff + error_code_cam_kiri + error_code_cam_kanan + error_code_lidar + error_code_pose_estimator + error_code_obstacle_filter + error_code_aruco_kiri + error_code_aruco_kanan + error_code_can > 0)
+        if (error_code_beckhoff + error_code_pose_estimator + error_code_can > 0)
         {
             global_fsm.value = FSM_GLOBAL_PREOP;
             break;
         }
 
-        if ((fb_beckhoff_digital_input[0] & 0b01) == 0)
+        if ((fb_beckhoff_digital_input & IN_SYSTEM_FULL_ENABLE) == 0)
         {
             global_fsm.value = FSM_GLOBAL_SAFEOP;
             break;
@@ -503,7 +671,21 @@ void Master::callback_tim_50hz()
      * Sistem beroperasi secara otomatis, tetapi untuk steeringnya bisa dikontrol melalui joystick
      */
     case FSM_GLOBAL_OP_4:
-        follow_lane_2_cam_steer_manual(0, 0, target_velocity_joy_wz);
+        local_fsm.value = 0;
+
+        if (metode_following == 0)
+        {
+            follow_waypoints_steer_manual(0, 0, target_velocity_joy_wz, 1, false);
+        }
+        else if (metode_following == 1)
+        {
+            follow_lane_steer_manual(0, 0, target_velocity_joy_wz);
+        }
+        else if (metode_following == 2)
+        {
+            fusion_follow_lane_waypoints_steer_manual(0, 0, target_velocity_joy_wz, 1, false);
+        }
+
         break;
 
     /**
@@ -511,7 +693,27 @@ void Master::callback_tim_50hz()
      * Sistem beroperasi secara otomatis, tetapi untuk gasnya bisa dikontrol melalui joystick
      */
     case FSM_GLOBAL_OP_5:
-        follow_lane_2_cam_gas_manual(target_velocity_joy_x, 0, 0);
+        local_fsm.value = 0;
+
+        if (metode_following == 0)
+        {
+            follow_waypoints_gas_manual(target_velocity_joy_x, 0, 0, 1.5, true);
+        }
+        else if (metode_following == 1)
+        {
+            follow_lane_gas_manual(target_velocity_joy_x, 0, 0);
+        }
+        else if (metode_following == 2)
+        {
+            fusion_follow_lane_waypoints_gas_manual(target_velocity_joy_x, 0, 0, 1.5, true);
+        }
+
+        if ((fb_beckhoff_digital_input & IN_SYSTEM_FULL_ENABLE) == 0)
+        {
+            global_fsm.value = FSM_GLOBAL_SAFEOP;
+            break;
+        }
+
         break;
 
     /**
@@ -519,14 +721,24 @@ void Master::callback_tim_50hz()
      * Sistem beroperasi secara manual bisa dikontrol melalui joystick
      */
     case FSM_GLOBAL_OP_2:
+        local_fsm.value = 0;
         manual_motion(target_velocity_joy_x, target_velocity_joy_y, target_velocity_joy_wz);
+        break;
+
+    case FSM_GLOBAL_RECORD_ROUTE:
+        local_fsm.value = 0;
+        process_record_route();
         break;
     }
 
     process_transmitter();
+
+    global_fsm.prev_value = global_fsm.value;
+    local_fsm.prev_value = local_fsm.value;
+    prev_is_rtabmap_ready = is_rtabmap_ready;
 }
 
-// ===============================================================================================
+// ================================================================================================
 
 int main(int argc, char **argv)
 {

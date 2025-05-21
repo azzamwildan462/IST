@@ -11,6 +11,8 @@
 #include <termios.h>   // Contains POSIX terminal control definitions
 #include <unistd.h>    // write(), read(), close()
 
+#include "boost/asio.hpp"
+
 #define READ_PROTOCOL 0x55
 #define WRITE_PROTOCOL 0xFF
 
@@ -29,10 +31,14 @@
 
 #define GRAVITY 9.8
 
-HelpLogger logger;
-
 class SerialIMU : public rclcpp::Node
 {
+private:
+    boost::asio::io_service io_service_;
+    boost::asio::serial_port serial_port;
+    char recv_buffer[256];
+    int16_t recv_len;
+
 public:
     rclcpp::TimerBase::SharedPtr tim_50hz;
     rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr pub_imu;
@@ -41,16 +47,32 @@ public:
     // =======================================================
     std::string port;
     std::string frame_id = "imu";
+    bool use_boost = false;
+    bool is_riontech = false;
+    int baudrate = 115200;
+
+    HelpLogger logger;
 
     // Vars
     // =======================================================
     int serial_port_fd;
 
+    sensor_msgs::msg::Imu imu_msg;
+
     SerialIMU()
-        : Node("serial_imu")
+        : Node("serial_imu"), io_service_(), serial_port(io_service_)
     {
         this->declare_parameter("port", "/dev/ttyUSB0");
         this->get_parameter("port", port);
+
+        this->declare_parameter("use_boost", false);
+        this->get_parameter("use_boost", use_boost);
+
+        this->declare_parameter("is_riontech", false);
+        this->get_parameter("is_riontech", is_riontech);
+
+        this->declare_parameter("baudrate", 115200);
+        this->get_parameter("baudrate", baudrate);
 
         if (!logger.init())
         {
@@ -58,24 +80,80 @@ public:
             rclcpp::shutdown();
         }
 
-        if (init_serial() > 0)
+        if (!use_boost)
         {
-            RCLCPP_ERROR(this->get_logger(), "Failed to initialize serial");
-            rclcpp::shutdown();
+            if (init_serial() > 0)
+            {
+                RCLCPP_ERROR(this->get_logger(), "Failed to initialize serial");
+                rclcpp::shutdown();
+            }
         }
-
-        //----Timer
-        tim_50hz = this->create_wall_timer(std::chrono::milliseconds(10), std::bind(&SerialIMU::callback_tim_50hz, this));
+        else
+        {
+            if (init_serial_boost() > 0)
+            {
+                RCLCPP_ERROR(this->get_logger(), "Failed to initialize serial");
+                rclcpp::shutdown();
+            }
+        }
 
         //----Publisher
         pub_imu = this->create_publisher<sensor_msgs::msg::Imu>("/hardware/imu", 1);
 
-        logger.info("Serial IMU init");
+        //----Timer
+        tim_50hz = this->create_wall_timer(std::chrono::milliseconds(1000), std::bind(&SerialIMU::callback_tim_50hz, this));
+
+        logger.info("Serial IMU init on %s (baudrate: %d)", port.c_str(), baudrate);
     }
 
     void callback_tim_50hz()
     {
-        read_serial();
+        while (rclcpp::ok())
+        {
+            try
+            {
+                if (!use_boost)
+                    read_serial();
+                else
+                    read_serial_asio();
+            }
+            catch (const std::exception &e)
+            {
+                logger.error("Error: %s", e.what());
+            }
+            // usleep(10000); // 100ms
+        }
+        // try
+        // {
+        //     if (!use_boost)
+        //         read_serial();
+        //     else
+        //         read_serial_asio();
+        // }
+        // catch (const std::exception &e)
+        // {
+        //     logger.error("Error: %s", e.what());
+        // }
+    }
+
+    int8_t init_serial_boost()
+    {
+        boost::system::error_code ec;
+        serial_port.open(port);
+
+        if (ec)
+        {
+            logger.error("Error %i from opening usb device: %s", ec.value(), ec.message().c_str());
+            return 1;
+        }
+
+        serial_port.set_option(boost::asio::serial_port_base::baud_rate(baudrate));
+        serial_port.set_option(boost::asio::serial_port_base::character_size(8));
+        serial_port.set_option(boost::asio::serial_port_base::stop_bits(boost::asio::serial_port_base::stop_bits::one));
+        serial_port.set_option(boost::asio::serial_port_base::parity(boost::asio::serial_port_base::parity::none));
+        serial_port.set_option(boost::asio::serial_port_base::flow_control(boost::asio::serial_port_base::flow_control::none));
+
+        return 0;
     }
 
     int8_t init_serial()
@@ -123,8 +201,26 @@ public:
         tty.c_cc[VMIN] = 0;
 
         // Set in/out baud rate to be 9600
-        cfsetispeed(&tty, B115200);
-        cfsetospeed(&tty, B115200);
+        if (baudrate == 9600)
+        {
+            cfsetispeed(&tty, B9600);
+            cfsetospeed(&tty, B9600);
+        }
+        else if (baudrate == 19200)
+        {
+            cfsetispeed(&tty, B19200);
+            cfsetospeed(&tty, B19200);
+        }
+        else if (baudrate == 38400)
+        {
+            cfsetispeed(&tty, B38400);
+            cfsetospeed(&tty, B38400);
+        }
+        else if (baudrate == 115200)
+        {
+            cfsetispeed(&tty, B115200);
+            cfsetospeed(&tty, B115200);
+        }
 
         // status |= TIOCM_DTR; /* turn on DTR */
         // status |= TIOCM_RTS; /* turn on RTS */
@@ -139,24 +235,95 @@ public:
         return 0;
     }
 
-    int8_t read_serial()
+    float parse_riontech_value(uint16_t byte_offset)
     {
-        unsigned char recv_buffer[128];
-        static sensor_msgs::msg::Imu imu_msg;
+        int _sign, a, b, c, d, e;
+        _sign = (recv_buffer[byte_offset] & 0xFF) / 16;
+        if (_sign == 1)
+            _sign = 1;
+        else
+            _sign = -1;
+        //  10 10 55 --> -010.55
+        a = (recv_buffer[byte_offset] & 0xFF) % 16;
+        b = (recv_buffer[byte_offset + 1] & 0xFF) / 16 % 16;
+        c = (recv_buffer[byte_offset + 1] & 0xFF) % 16;
+        d = (recv_buffer[byte_offset + 2] & 0xFF) / 16 % 16;
+        e = (recv_buffer[byte_offset + 2] & 0xFF) % 16;
+        return _sign * abs(a * 100.0 + b * 10.0 + c + d * 0.1 + e * 0.01);
+    }
 
-        uint16_t bytes_available = 0;
-        if (ioctl(serial_port_fd, FIONREAD, &bytes_available) == -1)
+    uint8_t rion_checksum(char *data, size_t len)
+    {
+        uint8_t temp = 0;
+        for (size_t i = 0; i < len; i++)
         {
-            return -1;
+            temp += data[i];
         }
+        return temp;
+    }
 
-        if (bytes_available == 0)
-            return 0;
+    float rion_parse(uint16_t byte_offset, float factor)
+    {
+#ifndef BIN2BCD
+#define BIN2BCD(data) (((data >> 4) & 0xF) * 10 + (data & 0xF))
+#endif
 
-        int8_t recv_len = read(serial_port_fd, &recv_buffer, bytes_available);
+        float temp = 0;
+        uint8_t sign = (recv_buffer[byte_offset] & 0x10) != 0;
+        temp = ((recv_buffer[byte_offset] & 0x0F) * 10000.00) + (BIN2BCD(recv_buffer[byte_offset + 1]) * 100.00) + (BIN2BCD(recv_buffer[byte_offset + 2]) * 1.00);
+        temp *= factor;
+        temp *= (sign == 1) ? -1 : 1;
+        return temp;
+    }
 
-        for (int i = 0; i < recv_len; i++)
+    void parse_riontech_data()
+    {
+        // for (int16_t i = 0; i < recv_len; i++)
+        // {
+        //     logger.info("Data: %x", recv_buffer[i]);
+        // }
+
+        if (recv_len > 0 && recv_buffer[0] == 0x68 && recv_buffer[1] == 0x1f)
         {
+            static const float deg2rad = M_PI / 180;
+            float roll = rion_parse(4, 0.01) * deg2rad;
+            float pitch = rion_parse(7, 0.01) * deg2rad;
+            float yaw = rion_parse(10, 0.01) * deg2rad;
+            float acc_x = rion_parse(13, 0.001);
+            float acc_y = rion_parse(16, 0.001);
+            float acc_z = rion_parse(19, 0.001);
+            float gyro_x = rion_parse(22, 0.01) * deg2rad;
+            float gyro_y = rion_parse(25, 0.01) * deg2rad;
+            float gyro_z = rion_parse(28, 0.01) * deg2rad;
+
+            tf2::Quaternion q_tf2;
+            q_tf2.setRPY(roll, pitch, yaw);
+            geometry_msgs::msg::Quaternion q_msg;
+            q_msg.x = q_tf2.x();
+            q_msg.y = q_tf2.y();
+            q_msg.z = q_tf2.z();
+            q_msg.w = q_tf2.w();
+            imu_msg.orientation = q_msg;
+            imu_msg.angular_velocity.x = gyro_x;
+            imu_msg.angular_velocity.y = gyro_y;
+            imu_msg.angular_velocity.z = gyro_z;
+            imu_msg.linear_acceleration.x = acc_x;
+            imu_msg.linear_acceleration.y = acc_y;
+            imu_msg.linear_acceleration.z = acc_z;
+
+            // logger.info("%d %x %x %d %d Yaw: %f", recv_len, recv_buffer[0], recv_buffer[1], recv_buffer[recv_buffer[1] - 1], rion_checksum(&recv_buffer[1], recv_buffer[1] - 1), rion_parse(10, 0.01));
+        }
+    }
+
+    void parse_serial_data()
+    {
+        size_t recv_len = strlen(recv_buffer);
+
+        logger.info("Received===================================: %d", recv_len); //
+        for (size_t i = 0; i < recv_len; i++)
+        {
+            // logger.info("Data: %d", recv_buffer[i]);
+            // logger.info("Data: %x", recv_buffer[i]);
             if (recv_buffer[i] == READ_PROTOCOL)
             {
                 if (recv_buffer[i + 1] == TYPE_ACC)
@@ -180,16 +347,6 @@ public:
                     imu_msg.linear_acceleration.x = acc_x;
                     imu_msg.linear_acceleration.y = acc_y;
                     imu_msg.linear_acceleration.z = acc_z;
-
-                    uint16_t crc_sum = 0;
-                    crc_sum = READ_PROTOCOL + TYPE_ACC + (acc_x_buffer & 0xFF) + (acc_x_buffer >> 8) + (acc_y_buffer & 0xFF) + (acc_y_buffer >> 8) + (acc_z_buffer & 0xFF) + (acc_z_buffer >> 8);
-
-                    if (crc_sum == recv_buffer[i + 10])
-                    {
-                        // logger.info("CRC OK");
-                    }
-
-                    // logger.info("Acc X: %f, Acc Y: %f, Acc Z: %f", acc_x, acc_y, acc_z);
                 }
                 else if (recv_buffer[i + 1] == TYPE_ANGULAR_VELOCITY)
                 {
@@ -205,23 +362,15 @@ public:
                     memcpy(&ang_vel_y_buffer, recv_buffer + i + 4, 2);
                     memcpy(&ang_vel_z_buffer, recv_buffer + i + 6, 2);
 
-                    ang_vel_x = (ang_vel_x_buffer / 32768.0) * 2000.0; // degree per second
-                    ang_vel_y = (ang_vel_y_buffer / 32768.0) * 2000.0; // degree per second
-                    ang_vel_z = (ang_vel_z_buffer / 32768.0) * 2000.0; // degree per second
+                    ang_vel_x = (ang_vel_x_buffer / 32768.0) * 2000.0 * M_PI / 180; // degree per second
+                    ang_vel_y = (ang_vel_y_buffer / 32768.0) * 2000.0 * M_PI / 180; // degree per second
+                    ang_vel_z = (ang_vel_z_buffer / 32768.0) * 2000.0 * M_PI / 180; // degree per second
 
                     imu_msg.angular_velocity.x = ang_vel_x;
                     imu_msg.angular_velocity.y = ang_vel_y;
                     imu_msg.angular_velocity.z = ang_vel_z;
 
-                    uint16_t crc_sum = 0;
-                    crc_sum = READ_PROTOCOL + TYPE_ANGULAR_VELOCITY + (ang_vel_x_buffer & 0xFF) + (ang_vel_x_buffer >> 8) + (ang_vel_y_buffer & 0xFF) + (ang_vel_y_buffer >> 8) + (ang_vel_z_buffer & 0xFF) + (ang_vel_z_buffer >> 8);
-
-                    if (crc_sum == recv_buffer[i + 10])
-                    {
-                        // logger.info("CRC OK");
-                    }
-
-                    // logger.info("Ang Vel X: %f, Ang Vel Y: %f, Ang Vel Z: %f", ang_vel_x, ang_vel_y, ang_vel_z);
+                    logger.info("///////////////////////////////////////////ang_vel_z: %f", ang_vel_z);
                 }
                 else if (recv_buffer[i + 1] == TYPE_ANGLE)
                 {
@@ -245,6 +394,8 @@ public:
                     double pitch = angle_y * M_PI / 180.0;
                     double yaw = angle_z * M_PI / 180.0;
 
+                    logger.info("===========================================Yaw: %f", yaw);
+
                     tf2::Quaternion q_tf2;
                     q_tf2.setRPY(roll, pitch, yaw);
                     geometry_msgs::msg::Quaternion q_msg;
@@ -253,16 +404,6 @@ public:
                     q_msg.z = q_tf2.z();
                     q_msg.w = q_tf2.w();
                     imu_msg.orientation = q_msg;
-
-                    uint16_t crc_sum = 0;
-                    crc_sum = READ_PROTOCOL + TYPE_ANGLE + (angle_x_buffer & 0xFF) + (angle_x_buffer >> 8) + (angle_y_buffer & 0xFF) + (angle_y_buffer >> 8) + (angle_z_buffer & 0xFF) + (angle_z_buffer >> 8);
-
-                    if (crc_sum == recv_buffer[i + 10])
-                    {
-                        // logger.info("CRC OK");
-                    }
-
-                    // logger.info("Roll: %f, Pitch: %f, Yaw: %f", roll, pitch, yaw);
                 }
                 else if (recv_buffer[i + 1] == TYPE_MAGNETIC)
                 {
@@ -273,19 +414,66 @@ public:
                     memcpy(&mag_x, recv_buffer + i + 2, 2);
                     memcpy(&mag_y, recv_buffer + i + 4, 2);
                     memcpy(&mag_z, recv_buffer + i + 6, 2);
-
-                    uint16_t crc_sum = 0;
-                    crc_sum = READ_PROTOCOL + TYPE_MAGNETIC + (mag_x & 0xFF) + (mag_x >> 8) + (mag_y & 0xFF) + (mag_y >> 8) + (mag_z & 0xFF) + (mag_z >> 8);
-
-                    if (crc_sum == recv_buffer[i + 10])
-                    {
-                        // logger.info("CRC OK");
-                    }
-
-                    // logger.info("Mag X: %d, Mag Y: %d, Mag Z: %d", mag_x, mag_y, mag_z);
                 }
             }
         }
+    }
+
+    int8_t read_serial_asio()
+    {
+        // logger.info("Reading serial");
+        boost::asio::async_read(serial_port, boost::asio::buffer(recv_buffer, 256),
+                                [this](const boost::system::error_code &error, std::size_t bytes_transferred)
+                                {
+                                    // logger.info("Bytes transferred: %d", bytes_transferred);
+                                    (void)bytes_transferred;
+                                    if (!error)
+                                    {
+                                        if (is_riontech)
+                                            parse_riontech_data();
+                                        else
+                                            parse_serial_data();
+                                        pub_imu->publish(imu_msg);
+                                    }
+                                });
+        return 0;
+    }
+
+    int8_t read_serial()
+    {
+        if (is_riontech)
+        {
+            uint8_t serialmsg[] = {0x68, 0x04, 0x00, 0x04, 0x08};
+            write(serial_port_fd, serialmsg, sizeof(serialmsg));
+        }
+
+        uint16_t bytes_available = 0;
+        if (ioctl(serial_port_fd, FIONREAD, &bytes_available) == -1)
+        {
+            return -1;
+        }
+
+        // logger.info("Bytes available: %d", bytes_available);
+
+        if (bytes_available == 0)
+            return 0;
+
+        if (bytes_available > 256)
+            bytes_available = 256;
+
+        recv_len = read(serial_port_fd, &recv_buffer, bytes_available);
+
+        // logger.info("Bytes read: %d", recv_len);
+
+        if (recv_len < 0)
+        {
+            return -1;
+        }
+
+        if (is_riontech)
+            parse_riontech_data();
+        else
+            parse_serial_data();
 
         pub_imu->publish(imu_msg);
 

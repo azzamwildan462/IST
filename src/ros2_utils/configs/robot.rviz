@@ -6,13 +6,17 @@ Panels:
       Expanded:
         - /Global Options1
         - /Status1
+        - /TF1
+        - /TF1/Frames1
         - /MarkerArray1
         - /MarkerArray1/Topic1
         - /PointCloud21
         - /PointCloud21/Topic1
+        - /Map1
         - /LaserScan1
         - /PointCloud23
         - /Imu1
+        - /PointCloud24
       Splitter Ratio: 0.5
     Tree Height: 656
   - Class: rviz_common/Selection
@@ -32,7 +36,7 @@ Panels:
     Experimental: false
     Name: Time
     SyncMode: 0
-    SyncSource: ""
+    SyncSource: LaserScan
 Visualization Manager:
   Class: ""
   Displays:
@@ -58,15 +62,35 @@ Visualization Manager:
       Enabled: true
       Frame Timeout: 15
       Frames:
-        All Enabled: true
+        All Enabled: false
         base_link:
           Value: true
         body_link:
           Value: true
+        camera_aligned_depth_to_infra1_frame:
+          Value: true
+        camera_color_frame:
+          Value: true
+        camera_color_optical_frame:
+          Value: true
+        camera_depth_frame:
+          Value: true
+        camera_depth_optical_frame:
+          Value: true
+        camera_infra1_frame:
+          Value: true
+        camera_infra1_optical_frame:
+          Value: true
+        camera_infra2_frame:
+          Value: true
+        camera_infra2_optical_frame:
+          Value: true
+        camera_link:
+          Value: true
         imu_link:
-          Value: true
+          Value: false
         lidar1_link:
-          Value: true
+          Value: false
         lidar2_link:
           Value: true
         map:
@@ -84,6 +108,21 @@ Visualization Manager:
             base_link:
               body_link:
                 {}
+              camera_link:
+                camera_aligned_depth_to_infra1_frame:
+                  camera_infra1_optical_frame:
+                    {}
+                camera_color_frame:
+                  camera_color_optical_frame:
+                    {}
+                camera_depth_frame:
+                  camera_depth_optical_frame:
+                    {}
+                camera_infra1_frame:
+                  {}
+                camera_infra2_frame:
+                  camera_infra2_optical_frame:
+                    {}
               imu_link:
                 {}
               lidar1_link:
@@ -215,7 +254,7 @@ Visualization Manager:
       Position Transformer: XYZ
       Selectable: true
       Size (Pixels): 3
-      Size (m): 0.029999999329447746
+      Size (m): 0.10000000149011612
       Style: Flat Squares
       Topic:
         Depth: 5
@@ -289,6 +328,40 @@ Visualization Manager:
         Value: /imu/data_raw
       Value: true
       fixed_frame_orientation: true
+    - Alpha: 1
+      Autocompute Intensity Bounds: true
+      Autocompute Value Bounds:
+        Max Value: 10
+        Min Value: -10
+        Value: true
+      Axis: Z
+      Channel Name: intensity
+      Class: rviz_default_plugins/PointCloud2
+      Color: 255; 255; 255
+      Color Transformer: Intensity
+      Decay Time: 0
+      Enabled: false
+      Invert Rainbow: false
+      Max Color: 255; 255; 255
+      Max Intensity: 4096
+      Min Color: 0; 0; 0
+      Min Intensity: 0
+      Name: PointCloud2
+      Position Transformer: XYZ
+      Selectable: true
+      Size (Pixels): 3
+      Size (m): 0.009999999776482582
+      Style: Flat Squares
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /camera/rs2_cam_main/depth/color/points
+      Use Fixed Frame: true
+      Use rainbow: true
+      Value: false
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -334,26 +407,21 @@ Visualization Manager:
   Value: true
   Views:
     Current:
-      Class: rviz_default_plugins/XYOrbit
-      Distance: 13.982280731201172
+      Angle: -0.010000133886933327
+      Class: rviz_default_plugins/TopDownOrtho
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
-      Focal Point:
-        X: -2.5618672370910645
-        Y: -0.19763481616973877
-        Z: 0
-      Focal Shape Fixed Size: true
-      Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.8047975897789001
+      Scale: 11.834121704101562
       Target Frame: <Fixed Frame>
-      Value: XYOrbit (rviz_default_plugins)
-      Yaw: 2.948587417602539
+      Value: TopDownOrtho (rviz_default_plugins)
+      X: 2.049771308898926
+      Y: -0.0027985721826553345
     Saved: ~
 Window Geometry:
   Displays:

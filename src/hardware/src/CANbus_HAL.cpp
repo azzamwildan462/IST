@@ -8,6 +8,8 @@
 #include "std_msgs/msg/u_int8.hpp"
 #include "std_msgs/msg/float32_multi_array.hpp"
 #include "std_msgs/msg/float32.hpp"
+#include "sensor_msgs/msg/imu.hpp"
+#include "tf2/LinearMath/Quaternion.h"
 
 #include <cerrno>
 #include <cstdio>
@@ -31,6 +33,7 @@
 #define COB_ID_CAR_FB_TRANSMISSION 0x18C
 #define COB_ID_EPS_ACTUATION 0x321
 #define COB_ID_EPS_ENCODER 0x231
+#define COB_ID_GYRO_RION 0x585
 
 #define EPS_ENCODER_MAX_COUNTER 10000
 #define EPS_ENCODER_MAX_RAD 1.5708
@@ -46,6 +49,7 @@ public:
     rclcpp::Publisher<std_msgs::msg::UInt8>::SharedPtr pub_fb_eps_mode;
     rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr pub_error_code;
     rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr pub_eps_encoder;
+    rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr pub_imu_can;
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr sub_master_actuator;
     rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_master_global_fsm;
 
@@ -71,6 +75,11 @@ public:
     uint8_t eps_mode_fb = 0;
     int16_t master_global_fsm = 0;
 
+    uint8_t epoch_encoder = 0;
+    uint8_t prev_epoch_encoder = 0;
+
+    sensor_msgs::msg::Imu imu_msg;
+
     CANbus_HAL()
         : Node("CANbus_HAL")
     {
@@ -94,9 +103,13 @@ public:
         pub_error_code = this->create_publisher<std_msgs::msg::Int16>("/can/error_code", 1);
         pub_eps_encoder = this->create_publisher<std_msgs::msg::Float32>("/can/eps_encoder", 1);
         pub_fb_eps_mode = this->create_publisher<std_msgs::msg::UInt8>("/can/eps_mode", 1);
+        pub_imu_can = this->create_publisher<sensor_msgs::msg::Imu>("/can/imu", 1);
 
         //----Timer
-        tim_50hz = this->create_wall_timer(std::chrono::milliseconds(1), std::bind(&CANbus_HAL::callback_routine, this));
+        if (use_socket_can)
+            tim_50hz = this->create_wall_timer(std::chrono::milliseconds(1), std::bind(&CANbus_HAL::callback_routine, this));
+        else
+            tim_50hz = this->create_wall_timer(std::chrono::milliseconds(10), std::bind(&CANbus_HAL::callback_routine, this));
 
         //----Subscriber
         sub_master_actuator = this->create_subscription<std_msgs::msg::Float32MultiArray>(
@@ -211,9 +224,12 @@ public:
         msg_battery.data = battery;
         pub_battery->publish(msg_battery);
 
-        std_msgs::msg::Int32 msg_encoder;
-        msg_encoder.data = encoder;
-        pub_encoder->publish(msg_encoder);
+        if (prev_epoch_encoder != epoch_encoder)
+        {
+            std_msgs::msg::Int32 msg_encoder;
+            msg_encoder.data = encoder;
+            pub_encoder->publish(msg_encoder);
+        }
 
         std_msgs::msg::UInt8 msg_fb_tps_accelerator;
         msg_fb_tps_accelerator.data = fb_tps_accelerator;
@@ -234,6 +250,8 @@ public:
         std_msgs::msg::UInt8 msg_fb_eps_mode;
         msg_fb_eps_mode.data = eps_mode_fb;
         pub_fb_eps_mode->publish(msg_fb_eps_mode);
+
+        pub_imu_can->publish(imu_msg);
     }
 
     void parse_can_jhctech()
@@ -269,6 +287,11 @@ public:
                 if (can_data->canId == COB_ID_CAR_ENCODER)
                 {
                     encoder = (can_data->data[3] | (can_data->data[2] << 8));
+
+                    prev_epoch_encoder = epoch_encoder;
+                    epoch_encoder++;
+                    if (epoch_encoder >= 255)
+                        epoch_encoder = 0;
                 }
                 else if (can_data->canId == COB_ID_CAR_BATTERY)
                 {
@@ -296,6 +319,52 @@ public:
                     memcpy(&fb_eps_encoder_buffer, &can_data->data[1], 2);
 
                     eps_encoder_fb = fb_eps_encoder_buffer * ENC_CNTR2RAD;
+                }
+                else if (can_data->canId == COB_ID_GYRO_RION)
+                {
+                    int16_t data_buffer = 0;
+
+                    // Posisi
+                    if (can_data->data[7] == 0x00)
+                    {
+                        float r = 0, p = 0, y = 0;
+                        data_buffer = can_data->data[0] | (can_data->data[1] << 8);
+                        r = (float)data_buffer * 0.01 * M_PI / 180;
+                        data_buffer = can_data->data[2] | (can_data->data[3] << 8);
+                        p = (float)data_buffer * 0.01 * M_PI / 180;
+                        data_buffer = can_data->data[4] | (can_data->data[5] << 8);
+                        y = (float)data_buffer * 0.01 * M_PI / 180;
+
+                        tf2::Quaternion q_tf2;
+                        q_tf2.setRPY(r, p, y);
+                        geometry_msgs::msg::Quaternion q_msg;
+                        q_msg.x = q_tf2.x();
+                        q_msg.y = q_tf2.y();
+                        q_msg.z = q_tf2.z();
+                        q_msg.w = q_tf2.w();
+
+                        imu_msg.orientation = q_msg;
+                    }
+                    // Akselero
+                    else if (can_data->data[7] == 0x01)
+                    {
+                        data_buffer = can_data->data[0] | (can_data->data[1] << 8);
+                        imu_msg.linear_acceleration.x = (float)data_buffer * 0.001;
+                        data_buffer = can_data->data[2] | (can_data->data[3] << 8);
+                        imu_msg.linear_acceleration.y = (float)data_buffer * 0.001;
+                        data_buffer = can_data->data[4] | (can_data->data[5] << 8);
+                        imu_msg.linear_acceleration.z = (float)data_buffer * 0.001;
+                    }
+                    // Gyro
+                    else if (can_data->data[7] == 0x02)
+                    {
+                        data_buffer = can_data->data[0] | (can_data->data[1] << 8);
+                        imu_msg.angular_velocity.x = (float)data_buffer * 0.01;
+                        data_buffer = can_data->data[2] | (can_data->data[3] << 8);
+                        imu_msg.angular_velocity.y = (float)data_buffer * 0.01;
+                        data_buffer = can_data->data[4] | (can_data->data[5] << 8);
+                        imu_msg.angular_velocity.z = (float)data_buffer * 0.01;
+                    }
                 }
 
                 can_data = can_data->Next;
@@ -354,6 +423,11 @@ public:
         if (frame.can_id == COB_ID_CAR_ENCODER)
         {
             encoder = (frame.data[3] | (frame.data[2] << 8));
+
+            prev_epoch_encoder = epoch_encoder;
+            epoch_encoder++;
+            if (epoch_encoder >= 255)
+                epoch_encoder = 0;
         }
         else if (frame.can_id == COB_ID_CAR_BATTERY)
         {
@@ -380,6 +454,52 @@ public:
             memcpy(&fb_eps_encoder_buffer, &frame.data[1], 2);
 
             eps_encoder_fb = fb_eps_encoder_buffer * ENC_CNTR2RAD;
+        }
+        else if (frame.can_id == COB_ID_GYRO_RION)
+        {
+            int16_t data_buffer = 0;
+
+            // Posisi
+            if (frame.data[7] == 0x00)
+            {
+                float r = 0, p = 0, y = 0;
+                data_buffer = frame.data[0] | (frame.data[1] << 8);
+                r = (float)data_buffer * 0.01 * M_PI / 180;
+                data_buffer = frame.data[2] | (frame.data[3] << 8);
+                p = (float)data_buffer * 0.01 * M_PI / 180;
+                data_buffer = frame.data[4] | (frame.data[5] << 8);
+                y = (float)data_buffer * 0.01 * M_PI / 180;
+
+                tf2::Quaternion q_tf2;
+                q_tf2.setRPY(r, p, y);
+                geometry_msgs::msg::Quaternion q_msg;
+                q_msg.x = q_tf2.x();
+                q_msg.y = q_tf2.y();
+                q_msg.z = q_tf2.z();
+                q_msg.w = q_tf2.w();
+
+                imu_msg.orientation = q_msg;
+            }
+            // Akselero
+            else if (frame.data[7] == 0x01)
+            {
+                data_buffer = frame.data[0] | (frame.data[1] << 8);
+                imu_msg.linear_acceleration.x = (float)data_buffer * 0.001;
+                data_buffer = frame.data[2] | (frame.data[3] << 8);
+                imu_msg.linear_acceleration.y = (float)data_buffer * 0.001;
+                data_buffer = frame.data[4] | (frame.data[5] << 8);
+                imu_msg.linear_acceleration.z = (float)data_buffer * 0.001;
+            }
+            // Gyro
+            else if (frame.data[7] == 0x02)
+            {
+                data_buffer = frame.data[0] | (frame.data[1] << 8);
+                imu_msg.angular_velocity.x = (float)data_buffer * 0.01 * M_PI / 180;
+                data_buffer = frame.data[2] | (frame.data[3] << 8);
+                imu_msg.angular_velocity.y = (float)data_buffer * 0.01 * M_PI / 180;
+                data_buffer = frame.data[4] | (frame.data[5] << 8);
+                imu_msg.angular_velocity.z = (float)data_buffer * 0.01 * M_PI / 180;
+            }
         }
     }
 

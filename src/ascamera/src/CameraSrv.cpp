@@ -171,6 +171,7 @@ void CameraSrv::onAttached(AS_CAM_ATTR_S *attr, void *privateData)
     ret = AS_SDK_CreateCamHandle(newdev, attr);
     if (ret == 0)
     {
+        LOG(INFO) << "===========================================================================" << std::endl;
         server->m_devsList.push_back(newdev);
 
         // get model type

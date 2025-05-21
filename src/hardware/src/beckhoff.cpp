@@ -14,13 +14,20 @@
 #define DO_TRANSMISSION_NEUTRAL 0b100
 #define DO_TRANSMISSION_REVERSE 0b001
 #define DO_TRANSMISSION_FORWARD 0b010
+#define DO_LAMPU_BAWAAN 0b100000000
+#define DO_LAMPU_BELAKANG_MERAH 0b1000000000000
+#define DO_LAMPU_BELAKANG_KUNING 0b10000000000000
+#define DO_LAMPU_BELAKANG_HIJAU 0b100000000000000
+#define DO_BUZZER_BELAKANG 0b1000000000000000
 
 #define EL6751_ID 0x1a5f3052 // CANopen
 #define EL2889_ID 0x0b493052 // Digital output
 #define EL3068_ID 0x0bfc3052 // Analog input
 #define EL4004_ID 0x0fa43052 // Analog output
-#define EL1889_ID 0x0b4f3052 // Digital input
+#define EL1889_ID 0x07613052 // Digital input
 #define JIAYU_ID 0x00000001  // Motor driver
+#define SLAVE_ID_DI_1 0x06
+#define SLAVE_ID_DI_2 0x07
 
 #define ANALOG_OUT_SCALER 3276.8f
 #define ANALOG_INPUT_SCALER 0.0003051757812f
@@ -32,6 +39,17 @@
 #define ADDRESS_ACTUAL_VELOCITY 0x6069
 #define ADDRESS_ACTUAL_TORQUE 0x6077
 #define ADDRESS_TARGET_VELOCITY 0x60FF
+#define ADDRESS_CURRENT_POSITION 0x6064
+
+#define IN_TR_FORWARD 0b01
+#define IN_TR_REVERSE 0b10
+#define IN_BRAKE_ACTIVE 0b100
+#define IN_EPS_nFAULT 0b1000
+#define IN_MASK_BUMPER 0b11110000
+#define IN_START_OP3 0b100000000
+#define IN_STOP_OP3 0b1000000000
+#define IN_START_GAS_MANUAL 0b10000000000
+#define IN_LS_BRAKE 0b1000000000000
 
 PACKED_BEGIN
 typedef struct
@@ -330,6 +348,7 @@ public:
     float speed_to_volt = 0.7;
     float dac_velocity_minimum = 0.4;
     float dac_velocity_maximum = 1.2;
+    int brake_idle_position = 0;
 
     // DAta raw beckhoff
     // =======================================================
@@ -338,7 +357,8 @@ public:
     analog_output_t *analog_output;
     if_brake_output_t *if_brake_output;
     if_brake_input_t *if_brake_input;
-    digital_in_t *digital_in;
+    digital_in_t *digital_in1;
+    digital_in_t *digital_in2;
 
     // Vars
     // =======================================================
@@ -366,6 +386,7 @@ public:
     uint8_t accelerator_switch = 0;
 
     uint8_t fsm_brake_driver = 0;
+    uint8_t fsm_brake_calibration = 0;
 
     uint16_t control_word = 0;
     uint16_t status_word = 0;
@@ -374,6 +395,14 @@ public:
     int16_t current_torque_brake = 0;
     int current_torque_brake_size = sizeof(current_torque_brake);
     int8_t brake_mode = 9; // 8: Position, 9: Velocity
+    int32_t local_brake_position = 0;
+    int32_t current_brake_position = 0;
+    int32_t prev_brake_position = 0;
+    int current_brake_position_size = sizeof(current_brake_position);
+    uint8_t status_braking = 0;
+    uint8_t prev_status_braking = 0;
+    uint16_t counter_unbrake = 0;
+    int32_t brake_maximum_position = 0;
 
     Beckhoff()
         : Node("beckhoff")
@@ -393,6 +422,9 @@ public:
         this->declare_parameter("dac_velocity_maximum", 1.2);
         this->get_parameter("dac_velocity_maximum", dac_velocity_maximum);
 
+        this->declare_parameter("brake_idle_position", 0);
+        this->get_parameter("brake_idle_position", brake_idle_position);
+
         if (!logger.init())
         {
             RCLCPP_ERROR(this->get_logger(), "Failed to initialize logger");
@@ -407,7 +439,7 @@ public:
 
         //----Timer
         tim_routine = this->create_wall_timer(std::chrono::milliseconds(10), std::bind(&Beckhoff::callback_tim_routine, this));
-        tim_control_brake = this->create_wall_timer(std::chrono::milliseconds(100), std::bind(&Beckhoff::callback_tim_control_brake, this));
+        tim_control_brake = this->create_wall_timer(std::chrono::milliseconds(100), std::bind(&Beckhoff::callback_tim_control_brake, this)); // SEMENTARA KARENA PERLU DIBENAHI SECARA MEKANIK REM NYA
 
         //----Publisher
         pub_sensors = this->create_publisher<std_msgs::msg::Float32MultiArray>("/beckhoff/sensors", 1);
@@ -475,7 +507,7 @@ public:
         {
             return;
         }
-        if (brake_jiayu() > 0)
+        if (init_brake_jiayu_fsm() > 0)
         {
             logger.warn("Brake Jiayu error");
         }
@@ -483,12 +515,24 @@ public:
 
     void callback_tim_routine()
     {
-        if (brake_slave_id != 255 && fsm_brake_driver == 3)
+        if (brake_slave_id != 255 && fsm_brake_driver == 3 && fsm_brake_calibration == 4)
         {
+            int32_t output_velocity_brake_send = -output_velocity_brake;
             (void)ec_SDOread(brake_slave_id, ADDRESS_STATUS_WORD, 0x00, FALSE, &status_word_size, &status_word, EC_TIMEOUTRXM);
             (void)ec_SDOread(brake_slave_id, ADDRESS_ACTUAL_TORQUE, 0x00, FALSE, &current_torque_brake_size, &current_torque_brake, EC_TIMEOUTRXM);
             (void)ec_SDOwrite(brake_slave_id, ADDRESS_MODES_OF_OPERATION, 0x00, FALSE, sizeof(brake_mode), &brake_mode, EC_TIMEOUTRXM);
-            (void)ec_SDOwrite(brake_slave_id, ADDRESS_TARGET_VELOCITY, 0x00, FALSE, sizeof(output_velocity_brake), &output_velocity_brake, EC_TIMEOUTRXM);
+            (void)ec_SDOwrite(brake_slave_id, ADDRESS_TARGET_VELOCITY, 0x00, FALSE, sizeof(output_velocity_brake), &output_velocity_brake_send, EC_TIMEOUTRXM);
+            (void)ec_SDOread(brake_slave_id, ADDRESS_CURRENT_POSITION, 0x00, FALSE, &current_brake_position_size, &current_brake_position, EC_TIMEOUTRXM);
+        }
+        else if (brake_slave_id != 255 && fsm_brake_driver != 3)
+        {
+            digital_out->data &= ~DO_LAMPU_BELAKANG_HIJAU;
+            digital_out->data &= ~DO_LAMPU_BELAKANG_KUNING;
+            digital_out->data |= DO_LAMPU_BELAKANG_MERAH;
+
+            ec_send_processdata();
+            int wkc = ec_receive_processdata(EC_TIMEOUTRET);
+            return;
         }
 
         ec_send_processdata();
@@ -497,54 +541,20 @@ public:
         if (wkc >= expectedWKC)
         {
             counter_beckhoff_disconnect = 0;
-            // test_analog_output();
-            // test_digital_output();
-            // test_analog_input();
 
             // ===================================================================================
 
-            // Ketika brake
-            if (master_target_volt_hat < -0.9)
+            // Ketika brake siap
+            if (brake_slave_id != 255 && fsm_brake_calibration == 4)
             {
-                static const float brake_minimum = -1.0;
-                static const float brake_maximum = -3.0;
-                static const float brake_torq_minimum = 0.0;
-                static const float brake_torq_maximum = 10.0;
-                static const float brake_max_velocity = 100.0;
-
-                float current_torq = 0;
-                if (brake_slave_id != 255)
-                    current_torq = (float)current_torque_brake;
-
-                float normalized_brake = (master_target_volt_hat - brake_minimum) / (brake_maximum - brake_minimum);
-                float normalized_torq = (current_torq - brake_torq_minimum) / (brake_torq_maximum - brake_torq_minimum);
-
-                float error_brake = normalized_brake - normalized_torq;
-                int32_t output_velocity = (int32_t)(error_brake * brake_max_velocity);
-
-                // logger.info("Brake: %.2f %.2f %.2f %.2f %d -> %d", master_target_volt_hat, current_torq, normalized_brake, normalized_torq, output_velocity_brake, output_velocity);
-
-                if (brake_slave_id != 255)
-                    output_velocity_brake = output_velocity;
-            }
-            else
-            {
-                static const float unbrake_torq_minimum = 0.0;
-                static const float unbrake_torq_maximum = 10.0;
-                static const float unbrake_max_velocity = -100.0;
-
-                float current_torq = 0;
-                if (brake_slave_id != 255)
-                    current_torq = (float)current_torque_brake;
-
-                float normalized_torq = (current_torq - unbrake_torq_minimum) / (unbrake_torq_maximum - unbrake_torq_minimum);
-
-                int32_t output_velocity = (int32_t)(normalized_torq * unbrake_max_velocity);
-
-                // logger.info("UnBrake: %.2f %.2f %.2f %d -> %d", master_target_volt_hat, current_torq, normalized_torq, output_velocity_brake, output_velocity);
-
-                if (brake_slave_id != 255)
-                    output_velocity_brake = output_velocity;
+                if (master_target_volt_hat < -1.0 - __FLT_EPSILON__)
+                {
+                    (void)brake_control_position(brake_maximum_position, 10000);
+                }
+                else
+                {
+                    (void)brake_control_position(brake_idle_position, 10000);
+                }
             }
 
             // ===================================================================================
@@ -591,8 +601,8 @@ public:
                 {
                     digital_out->data &= ~DO_SWITCH_THROTTLE;
                     digital_out->data &= ~DO_TRANSMISSION_FORWARD;
-                    digital_out->data &= ~DO_TRANSMISSION_REVERSE;
                     digital_out->data |= DO_TRANSMISSION_NEUTRAL;
+                    digital_out->data &= ~DO_TRANSMISSION_REVERSE;
                 }
                 // Forward
                 else if (accelerator_switch == 3)
@@ -603,6 +613,29 @@ public:
                     digital_out->data |= DO_TRANSMISSION_FORWARD;
                 }
             }
+
+            // Kontrol Lampu belakang
+            if (master_global_fsm == 0 || master_global_fsm == 1)
+            {
+                digital_out->data &= ~DO_LAMPU_BELAKANG_HIJAU;
+                digital_out->data &= ~DO_LAMPU_BELAKANG_KUNING;
+                digital_out->data |= DO_LAMPU_BELAKANG_MERAH;
+            }
+            else if (master_global_fsm == 7 || master_global_fsm == 8)
+            {
+                digital_out->data &= ~DO_LAMPU_BELAKANG_HIJAU;
+                digital_out->data &= ~DO_LAMPU_BELAKANG_MERAH;
+                digital_out->data |= DO_LAMPU_BELAKANG_KUNING;
+            }
+            else
+            {
+                digital_out->data &= ~DO_LAMPU_BELAKANG_KUNING;
+                digital_out->data &= ~DO_LAMPU_BELAKANG_MERAH;
+                digital_out->data |= DO_LAMPU_BELAKANG_HIJAU;
+            }
+
+            // Always enable
+            digital_out->data |= DO_LAMPU_BAWAAN;
 
             // ===================================================================================
 
@@ -631,7 +664,11 @@ public:
                 dac_velocity_send = buffer_dac_velocity;
             }
 
-            analog_output->data_2 = (int16_t)(dac_velocity_send * ANALOG_OUT_SCALER);
+            if (brake_slave_id != 255 && fsm_brake_calibration == 4 && abs(brake_idle_position - local_brake_position) < 50)
+                analog_output->data_1 = (int16_t)(dac_velocity_send * ANALOG_OUT_SCALER);
+            else if (brake_slave_id == 255)
+                analog_output->data_1 = (int16_t)(dac_velocity_send * ANALOG_OUT_SCALER);
+
             // logger.info("INFO: %.2f || %.2f %.2f %d", fb_throttle_velocity_volt, buffer_dac_velocity, dac_velocity_send, digital_out->data);
 
             // ====================================================================================
@@ -652,12 +689,49 @@ public:
             rclcpp::shutdown();
         }
 
+        int32_t diff_brake_position = current_brake_position - prev_brake_position;
+        if (diff_brake_position > 1000000000 || diff_brake_position < -1000000000)
+        {
+            logger.error("Brake position error");
+            diff_brake_position = 0;
+        }
+
+        local_brake_position += diff_brake_position;
+
+        prev_brake_position = current_brake_position;
+
         std_msgs::msg::Int16 msg_error_code;
         msg_error_code.data = error_code;
         pub_error_code->publish(msg_error_code);
     }
 
-    int8_t brake_jiayu()
+    int8_t brake_control_position(float target, float max_velocities)
+    {
+        static float kp = 0.3;
+        static const float toleransi_error = 100;
+
+        float error = local_brake_position - target;
+
+        float proportional = error * kp;
+
+        float output = proportional;
+
+        if (output > max_velocities)
+            output = max_velocities;
+        else if (output < -max_velocities)
+            output = -max_velocities;
+
+        output_velocity_brake = (int)output;
+
+        // logger.info("Brake: %d %d %d %d %d", local_brake_position, target, output_velocity_brake, error, output);
+
+        if (fabs(error) < toleransi_error)
+            return 1;
+        else
+            return 0;
+    }
+
+    int8_t init_brake_jiayu_fsm()
     {
         // uint16_t sword = if_brake_input->status_word;
         (void)ec_SDOread(brake_slave_id, ADDRESS_STATUS_WORD, 0x00, FALSE, &status_word_size, &status_word, EC_TIMEOUTRXM);
@@ -674,22 +748,124 @@ public:
 
         if (3 == fsm_brake_driver)
         {
+
+            // if (status_braking == 0)
+            // {
+            //     control_word = 7;
+            // }
+            // else if (status_braking == 1)
+            // {
+            //     control_word = 15;
+            // }
+
+            // logger.info("BRAKING SWORD: %d CWORD: %d", status_word, control_word);
+
+            static uint8_t counter_ls_brake_active = 0;
+            static uint8_t counter_brake_active = 0;
+            static bool is_idle_calibration = false;
+            static bool is_maximum_calibration = false;
+
+            // logger.info("fsm_brake_calibration: (%d) (%d %d) (%d %d) %d %d %d %d %d", sword, is_idle_calibration, is_maximum_calibration, (digital_in1->data & IN_LS_BRAKE), (digital_in1->data & IN_BRAKE_ACTIVE), fsm_brake_calibration, brake_idle_position, brake_maximum_position, local_brake_position, current_brake_position);
+
+            switch (fsm_brake_calibration)
+            {
+            case 0:
+                counter_ls_brake_active = 0;
+                counter_brake_active = 0;
+                fsm_brake_calibration = 1;
+                break;
+
+            case 1:
+                output_velocity_brake = -10000;
+
+                if ((digital_in1->data & IN_LS_BRAKE) == IN_LS_BRAKE)
+                {
+                    local_brake_position = 0;
+                    is_idle_calibration = true;
+                    logger.warn("Brake idle calibration");
+                }
+
+                if ((digital_in1->data & IN_BRAKE_ACTIVE) == IN_BRAKE_ACTIVE)
+                {
+                    if (is_idle_calibration)
+                    {
+                        brake_maximum_position = local_brake_position;
+                        is_maximum_calibration = true;
+                        logger.warn("Brake maximum calibration on %d", local_brake_position);
+                    }
+                }
+
+                if (is_idle_calibration && is_maximum_calibration)
+                {
+                    fsm_brake_calibration = 2;
+                }
+
+                break;
+
+            case 2:
+                output_velocity_brake = 10000;
+
+                if ((digital_in1->data & IN_LS_BRAKE) == IN_LS_BRAKE)
+                {
+                    logger.warn("Brake idle sens again");
+                    fsm_brake_calibration = 3;
+                }
+
+                break;
+
+            case 3:
+                if (brake_control_position(brake_idle_position, 1500) == 1)
+                {
+                    fsm_brake_calibration = 4;
+                }
+                break;
+            }
+
+            if (fsm_brake_calibration != 4)
+            {
+                int32_t output_velocity_brake_send = -output_velocity_brake;
+                (void)ec_SDOwrite(brake_slave_id, ADDRESS_CONTROL_WORD, 0x00, FALSE, sizeof(control_word), &control_word, EC_TIMEOUTRXM);
+                (void)ec_SDOread(brake_slave_id, ADDRESS_ACTUAL_TORQUE, 0x00, FALSE, &current_torque_brake_size, &current_torque_brake, EC_TIMEOUTRXM);
+                (void)ec_SDOwrite(brake_slave_id, ADDRESS_MODES_OF_OPERATION, 0x00, FALSE, sizeof(brake_mode), &brake_mode, EC_TIMEOUTRXM);
+                (void)ec_SDOwrite(brake_slave_id, ADDRESS_TARGET_VELOCITY, 0x00, FALSE, sizeof(output_velocity_brake), &output_velocity_brake_send, EC_TIMEOUTRXM);
+                (void)ec_SDOread(brake_slave_id, ADDRESS_CURRENT_POSITION, 0x00, FALSE, &current_brake_position_size, &current_brake_position, EC_TIMEOUTRXM);
+
+                int32_t diff_brake_position = current_brake_position - prev_brake_position;
+                if (diff_brake_position > 1000000 || diff_brake_position < -1000000)
+                {
+                    logger.error("Brake position error");
+                    diff_brake_position = 0;
+                }
+
+                local_brake_position += diff_brake_position;
+
+                prev_brake_position = current_brake_position;
+            }
+
             return 0;
         }
 
-        if (5216 == sword || 1088 == sword || 33 == sword)
+        if (33 == sword)
+        {
+            control_word = 7;
+        }
+        else if (35 == sword || 55 == sword)
+        {
+            control_word = 15;
+        }
+        else if (5216 == sword || 1088 == sword)
         {
             // if_brake_output->control_word = 0x06;
             control_word = 6;
             fsm_brake_driver = 1;
         }
-        else if (5153 == sword || 1057 == sword)
+        else if (5153 == sword || 1057 == sword || 4129 == sword)
         {
             // if_brake_output->control_word = 0x07;
             control_word = 7;
             fsm_brake_driver = 2;
         }
-        else if (5155 == sword || 1059 == sword)
+        else if (5155 == sword || 1059 == sword || 4131 == sword || 1079 == sword)
         {
             // if_brake_output->control_word = 0x0f;
             control_word = 15;
@@ -698,12 +874,13 @@ public:
         else
         {
             // if_brake_output->control_word = 0x06;
-            control_word = 6;
+            control_word = 7;
             fsm_brake_driver = 0;
         }
 
+        (void)ec_SDOwrite(brake_slave_id, ADDRESS_MODES_OF_OPERATION, 0x00, FALSE, sizeof(brake_mode), &brake_mode, EC_TIMEOUTRXM);
         (void)ec_SDOwrite(brake_slave_id, ADDRESS_CONTROL_WORD, 0x00, FALSE, sizeof(control_word), &control_word, EC_TIMEOUTRXM);
-        // logger.info("SWORD: %d CWORD: %d", status_word, control_word);
+        logger.info("SWORD: %d CWORD: %d", status_word, control_word);
 
         return 0;
     }
@@ -725,14 +902,11 @@ public:
         msg_analog_input.data.push_back((float)analog_input->data_8 * ANALOG_INPUT_SCALER);
         pub_analog_input->publish(msg_analog_input);
 
-        // std_msgs::msg::UInt8MultiArray msg_digital_input;
-        // msg_digital_input.data.push_back(digital_in->data & 0xFF);
-        // msg_digital_input.data.push_back((digital_in->data >> 8) & 0xFF);
-        // pub_digital_input->publish(msg_digital_input);
-
         std_msgs::msg::UInt8MultiArray msg_digital_input;
-        msg_digital_input.data.push_back(0);
-        msg_digital_input.data.push_back(0);
+        msg_digital_input.data.push_back(digital_in1->data & 0xFF);
+        msg_digital_input.data.push_back((digital_in1->data >> 8) & 0xFF);
+        msg_digital_input.data.push_back((digital_in2->data >> 0) & 0xFF);
+        msg_digital_input.data.push_back((digital_in2->data >> 8) & 0xFF);
         pub_digital_input->publish(msg_digital_input);
     }
 
@@ -816,22 +990,22 @@ public:
 
                 logger.info("%d slaves found and configured.", ec_slavecount);
 
-                for (uint8_t slave = 1; slave <= ec_slavecount; slave++)
-                {
-                    switch (ec_slave[slave].eep_id)
-                    {
-                    case JIAYU_ID:
-                        brake_slave_id = slave;
-                        logger.info("Brake Driver ID: %d", brake_slave_id);
-                        break;
-                    }
-                }
+                // for (uint8_t slave = 1; slave <= ec_slavecount; slave++)
+                // {
+                //     switch (ec_slave[slave].eep_id)
+                //     {
+                //     case JIAYU_ID:
+                //         brake_slave_id = slave;
+                //         logger.info("Brake Driver ID: %d", brake_slave_id);
+                //         break;
+                //     }
+                // }
 
-                if (brake_slave_id == 255)
-                {
-                    logger.warn("No slave found with brake driver ID");
-                    // return 4;
-                }
+                // if (brake_slave_id == 255)
+                // {
+                //     logger.warn("No slave found with brake driver ID");
+                //     // return 4;
+                // }
 
                 expectedWKC = (ec_group[0].outputsWKC * 2) + ec_group[0].inputsWKC;
                 logger.info("Calculated workcounter %d", expectedWKC);
@@ -856,11 +1030,11 @@ public:
                 }
 
                 // =============== CONFIGURE WATCHDOG ================
-                for (uint8_t slave = 1; slave <= ec_slavecount; slave++)
-                {
-                    logger.info("Setting watchdog for slave %d", slave);
-                    set_watchdog(slave, 100);
-                }
+                // for (uint8_t slave = 1; slave <= ec_slavecount; slave++)
+                // {
+                //     logger.info("Setting watchdog for slave %d", slave);
+                //     set_watchdog(slave, 100);
+                // }
                 // ===================================================
 
                 ec_config_map(&IOmap);
@@ -921,15 +1095,30 @@ public:
                         case JIAYU_ID:
                             // if_brake_input = (if_brake_input_t*)ec_slave[slave].inputs;
                             // if_brake_output = (if_brake_output_t*)ec_slave[slave].outputs;
-                            logger.info("JIAYU Found & Configured");
+                            brake_slave_id = slave; // SEMENTARA KARENA PERLU DIBENAHI SECARA MEKANIK REM NYA
+                            logger.info("Brake Driver ID: %d", brake_slave_id);
                             break;
 
                         case EL1889_ID:
-                            digital_in = (digital_in_t *)ec_slave[slave].inputs;
-                            logger.info("EL1889 Configured");
+                            if (slave == SLAVE_ID_DI_1)
+                            {
+                                digital_in1 = (digital_in_t *)ec_slave[slave].inputs;
+                                logger.info("EL1889(1) Configured on slave %d", slave);
+                            }
+                            else if (slave == SLAVE_ID_DI_2)
+                            {
+                                digital_in2 = (digital_in_t *)ec_slave[slave].inputs;
+                                logger.info("EL1889(2) Configured on slave %d", slave);
+                            }
                             break;
                         }
                     }
+                }
+
+                if (brake_slave_id == 255)
+                {
+                    logger.warn("No slave found with brake driver ID");
+                    // return 4;
                 }
 
                 return 0;

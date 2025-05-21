@@ -22,24 +22,36 @@ int main(int argc, char **argv)
 {
     rclcpp::init(argc, argv);
     auto node = std::make_shared<CameraPublisher>();
-    // rclcpp::spin(std::make_shared<CameraPublisher>());
 
+    // Create logger and redirect output
     auto logger = node->get_logger();
     auto buf = std::make_shared<LogRedirectBuffer>(logger);
     std::cout.rdbuf(buf.get());
     std::cerr.rdbuf(buf.get());
-    RCLCPP_INFO(logger, "hello world angstrong camera ros2 node");
+
+    RCLCPP_INFO(logger, "Hello world Angstrong Camera ROS2 Node");
 
     node->start();
-    rclcpp::WallRate loop_rate(25);
 
-    while (rclcpp::ok()) {
-        rclcpp::spin_some(node);
-        loop_rate.sleep();
+    // Create a MultiThreadedExecutor
+    rclcpp::executors::MultiThreadedExecutor executor;
+
+    // Add the node to the executor
+    executor.add_node(node);
+
+    // Set the loop rate (Optional: Multi-threaded executor won't strictly use loop_rate)
+    rclcpp::WallRate loop_rate(100);
+
+    // Run the executor
+    while (rclcpp::ok())
+    {
+        executor.spin_once(); // Spins one iteration in multiple threads
+        loop_rate.sleep();    // Maintain the loop rate
     }
+
     node->stop();
 
-    RCLCPP_INFO(logger, "angstrong camera ros2 node shutdown");
+    RCLCPP_INFO(logger, "Angstrong Camera ROS2 Node Shutdown");
 
     rclcpp::shutdown();
     return 0;

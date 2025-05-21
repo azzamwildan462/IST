@@ -34,8 +34,8 @@ print("ws_path: ", ws_path)
 print("path_config: ", path_config)
 
 def generate_launch_description():
-    SetEnvironmentVariable(name='RMW_IMPLEMENTATION', value='rmw_cyclonedds_cpp'),
-    SetEnvironmentVariable(name='CYCLONEDDS_URI', value='file://' + path_config + 'cyclonedds.xml'),
+    # SetEnvironmentVariable(name='RMW_IMPLEMENTATION', value='rmw_cyclonedds_cpp'),
+    # SetEnvironmentVariable(name='CYCLONEDDS_URI', value='file://' + path_config + 'cyclonedds.xml'),
 
     rosbridge_server = Node(
         package='rosbridge_server',
@@ -102,14 +102,66 @@ def generate_launch_description():
         ]
     )
 
-    hokuyo_lidar_driver = LifecycleNode(
+    hokuyo1_lidar_driver = LifecycleNode(
         package="urg_node2",
         executable="urg_node2_node",
-        name="urg_node2",
+        name="urg_node2_1",
         namespace='',
         parameters=[
             {
                 "ip_address": "192.168.0.10",
+                "frame_id": "lidar1_link",
+                "angle_min": -1.57,
+                "angle_max": 1.57,
+            },
+        ],
+        output="screen",
+        respawn=True,
+    )
+
+    # Unconfigure状態からInactive状態への遷移（auto_startがtrueのとき実施）
+    hokuyo1_lidar_configure = RegisterEventHandler(
+        event_handler=OnProcessStart(
+            target_action=hokuyo1_lidar_driver,
+            on_start=[
+                EmitEvent(
+                    event=ChangeState(
+                        lifecycle_node_matcher=matches_action(hokuyo1_lidar_driver),
+                        transition_id=Transition.TRANSITION_CONFIGURE,
+                    ),
+                ),
+            ],
+        ),
+        condition=IfCondition(LaunchConfiguration('auto_start')),
+    )
+
+    # Inactive状態からActive状態への遷移（auto_startがtrueのとき実施）
+    hokuyo1_lidar_activate = RegisterEventHandler(
+        event_handler=OnStateTransition(
+            target_lifecycle_node=hokuyo1_lidar_driver,
+            start_state='configuring',
+            goal_state='inactive',
+            entities=[
+                EmitEvent(
+                    event=ChangeState(
+                        lifecycle_node_matcher=matches_action(hokuyo1_lidar_driver),
+                        transition_id=Transition.TRANSITION_ACTIVATE,
+                    ),
+                ),
+            ],
+        ),
+        condition=IfCondition(LaunchConfiguration('auto_start')),
+    )
+
+
+    hokuyo2_lidar_driver = LifecycleNode(
+        package="urg_node2",
+        executable="urg_node2_node",
+        name="urg_node2_2",
+        namespace='lidar2',
+        parameters=[
+            {
+                "ip_address": "172.16.32.32",
                 "frame_id": "lidar2_link",
                 "angle_min": -1.57,
                 "angle_max": 1.57,
@@ -120,13 +172,13 @@ def generate_launch_description():
     )
 
     # Unconfigure状態からInactive状態への遷移（auto_startがtrueのとき実施）
-    urg_node2_node_configure_event_handler = RegisterEventHandler(
+    hokuyo2_lidar_configure = RegisterEventHandler(
         event_handler=OnProcessStart(
-            target_action=hokuyo_lidar_driver,
+            target_action=hokuyo2_lidar_driver,
             on_start=[
                 EmitEvent(
                     event=ChangeState(
-                        lifecycle_node_matcher=matches_action(hokuyo_lidar_driver),
+                        lifecycle_node_matcher=matches_action(hokuyo2_lidar_driver),
                         transition_id=Transition.TRANSITION_CONFIGURE,
                     ),
                 ),
@@ -136,21 +188,46 @@ def generate_launch_description():
     )
 
     # Inactive状態からActive状態への遷移（auto_startがtrueのとき実施）
-    urg_node2_node_activate_event_handler = RegisterEventHandler(
+    hokuyo2_lidar_activate = RegisterEventHandler(
         event_handler=OnStateTransition(
-            target_lifecycle_node=hokuyo_lidar_driver,
+            target_lifecycle_node=hokuyo2_lidar_driver,
             start_state='configuring',
             goal_state='inactive',
             entities=[
                 EmitEvent(
                     event=ChangeState(
-                        lifecycle_node_matcher=matches_action(hokuyo_lidar_driver),
+                        lifecycle_node_matcher=matches_action(hokuyo2_lidar_driver),
                         transition_id=Transition.TRANSITION_ACTIVATE,
                     ),
                 ),
             ],
         ),
         condition=IfCondition(LaunchConfiguration('auto_start')),
+    )
+
+    rs2_cam_main = Node(
+        package="realsense2_camera",
+        executable="realsense2_camera_node",
+        name="rs2_cam_main",
+        parameters=[
+            {
+                "camera_name": "camera",
+                "camera_namespace": "",
+                "enable_accel": False,
+                "enable_gyro": False,
+                "enable_depth": True,
+                "enable_color": True,
+                "enable_sync": True,
+                "unite_imu_method": 2,
+                "align_depth.enable": True,
+                "pointcloud.enable": False,
+                "initial_reset": False,
+                "rgb_camera.profile": "640x360x15",
+            }
+        ],
+        arguments=["--ros-args", "--log-level", "error"],
+        respawn=True,
+        prefix='nice -n -20 chrt -f 96',
     )
 
     rs2_cam_kiri = Node(
@@ -259,8 +336,35 @@ def generate_launch_description():
             "INFLUXDB_PASSWORD": "wildan462",
             "INFLUXDB_ORG": "awmawm",
             "INFLUXDB_BUCKET": "awmawm",
-            "ROBOT_NAME": "ist_1",
+            "ROBOT_NAME": "ist_1", 
         }],
+        output="screen",
+        respawn=True,
+    )
+
+    telemetry_icar = Node(
+        package="communication",
+        executable="telemetry.py",
+        name="telemetry_icar",
+        parameters=[{
+            "INFLUXDB_URL": "http://172.30.37.21:8086",
+            "INFLUXDB_USERNAME": "awm462",
+            "INFLUXDB_PASSWORD": "wildan462",
+            "INFLUXDB_ORG": "awmawm",
+            "INFLUXDB_BUCKET": "awmawm",
+            "ROBOT_NAME": "icar_omoda", 
+        }],
+        output="screen",
+        respawn=True,
+    )
+
+    wit_ros2_imu = Node(
+        package="communication",
+        executable="wit_ros2_imu.py",
+        name="wit_ros2_imu",
+        # remappings=[('/wit/imu', '/imu/data')],
+        # parameters=[{'port': '/dev/serial/by-id/usb-1a86_USB_Serial-if00-port0'},
+        #             {"baud": 9600}],
         output="screen",
         respawn=True,
     )
@@ -271,10 +375,20 @@ def generate_launch_description():
         name='master',
         output='screen',
         parameters=[{
-            "use_ekf_odometry": False
+            "use_ekf_odometry": True,
+            "offset_sudut_steering": -0.04,
+            "waypoint_file_path": os.path.join(path_config,"waypoint.csv"),
+            "terminal_file_path": os.path.join(path_config,"terminal.csv"),
+            "pid_terms": [0.0070, 0.000000, 0, 0.02, -1.4, 0.4, -0.0005, 0.0005],
+            "metode_following": 0,
+            "enable_obs_detection": True,
+            "timeout_terminal_1": 10.0,
+            "timeout_terminal_2": 10.0,
+            "wheelbase": 0.9,
+            "profile_max_velocity": 1.5,
         }],
         respawn=True,
-        prefix='nice -n -8'
+        prefix='nice -n -8 chrt -f 95'
     )
 
     pose_estimator = Node(
@@ -283,10 +397,18 @@ def generate_launch_description():
         name='pose_estimator',
         output='screen',
         parameters=[{
-            "encoder_to_meter" : 0.000013215227,
+            # "encoder_to_meter" : 0.000013215227,
+            # "encoder_to_meter" : 0.000013215227 * 7.1 / 7,
+            # "encoder_to_meter" : 0.0000123550127, # sama navis
+            # "encoder_to_meter" : 0.0000279741933,
+            "encoder_to_meter" : 0.0000282567609,
+            "offset_sudut_steering": -0.04,
+            "gyro_type": 0,
+            "timer_period": 40,
         }],
         respawn=True,
-        prefix='nice -n -9'
+        # remappings=[('/hardware/imu', '/can/imu')],
+        prefix='nice -n -9 chrt -f 80'
     )
 
     obstacle_filter = Node(
@@ -296,12 +418,17 @@ def generate_launch_description():
         output='screen',
         parameters=[{
             "lidar_frame_id": "lidar2_link",
-            "scan_yaw_start": -1.00, 
-            "scan_yaw_end": 1.00,
-            "scan_r_max": 2.00,
+            "scan_yaw_start": -0.5, 
+            "scan_yaw_end": 0.5,
+            "scan_r_max": 1.5,
             "publish_filtered_lidar": True,
             "lidar_topic": "/scan", 
-            "use_pointcloud2": False, # Untuk hokuyo atau witty
+            "use_pointcloud2": False, # Bernilai False Untuk hokuyo atau witty
+            "scan_box_x_min": 0.5,
+            "scan_box_y_min": -0.5,
+            "scan_box_x_max": 2.5,
+            "scan_box_y_max": 0.5,
+            "use_scan_box": False,
         }],
         respawn=True,
         prefix='nice -n -8'
@@ -314,8 +441,9 @@ def generate_launch_description():
         output='screen',
         parameters=[{
             "if_name": "enp5s0",
-            "po2so_config": 4,
-            "dac_velocity_maximum": 3.0
+            # "if_name": "enxf8e43b8f7f88",
+            "po2so_config": 0,
+            "dac_velocity_maximum": 4.0,
         }],
         respawn=True,
         prefix='nice -n -20 chrt -f 99'
@@ -330,6 +458,21 @@ def generate_launch_description():
             "if_name": "/dev/serial/by-id/usb-STMicroelectronics_STM32_Virtual_ComPort_203631654D4D-if00",
             "use_socket_can": False,
         }],
+        remappings=[('/can/imu', '/hardware/imu')],
+        respawn=True,
+        prefix='nice -n -20 chrt -f 98'
+    )
+
+    CANbus_HAL_socket_can = Node(
+        package='hardware',
+        executable='CANbus_HAL',
+        name='CANbus_HAL',
+        output='screen',
+        parameters=[{
+            "if_name": "can0",
+            "bitrate": 125000,
+            "use_socket_can": True,
+        }],
         respawn=True,
         prefix='nice -n -20 chrt -f 98'
     )
@@ -342,9 +485,15 @@ def generate_launch_description():
         output="screen",
         parameters=[{
             "port": "/dev/imu_usb",
+            "port": "/dev/serial/by-id/usb-1a86_USB_Serial-if00-port0",
+            "use_boost": False,
+
+            "is_riontech": True, 
+            "baudrate": 115200,
+            "port": "/dev/serial/by-id/usb-FTDI_FT232R_USB_UART_A10KUSZ2-if00-port0"
         }],
         respawn=True,
-        prefix='nice -n -20 chrt -f 90'
+        # prefix='nice -n -20 chrt -f 90'
     )
 
     keyboard_input = Node(
@@ -361,6 +510,11 @@ def generate_launch_description():
         executable='vision_capture',
         name='vision_capture',
         output='screen',
+        parameters=[{
+            # "camera_path": "/dev/v4l/by-id/usb-046d_罗技高清网络摄像机_C930c-video-index0",
+            "camera_path": "/dev/v4l/by-id/usb-Chicony_Electronics_Co._Ltd._HD_User_Facing_0001-video-index0",
+            "hardcoded_image": os.path.join(ws_path,"src/vision/assets/coba_kam.png")
+        }],
         respawn=True,
         prefix='nice -n -8'
     )
@@ -370,16 +524,53 @@ def generate_launch_description():
         executable='lane_detection',
         name='lane_detection',
         output='screen',
+        namespace='lane',
         parameters=[{
-            "low_h": 27,
-            "high_h": 255,
-            "low_l": 153,
-            "high_l": 255,
-            "low_s": 0,
-            "high_s": 255,
-            "gray_threshold": 200,
             "use_dynamic_config": True,
-            "config_path": os.path.join(path_config,"dynamic_conf.yaml")
+            "config_path": os.path.join(path_config,"dynamic_conf.yaml"),
+            "use_frame_bgr": True,
+            "absolute_image_topic": "/ascamera_multi/ascamera_multi/rgb0/image",
+            # "absolute_image_topic": "/image_bgr",
+            "lookahead_distance_y": 15,
+            "erode_size": 5,
+            "dilate_size": 5,
+            "morph_close_size": 5,
+            "jarak_minimal": 100,
+            "jarak_maksimal": 400,
+            "pangkal_x": 320,
+            "pangkal_y": 480,
+            "batas_x_kiri_scan": 3,
+            "batas_x_kanan_scan": 637,
+            "minimum_contour_area": 2000,
+            "deadzone_kanan_kiri_thr": 0.8,
+            # "video_path": os.path.join(ws_path,"src/ros2_utils/video/raw"),
+            "video_path": "",
+        }
+        ],
+        respawn=True,
+        prefix='nice -n -8'
+    )
+
+    aruco_detection = Node(
+        package='vision',
+        executable='single_detection',
+        name='aruco_detection',
+        output='screen',
+        namespace='aruco_detection',
+        parameters=[{
+            "use_dynamic_config": True,
+            "config_path": os.path.join(path_config,"dynamic_conf.yaml"),
+            "setpoint_x": 450,
+            "setpoint_y": 240,
+            "detect_aruco": True,
+            "use_frame_bgr": True,
+            "aruco_dictionary_type": "DICT_4X4_50",
+            "min_aruco_range": 200.0,
+            "aruco_in_counter_threshold": 30,
+            "aruco_out_counter_threshold": 20,
+            # "absolute_image_topic": "/cam_kanan/image_bgr",
+            # "absolute_image_topic": "/image_bgr",
+            "absolute_image_topic": "/ascamera_multi/ascamera_multi/rgb0/image",
         }
         ],
         respawn=True,
@@ -398,14 +589,14 @@ def generate_launch_description():
             {"usb_path": "2"},
             {"confiPath": os.path.join(ws_path,"src/ascamera/configurationfiles")},
             {"color_pcl": False},
-            {"pub_tfTree": True},
+            {"pub_tfTree": False},
             {"depth_width": 640},
             {"depth_height": 480},
             {"rgb_width": 640},
             {"rgb_height": 480},
             {"fps": 25},
         ],
-        # remappings=[("/ascamera_kiri/ascamera_kiri/rgb0/image", "/cam_kiri/image_bgr")],
+        prefix='nice -n -8 chrt -f 97' 
     )
 
     ascamera_kanan = Node(
@@ -420,14 +611,36 @@ def generate_launch_description():
             {"usb_path": "4"},
             {"confiPath": os.path.join(ws_path,"src/ascamera/configurationfiles")},
             {"color_pcl": False},
-            {"pub_tfTree": True},
+            {"pub_tfTree": False},
             {"depth_width": 640},
             {"depth_height": 480},
             {"rgb_width": 640},
             {"rgb_height": 480},
             {"fps": 25},
         ],
-        # remappings=[("/ascamera_kanan/ascamera_kanan/rgb1/image", "/cam_kanan/image_bgr")],
+        prefix='nice -n -8 chrt -f 97' 
+    )
+
+    ascamera_multi = Node(
+        namespace= "ascamera_multi",
+        package='ascamera',
+        executable='ascamera_node',
+        name='ascamera_multi',
+        respawn=True,
+        output='screen',
+        parameters=[
+            {"usb_bus_no": -1},
+            {"usb_path": "null"},
+            {"confiPath": os.path.join(ws_path,"src/ascamera/configurationfiles")},
+            {"color_pcl": False},
+            {"pub_tfTree": False},
+            {"depth_width": 640},
+            {"depth_height": 480},
+            {"rgb_width": 640},
+            {"rgb_height": 480},
+            {"fps": 30},
+        ],
+        prefix='nice -n -20' 
     )
     
 
@@ -438,8 +651,9 @@ def generate_launch_description():
         output='screen',
         namespace='cam_kanan',
         parameters=[{
-            "camera_path": "/dev/v4l/by-id/usb-046d_C922_Pro_Stream_Webcam_70F3B3DF-video-index0",
-            "hardcoded_image": os.path.join(ws_path,"src/vision/assets/cam_kanan.jpeg")
+            # "camera_path": "/dev/v4l/by-id/usb-046d_罗技高清网络摄像机_C930c-video-index0",
+            "camera_path": "/dev/v4l/by-id/usb-046d_HD_Pro_Webcam_C920_B72C07EF-video-index0",
+            # "hardcoded_image": os.path.join(ws_path,"src/vision/assets/cam_kanan.jpeg")
         }],
         respawn=True,
         prefix='nice -n -8'
@@ -454,20 +668,29 @@ def generate_launch_description():
         parameters=[{
             "use_dynamic_config": True,
             "config_path": os.path.join(path_config,"dynamic_conf.yaml"),
-            "point_to_velocity_ratio": 0.003,
-            "point_to_velocity_angle_threshold": 0.56,
-            "metode_perhitungan": 1,
-            "setpoint_x": 420,
-            "setpoint_y": 240,
+            "point_to_velocity_ratio": 0.002,
+            "point_to_velocity_angle_threshold": 0.3,
+            "metode_perhitungan": 3,
+            "setpoint_x": 260,
+            "setpoint_y": 165,
             "camera_namespace": "cam_kanan",
-            "right_to_left_scan": False,
-            "absolute_image_topic": "/ascamera_kanan/ascamera_kanan/rgb0/image",
-            "erode_size": 5,
+            "right_to_left_scan": True, # Awal false, pindah kamera aku ganti jadi true
+            # "absolute_image_topic": "/cam_kanan/image_bgr",
+            "absolute_image_topic": "/ascamera_multi/ascamera_multi/rgb0/image",
+            # "absolute_image_topic": "/ascamera_kanan/ascamera_kanan/rgb0/image",
+            "erode_size": 3,
             "dilate_size": 5,
+            "debug_mode": False, 
+            "rotation_angle": 0.75,
+            "maximum_error_jarak_setpoint": 600.0,
+            "pid_terms": [1.0, 0.000000, 0, 0.02, -0.1, 0.1, -0.0005, 0.0005],
+            "pangkal_x": 500,
+            "pangkal_y": 300,
+            "video_path": os.path.join(ws_path,"src/vision/assets/cam_kanan.mp4"),
         }
         ],
         respawn=True,
-        prefix='nice -n -8'
+        prefix='nice -n -19 chrt -f 94'
     )
 
     aruco_detection_kanan = Node(
@@ -488,7 +711,9 @@ def generate_launch_description():
             "aruco_in_counter_threshold": 30,
             "aruco_out_counter_threshold": 20,
             "camera_namespace": "cam_kanan",
-            "absolute_image_topic": "/ascamera_kanan/ascamera_kanan/rgb0/image",
+            # "absolute_image_topic": "/cam_kanan/image_bgr",
+            "absolute_image_topic": "/ascamera_multi/ascamera_multi/rgb0/image",
+            # "absolute_image_topic": "/ascamera_kanan/ascamera_kanan/rgb0/image",
         }
         ],
         respawn=True,
@@ -502,8 +727,9 @@ def generate_launch_description():
         output='screen',
         namespace='cam_kiri',
         parameters=[{
-            "camera_path": "/dev/v4l/by-id/usb-046d_C922_Pro_Stream_Webcam_70F3B3DF-video-index0",
-            "hardcoded_image": os.path.join(ws_path,"src/vision/assets/cam_kiri.jpeg")
+            # "camera_path": "/dev/v4l/by-id/usb-046d_HD_Pro_Webcam_C920_B72C07EF-video-index0",
+            "camera_path": "/dev/v4l/by-id/usb-046d_罗技高清网络摄像机_C930c-video-index0",
+            # "hardcoded_image": os.path.join(ws_path,"src/vision/assets/cam_kiri.jpeg")
         }],
         respawn=True,
         prefix='nice -n -8'
@@ -518,20 +744,28 @@ def generate_launch_description():
         parameters=[{
             "use_dynamic_config": True,
             "config_path": os.path.join(path_config,"dynamic_conf.yaml"),
-            "point_to_velocity_ratio": 0.005,
-            "point_to_velocity_angle_threshold": 0.6,
-            "metode_perhitungan": 1,
-            "setpoint_x": 160,
-            "setpoint_y": 240,
+            "point_to_velocity_ratio": 0.002,
+            "point_to_velocity_angle_threshold": 0.3,
+            "metode_perhitungan": 3,
+            "setpoint_x": 495,
+            "setpoint_y": 125,
             "camera_namespace": "cam_kiri",
-            "right_to_left_scan": True,
-            "absolute_image_topic": "/ascamera_kiri/ascamera_kiri/rgb0/image",
+            "right_to_left_scan": False,
+            # "absolute_image_topic": "/cam_kiri/image_bgr",
+            "absolute_image_topic": "/ascamera_multi/ascamera_multi/rgb1/image",
+            # "absolute_image_topic": "/ascamera_kiri/ascamera_kiri/rgb0/image",
             "erode_size": 5,
             "dilate_size": 5,
+            "debug_mode": False, 
+            "rotation_angle": -0.7,
+            "maximum_error_jarak_setpoint": 600.0,
+            "pid_terms": [1.0, 0.000000, 0, 0.02, -0.1, 0.1, -0.0005, 0.0005],
+            "pangkal_x": 100,
+            "pangkal_y": 300,
         }
         ],
         respawn=True,
-        prefix='nice -n -8'
+        prefix='nice -n -19 chrt -f 94' 
     )
 
     aruco_detection_kiri = Node(
@@ -552,7 +786,9 @@ def generate_launch_description():
             "aruco_in_counter_threshold": 30,
             "aruco_out_counter_threshold": 20,
             "camera_namespace": "cam_kiri",
-            "absolute_image_topic": "/ascamera_kiri/ascamera_kiri/rgb0/image",
+            # "absolute_image_topic": "/cam_kiri/image_bgr",
+            "absolute_image_topic": "/ascamera_multi/ascamera_multi/rgb1/image",
+            # "absolute_image_topic": "/ascamera_kiri/ascamera_kiri/rgb0/image",
         }
         ],
         respawn=True,
@@ -577,7 +813,7 @@ def generate_launch_description():
         executable="static_transform_publisher",
         name="tf_base_link_to_lidar1_link",
         # fmt: off
-        arguments=["0.20","0.00","0.35","0.00","0.00","0.00","base_link","lidar1_link",
+        arguments=["1.378","0.00","0.22","0.00","0.00","3.1415","base_link","lidar1_link",
             "--ros-args","--log-level","error",],
         # fmt: on
         respawn=True,
@@ -588,7 +824,7 @@ def generate_launch_description():
         executable="static_transform_publisher",
         name="tf_base_link_to_lidar2_link",
         # fmt: off
-        arguments=["0.20","0.00","0.35","0.00","0.00","0.00","base_link","lidar2_link",
+        arguments=["-0.2","0.00","0.8","0.00","0.00","0.00","base_link","lidar2_link",
             "--ros-args","--log-level","error",],
         # fmt: on
         respawn=True,
@@ -599,7 +835,18 @@ def generate_launch_description():
         executable="static_transform_publisher",
         name="tf_base_link_to_imu_link",
         # fmt: off
-        arguments=["0.50","0.00","0.55","0.00","0.00","0.00","base_link","imu_link",
+        arguments=["0.00","0.00","0.00","0.00","0.00","0.00","base_link","imu_link",
+            "--ros-args","--log-level","error",],
+        # fmt: on
+        respawn=True,
+    )
+
+    tf_base_link_to_camera_link = Node(
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        name="tf_base_link_to_camera_link",
+        # fmt: off
+        arguments=["1.428","0.00","0.97","0.00","0.06","0.00","base_link","camera_link",
             "--ros-args","--log-level","error",],
         # fmt: on
         respawn=True,
@@ -618,83 +865,109 @@ def generate_launch_description():
 
     # =============================================================================
 
-    rtabmap_slam_rtabmap = Node(
+    rtabmap_slam_rtabmap3 = Node(
         package="rtabmap_slam",
         executable="rtabmap",
         name="rtabmap",
         namespace="slam",
         parameters=[
             {
-                "subscribe_depth": False,
-                "subscribe_scan": False,
-                "subscribe_scan_cloud": True,
+                "frame_id": "base_link",
+                "map_frame_id": "map",
+                "odom_frame_id": "odom",
+                "subscribe_depth": True,
+                "subscribe_scan": True,
+                "subscribe_scan_cloud": False,
                 "subscribe_stereo": False,
                 "subscribe_rgbd": False,
                 "subscribe_rgb": False,
                 "subscribe_Odometry": True,
-                # "scan_cloud_topic": "/fused_pointcloud", # The topic for the fused point cloud
+                'scan_max_range': 50.0,  # LiDAR max range (meters)
+                'scan_voxel_size': 0.05,  # Downsampling resolution (meters)
+                "qos_scan": 1,
+                "wait_for_transform": 2.0,
+
+                "odom_tf_linear_variance": 0.0001,
+                "odom_tf_angular_variance": 0.0001,
+                # "odom_tf_linear_variance": 0.0000000001,
+                # "odom_tf_angular_variance": 0.0000000001,
+                "publish_tf": False,
+                "publish_map": True,
+                "subscribe_scan": True,
+                "subscribe_scan_cloud": False,
+                "subscribe_stereo": False,
+                "subscribe_rgbd": False,
                 "frame_id": "base_link",
                 "map_frame_id": "map",
                 "odom_frame_id": "odom",
                 "odom_tf_linear_variance": 0.01,
                 "odom_tf_angular_variance": 0.01,
                 "publish_tf": False,
-                "publish_map": True,
-                "approx_sync": True,
-                # "publish_tf_map_odom": True,
+                # "approx_sync": True,
                 "Grid/CellSize": "0.025",  # Added by Pandu
                 "Grid/FootprintHeight": "1.5",  # Added by Pandu
                 "Grid/FootprintLength": "0.5",  # Added by Pandu
                 "Grid/FootprintWidth": "0.5",  # Added by Pandu
                 "Grid/FromDepth": "False",  # Added from documentation
-                "Grid/Sensor": "0",  # Added to suppress warning
+                "Grid/Sensor": "2",  # Added to suppress warning
                 "Icp/MaxCorrespondenceDistance": "0.1",  # Added from documentation
                 "Icp/VoxelSize": "0.05",  # Added from documentation
                 "Mem/IncrementalMemory": "False",  # Added by Pandu
-                "RGBD/AngularUpdate": "0.01",  # Added from documentation
+                "RGBD/AngularUpdate": "0.01",  # Added from documentation # 0.01
                 "RGBD/LinearUpdate": "0.01",  # Added from documentation
                 "RGBD/NeighborLinkRefining": "True",  # Added from documentation
-                "RGBD/OptimizeFromGraphEnd": "False",  # Added from documentation
+                "RGBD/OptimizeFromGraphEnd": "False",  # Added from documentation # False
                 "RGBD/ProximityBySpace": "True",  # Added from documentation
                 "RGBD/ProximityPathMaxNeighbors": "10",  # Added to suppress warning
+                # "Vis/MinInliers": "10",  # Baru
                 "Reg/Force3DoF": "true",  # Added from documentation
                 "Reg/Strategy": "1",  # Added from documentation
-                "use_sim_time": True,
+
+                "use_sim_time": False,
+                "Threads": 10, # Added by Azzam
             }
         ],
         remappings=[
-            ("scan_cloud", "/lidar1/livox/lidar"),
+            ("scan", "/scan"),
+            ('rgb/image', '/camera/rs2_cam_main/color/image_raw'),
+            ('rgb/camera_info', '/camera/rs2_cam_main/color/camera_info'),
+            ('depth/image', '/camera/rs2_cam_main/aligned_depth_to_color/image_raw')
         ],
         arguments=["--ros-args", "--log-level", "warn"],
-        prefix='nice -n -9',
+        # prefix='nice -n -9 chrt -f 90',
         respawn=True,
     )
 
-    rtabmap_viz_rtabmap_viz = Node(
-        package="rtabmap_viz",
-        executable="rtabmap_viz",
-        name="rtabmap_viz",
+    cartographer_node = Node(
+        package='cartographer_ros',
+        executable='cartographer_node',
+        name='cartographer_node',
         namespace="slam",
-        parameters=[
-            {
-                "subscribe_depth": False,
-                "subscribe_scan": False,
-                "subscribe_scan_cloud": True,
-                "subscribe_stereo": False,
-                "subscribe_rgbd": False,
-                "subscribe_rgb": False,
-                "subscribe_Odometry": True,
-                "frame_id": "base_link",
-                "odom_frame_id": "odom",
-                "approx_sync": True,
-                "use_sim_time": True,
-            }
-        ],
-        remappings=[
-            ("scan_cloud", "/lidar1/livox/lidar"),
-        ],
-        arguments=["--ros-args", "--log-level", "warn"],
-        respawn=False,
+        output='screen',
+        remappings=[('scan', '/scan'),('odom', '/odom')],
+        respawn=True,
+        arguments=['-configuration_directory', path_config, '-configuration_basename', 'cartographer_config.lua', '-load_state_filename', '/home/ist/test_map/garasi_icar.pbstream', '-load_frozen_state', 'true']
+    )
+
+    cartographer_mapping = Node(
+        package='cartographer_ros',
+        executable='cartographer_node',
+        name='cartographer_node',
+        namespace="slam",
+        output='screen',
+        remappings=[('scan', '/scan'),('odom', '/odom')],
+        respawn=True,
+        arguments=['-configuration_directory', path_config, '-configuration_basename', 'cartographer_config.lua']
+    )
+
+    cartographer_grid_node = Node(
+        package='cartographer_ros',
+        executable='cartographer_occupancy_grid_node',
+        name='occupancy_grid_node',
+        namespace="slam",
+        output='screen',
+        respawn=True,
+        arguments=['-resolution', '0.05']
     )
 
     ekf_node = Node(
@@ -712,7 +985,8 @@ def generate_launch_description():
                 "two_d_mode": True,
                 "smooth_lagged_data": True,
                 "history_length": 1.0,
-                "frequency": 10.0,
+                "frequency": 25.0,
+
                 "odom0": "/odom",
                 # fmt: off
                 "odom0_config": [
@@ -726,7 +1000,8 @@ def generate_launch_description():
                 "odom0_differential": True,
                 "odom0_relative": True,
 
-                "pose0": "localization_pose",
+                "pose0": "localization_pose", # Ini untuk rtabmap
+                # "pose0": "tracked_pose", # Ini untuk cartographer
                 # fmt: off
                 "pose0_config":[
                     True,True,False,
@@ -745,49 +1020,74 @@ def generate_launch_description():
         respawn=True,
     )
 
+    # return LaunchDescription(
+    #     [
+    #         # DeclareLaunchArgument('auto_start', default_value='true'),
+    #         # hokuyo1_lidar_driver,
+    #         # hokuyo1_lidar_configure,
+    #         # hokuyo1_lidar_activate,
+    #         # hokuyo2_lidar_driver,
+    #         # hokuyo2_lidar_configure,
+    #         # hokuyo2_lidar_activate,
+    #         beckhoff,
+    #         # CANbus_HAL,
+    #     ]
+    # )
+
+    # ==============================================================================
+
     return LaunchDescription(
         [
-            ascamera_kiri,
-            ascamera_kanan,
-            # rs2_cam_kiri,
-            # rs2_cam_kanan,
-            # vision_capture_kanan,
-            # vision_capture_kiri,
+            # ascamera_multi,
 
-            lane_detection_kanan,
-            aruco_detection_kanan,
-            lane_detection_kiri,
-            aruco_detection_kiri,
+            # TimerAction(
+            #     period=8.0,
+            #     actions=[
+            #         lane_detection,
+            #         aruco_detection,
+            #     ],
+            # ),
 
             # =============================================================================
 
             pose_estimator,
-            tf_map_empty,
+            tf_base_link_to_lidar2_link,
             tf_base_link_to_body_link,
             tf_base_link_to_lidar1_link,
-            tf_base_link_to_lidar2_link,
             tf_base_link_to_imu_link,
+            tf_base_link_to_camera_link,
+
+            # # =============================================================================
+
+            rs2_cam_main,
             
-            # =============================================================================
+            # # =============================================================================
 
-            # witty_lidar,
-
-            # DeclareLaunchArgument('auto_start', default_value='true'),
-            # hokuyo_lidar_driver,
-            # urg_node2_node_configure_event_handler,
-            # urg_node2_node_activate_event_handler,
-
-            # livox_lidar_driver,
+            DeclareLaunchArgument('auto_start', default_value='true'),
+            hokuyo1_lidar_driver,
+            hokuyo1_lidar_configure,
+            hokuyo1_lidar_activate,
+            hokuyo2_lidar_driver,
+            hokuyo2_lidar_configure,
+            hokuyo2_lidar_activate,
 
             # obstacle_filter,
 
-            # =============================================================================
+            # # =============================================================================
 
-            imu_serial,
+            # TimerAction(
+            #     period=1.0,
+            #     actions=[
+            #         # wit_ros2_imu,
+            #         # imu_serial,
+            #     ],
+            # ),
+
             beckhoff,
             CANbus_HAL,
+            # CANbus_HAL_socket_can, # Untuk PC tanpa embedded CAN
 
-            # =============================================================================
+            # # =============================================================================
 
             rosapi_node,
             rosbridge_server, 
@@ -795,27 +1095,16 @@ def generate_launch_description():
             master,
             ui_server,
 
-            # =============================================================================
-
-            # joy_node,
-            # keyboard_input,
-
-            # =============================================================================
-
-            # telemetry,
-
-            # =============================================================================
+            # # =============================================================================
             
+            TimerAction(
+                period=0.5,
+                actions=[
+                    rtabmap_slam_rtabmap3,
+                    ekf_node,
+                ],
+            ),
+
             # rviz2,
-            # vision_capture,
-            # lane_detection,
-            # TimerAction(
-            #     period=4.0,
-            #     actions=[
-            #         rtabmap_slam_rtabmap,
-            #         # rtabmap_viz_rtabmap_viz,
-            #         ekf_node,
-            #     ],
-            # ),
         ]
     )

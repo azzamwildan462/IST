@@ -25,6 +25,8 @@ public:
     rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr sub_gyro;
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr sub_pose_offset;
     rclcpp::Subscription<std_msgs::msg::UInt8>::SharedPtr sub_fb_transmission;
+    rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr sub_CAN_eps_encoder;
+    rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr sub_odometry_filtered;
 
     //----TransformBroadcaster
     std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster;
@@ -34,6 +36,7 @@ public:
     // Configs (static)
     // =======================================================
     float encoder_to_meter = 1.0;
+    int timer_period = 20; // ms
 
     uint16_t encoder[2] = {0, 0};
     uint16_t prev_encoder[2] = {0, 0};
@@ -51,8 +54,25 @@ public:
 
     uint8_t fb_transmission = 0;
 
+    float steering_position = 0;
+    float offset_sudut_steering = 0;
+    float d_gyro_steering = 0;
+    float wheelbase = 1.00;
+
+    int gyro_type = 0;
+
+    float pose_filtered[3] = {0, 0, 0};
+
+    float imu_z_velocity = 0;
+
+    float delta_theta_filtered = 0;  // error theta sekarang terhadap filtered
+    float delta_vTheta_filtered = 0; // error theta sekarang terhadap filtered
+
+    bool is_gyro_recvd = false;
+
+    //=======================================================
     // Vars
-    // =======================================================
+    // =========================================================
     int16_t error_code = 0;
 
     PoseEstimator()
@@ -60,6 +80,18 @@ public:
     {
         this->declare_parameter("encoder_to_meter", 1.0);
         this->get_parameter("encoder_to_meter", encoder_to_meter);
+
+        this->declare_parameter("offset_sudut_steering", 0.0);
+        this->get_parameter("offset_sudut_steering", offset_sudut_steering);
+
+        this->declare_parameter("gyro_type", 0);
+        this->get_parameter("gyro_type", gyro_type);
+
+        this->declare_parameter("wheelbase", 1.0);
+        this->get_parameter("wheelbase", wheelbase);
+
+        this->declare_parameter("timer_period", 20);
+        this->get_parameter("timer_period", timer_period);
 
         if (!logger.init())
         {
@@ -70,7 +102,7 @@ public:
         tf_broadcaster = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
 
         //----Timer
-        tim_50hz = this->create_wall_timer(std::chrono::milliseconds(20), std::bind(&PoseEstimator::callback_tim_50hz, this));
+        tim_50hz = this->create_wall_timer(std::chrono::milliseconds(timer_period), std::bind(&PoseEstimator::callback_tim_50hz, this));
 
         //----Publisher
         pub_odom = this->create_publisher<nav_msgs::msg::Odometry>("odom", 10);
@@ -85,8 +117,43 @@ public:
             "/master/pose_offset", 1, std::bind(&PoseEstimator::callback_sub_pose_offset, this, std::placeholders::_1));
         sub_fb_transmission = this->create_subscription<std_msgs::msg::UInt8>(
             "/can/fb_transmission", 1, std::bind(&PoseEstimator::callback_sub_fb_transmission, this, std::placeholders::_1));
+        sub_odometry_filtered = this->create_subscription<nav_msgs::msg::Odometry>(
+            "/slam/odometry/filtered", 1, std::bind(&PoseEstimator::callback_sub_odom_filtered, this, std::placeholders::_1));
 
         logger.info("PoseEstimator initialized");
+    }
+
+    void callback_sub_odom_filtered(const nav_msgs::msg::Odometry::SharedPtr msg)
+    {
+        pose_filtered[0] = msg->pose.pose.position.x;
+        pose_filtered[1] = msg->pose.pose.position.y;
+
+        // get_angle from quartenion
+        tf2::Quaternion q(msg->pose.pose.orientation.x, msg->pose.pose.orientation.y, msg->pose.pose.orientation.z, msg->pose.pose.orientation.w);
+        tf2::Matrix3x3 m(q);
+        double roll, pitch, yaw;
+        m.getRPY(roll, pitch, yaw);
+
+        pose_filtered[2] = yaw;
+        delta_theta_filtered = pose_filtered[2] - final_pose_xyo[2];
+
+        while (delta_theta_filtered > M_PI)
+            delta_theta_filtered -= 2 * M_PI;
+        while (delta_theta_filtered < -M_PI)
+            delta_theta_filtered += 2 * M_PI;
+
+        float v_yaw = msg->twist.twist.angular.z;
+        delta_vTheta_filtered = v_yaw - final_vel_dxdydo[2];
+
+        while (delta_vTheta_filtered > M_PI)
+            delta_vTheta_filtered -= 2 * M_PI;
+        while (delta_vTheta_filtered < -M_PI)
+            delta_vTheta_filtered += 2 * M_PI;
+    }
+
+    void callback_sub_CAN_eps_encoder(const std_msgs::msg::Float32::SharedPtr msg)
+    {
+        steering_position = msg->data + offset_sudut_steering;
     }
 
     void callback_sub_fb_transmission(const std_msgs::msg::UInt8::SharedPtr msg)
@@ -116,9 +183,9 @@ public:
         std_msgs::msg::Float32 msg_encoder_meter;
 
         if (fb_transmission == 5)
-            msg_encoder_meter.data = (sensor_left_encoder + sensor_right_encoder) / 2.0 * encoder_to_meter * 50 * -1;
+            msg_encoder_meter.data = (sensor_left_encoder + sensor_right_encoder) / 2.0 * encoder_to_meter * 25 * -1;
         else
-            msg_encoder_meter.data = (sensor_left_encoder + sensor_right_encoder) / 2.0 * encoder_to_meter * 50;
+            msg_encoder_meter.data = (sensor_left_encoder + sensor_right_encoder) / 2.0 * encoder_to_meter * 25;
 
         pub_encoder_meter->publish(msg_encoder_meter);
     }
@@ -137,7 +204,7 @@ public:
         //     return;
         // }
 
-        static const float dt = 0.02;
+        static const float dt = 0.04;
 
         current_time = rclcpp::Clock(RCL_SYSTEM_TIME).now();
 
@@ -150,7 +217,7 @@ public:
 
         rclcpp::Duration dt_gyro = current_time - last_time_gyro_update;
         static rclcpp::Duration prev_dt_gyro = dt_gyro;
-        if ((prev_dt_gyro.seconds() > 0.12 && dt_gyro.seconds() <= 0.12) || fabs(d_gyro) > 7.28)
+        if ((prev_dt_gyro.seconds() > 0.5 && dt_gyro.seconds() <= 0.5) || !is_gyro_recvd)
         {
             logger.warn("Gyro restarted");
             d_gyro = 0;
@@ -165,14 +232,22 @@ public:
         while (d_gyro < -M_PI)
             d_gyro += 2 * M_PI;
 
+        d_gyro_steering = (sensor_left_encoder + sensor_right_encoder) / 2.0 * encoder_to_meter * tanf(steering_position) / wheelbase;
+
         final_vel_dxdydo[0] = (sensor_left_encoder + sensor_right_encoder) / 2.0 * cosf(final_pose_xyo[2]) * encoder_to_meter / dt;
         final_vel_dxdydo[1] = (sensor_left_encoder + sensor_right_encoder) / 2.0 * sinf(final_pose_xyo[2]) * encoder_to_meter / dt;
-        final_vel_dxdydo[2] = d_gyro;
+
+        if (gyro_type == 0)
+            final_vel_dxdydo[2] = d_gyro;
+        else if (gyro_type == 1)
+            final_vel_dxdydo[2] = d_gyro_steering;
 
         while (final_vel_dxdydo[2] > M_PI)
             final_vel_dxdydo[2] -= 2 * M_PI;
         while (final_vel_dxdydo[2] < -M_PI)
             final_vel_dxdydo[2] += 2 * M_PI;
+
+        // final_vel_dxdydo[2] = imu_z_velocity;
 
         final_pose_xyo[0] += final_vel_dxdydo[0] * dt;
         final_pose_xyo[1] += final_vel_dxdydo[1] * dt;
@@ -182,6 +257,17 @@ public:
             final_pose_xyo[2] -= 2 * M_PI;
         while (final_pose_xyo[2] < -M_PI)
             final_pose_xyo[2] += 2 * M_PI;
+
+        // final_pose_xyo[2] = final_pose_xyo[2] * 0.2 + (final_pose_xyo[2] + delta_theta_filtered) * 0.8;
+
+        // while (final_pose_xyo[2] > M_PI)
+        //     final_pose_xyo[2] -= 2 * M_PI;
+        // while (final_pose_xyo[2] < -M_PI)
+        //     final_pose_xyo[2] += 2 * M_PI;
+
+        // logger.info("%f %f %f %f", final_vel_dxdydo[2], d_gyro, final_pose_xyo[2], gyro);
+
+        // logger.info("zz: %.2f", final_pose_xyo[2] * 180 / M_PI);
 
         tf2::Quaternion q;
         q.setRPY(0, 0, final_pose_xyo[2]);
@@ -204,7 +290,7 @@ public:
         msg_odom.pose.covariance[35] = 1e-2;
         msg_odom.twist.twist.linear.x = final_vel_dxdydo[0];
         msg_odom.twist.twist.linear.y = final_vel_dxdydo[1];
-        msg_odom.twist.twist.angular.z = final_vel_dxdydo[2];
+        msg_odom.twist.twist.angular.z = final_vel_dxdydo[2] / dt;
         msg_odom.twist.covariance[0] = 1e-2;
         msg_odom.twist.covariance[7] = 1e-2;
         msg_odom.twist.covariance[14] = 1e6;
@@ -238,8 +324,19 @@ public:
         double roll, pitch, yaw;
         m.getRPY(roll, pitch, yaw);
 
+        imu_z_velocity = msg->angular_velocity.z;
+
+        // logger.info("%.2f %.2f %.2f %f %f %f", roll, pitch, yaw, msg->angular_velocity.x, msg->angular_velocity.y, msg->angular_velocity.z);
+
         gyro = yaw;
         last_time_gyro_update = rclcpp::Clock(RCL_SYSTEM_TIME).now();
+
+        static uint16_t cntr_awal_recvd = 0;
+        if (cntr_awal_recvd++ > 50)
+        {
+            is_gyro_recvd = true;
+            cntr_awal_recvd = 50;
+        }
     }
 };
 

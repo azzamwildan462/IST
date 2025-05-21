@@ -2,7 +2,7 @@
 <html>
 
 <head>
-  <title>ROS 2 WebSocket Example</title>
+  <title>Web UI</title>
   <link rel="stylesheet" href="./bulma.min.css">
   <link rel="stylesheet" href="./index.css">
   <script src="./roslib.min.js"></script>
@@ -39,17 +39,23 @@
         <a class="navbar-item" href="./diagnosa_error.html">
           Diagnosa Error
         </a>
-        <a class="navbar-item" href="./kalibrasi_kamera_kiri.html">
+        <!-- <a class="navbar-item" href="./kalibrasi_kamera_kiri.html">
           Kalibrasi Kamera Kiri
         </a>
         <a class="navbar-item" href="./kalibrasi_kamera_kanan.html">
           Kalibrasi Kamera Kanan
+        </a> -->
+        <a class="navbar-item" href="./kalibrasi_kamera.html">
+          Kalibrasi Kamera
         </a>
         <a class="navbar-item" href="./ROS_if.html">
           ROS Interface
         </a>
         <a class="navbar-item" href="./ROS_if_imv.html">
           ROS Image Viewer
+        </a>
+        <a class="navbar-item" href="./slam.html">
+          SLAM
         </a>
       </div>
     </div>
@@ -85,11 +91,11 @@
           <div class="column is-four-fifths">
             <div id="mode-radio" class="control">
               <label class="radio">
-                <input type="radio" name="mode-radio" id="mode-otomatis" name="foobar" checked />
+                <input type="radio" name="mode-radio" id="mode-otomatis" name="foobar" />
                 Otomatis
               </label>
               <label class="radio">
-                <input type="radio" name="mode-radio" id="mode-manual" name="foobar" />
+                <input type="radio" name="mode-radio" id="mode-manual" name="foobar" checked />
                 Manual
               </label>
             </div>
@@ -207,6 +213,54 @@
           </div>
           <div id="master-transmission" class="column is-four-fifths">
             Auto
+          </div>
+        </div>
+        <div class="columns">
+          <div class="column">
+            Aruco
+          </div>
+          <div id="detected-aruco" class="column is-four-fifths">
+            -1
+          </div>
+        </div>
+        <div class="columns">
+          <div class="column">
+            Obs Detected
+          </div>
+          <div id="obs-emergency" class="column is-four-fifths">
+            0
+          </div>
+        </div>
+        <div class="columns">
+          <div class="column">
+            SLAM ref_id
+          </div>
+          <div id="slam-ref-id" class="column is-four-fifths">
+            -1
+          </div>
+        </div>
+        <div class="columns">
+          <div class="column">
+            SLAM lc_id
+          </div>
+          <div id="slam-lc-id" class="column is-four-fifths">
+            -1
+          </div>
+        </div>
+        <div class="columns">
+          <div class="column">
+            SLAM prox_id
+          </div>
+          <div id="slam-prox-id" class="column is-four-fifths">
+            -1
+          </div>
+        </div>
+        <div class="columns">
+          <div class="column">
+            SLAM lm_id
+          </div>
+          <div id="slam-lm-id" class="column is-four-fifths">
+            -1
           </div>
         </div>
       </div>

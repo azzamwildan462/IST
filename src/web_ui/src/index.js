@@ -16,9 +16,15 @@ let battery_value = 45;
 let global_fsm_value = 0;
 let master_fsm_value = 0;
 let master_transmission_value = 0;
+let detected_aruco_value = -1;
+let obs_emergency_value = 0;
+let slam_ref_id_value = 0;
+let slam_lc_id_value = 0;
+let slam_prox_id_value = 0;
+let slam_lm_id_value = 0;
 
 let ui_control_btn = 0;
-let ui_target_velocity = 0;
+let ui_target_velocity = -1.0;
 let ui_target_steering = 0;
 
 // ================================================================
@@ -93,6 +99,39 @@ sub_master_transmission.subscribe(function (message) {
     master_transmission_value = message.data;
 });
 
+var sub_aruco = new ROSLIB.Topic({
+    ros: ros,
+    name: "/aruco_detection/aruco_nearest_marker_id",
+    messageType: "std_msgs/Int16",
+});
+
+sub_aruco.subscribe(function (message) {
+    detected_aruco_value = message.data;
+});
+
+var sub_obs_emergency = new ROSLIB.Topic({
+    ros: ros,
+    name: "/master/obs_find",
+    messageType: "std_msgs/Float32",
+});
+sub_obs_emergency.subscribe(function (message) {
+    obs_emergency_value = message.data;
+});
+
+var slam_info = new ROSLIB.Topic({
+    ros: ros,
+    name: '/slam/info',
+    messageType: 'rtabmap_msgs/Info'
+});
+
+slam_info.subscribe(function (message) {
+    slam_ref_id_value = message.ref_id;
+    slam_lc_id_value = message.loop_closure_id;
+    slam_prox_id_value = message.proximity_detection_id;
+    slam_lm_id_value = message.landmark_id;
+}
+);
+
 const topic = new ROSLIB.Topic({
     ros: ros,
     name: '/master/ui_control_btn',
@@ -113,7 +152,7 @@ document.addEventListener('keydown', function (event) {
         ui_target_velocity = 0.85;
     }
     else if (event.key == 'i') {
-        ui_target_velocity = 1.5;
+        ui_target_velocity = 2.5;
     }
     else if (event.key == 'm') {
         ui_target_steering = steering_feedback - 0.1;
@@ -127,6 +166,12 @@ document.addEventListener('keydown', function (event) {
     else if (event.key == ' ') {
         ui_target_velocity = -1;
         ui_target_steering = 0;
+    }
+    else if (event.key == 'g') {
+        ui_target_velocity = -2;
+    }
+    else if (event.key == 'v') {
+        ui_target_velocity = -3;
     }
 
 });
@@ -225,6 +270,9 @@ function control_display_fsm() {
     else if (master_fsm_value == 3) {
         master_fsm.innerHTML = ": Menunggu di Station 2"
     }
+    else if (master_fsm_value == 4) {
+        master_fsm.innerHTML = ": Berhenti Sejenak"
+    }
 
     if (master_transmission_value == 0) {
         master_transmission.innerHTML = ": Auto"
@@ -303,6 +351,30 @@ function ui_control_controller() {
                     ui_control_btn &= ~(7 << 5);
                 }
             }
+            /**
+             * Sementara karena menunggu beckhoff dari cina
+             */
+            else if (kontrol_hardware.checked) {
+                transmisi_forward.disabled = false;
+                transmisi_neutral.disabled = false;
+                transmisi_reverse.disabled = false;
+                transmisi_auto.disabled = false;
+                if (transmisi_forward.checked) {
+                    ui_control_btn &= ~(7 << 5);
+                    ui_control_btn |= (3 << 5);
+                }
+                else if (transmisi_neutral.checked) {
+                    ui_control_btn &= ~(7 << 5);
+                    ui_control_btn |= (1 << 5);
+                }
+                else if (transmisi_reverse.checked) {
+                    ui_control_btn &= ~(7 << 5);
+                    ui_control_btn |= (5 << 5);
+                }
+                else if (transmisi_auto.checked) {
+                    ui_control_btn &= ~(7 << 5);
+                }
+            }
             else {
                 transmisi_forward.disabled = true;
                 transmisi_neutral.disabled = true;
@@ -358,6 +430,12 @@ const transmisi_auto = document.getElementById('transmisi-auto');
 const kontrol_disable = document.getElementById('kontrol-disable');
 const kontrol_enable = document.getElementById('kontrol-enable');
 const master_transmission = document.getElementById('master-transmission');
+const detected_aruco = document.getElementById('detected-aruco');
+const obs_emergency = document.getElementById('obs-emergency');
+const slam_ref_id = document.getElementById('slam-ref-id');
+const slam_lc_id = document.getElementById('slam-lc-id');
+const slam_prox_id = document.getElementById('slam-prox-id');
+const slam_lm_id = document.getElementById('slam-lm-id');
 
 setInterval(() => {
     let velocity_actuation_display = velocity_actuation * 10 * 3.6;
@@ -384,6 +462,13 @@ setInterval(() => {
     baterai_dom.value = battery_value;
 
     control_display_fsm();
+
+    detected_aruco.textContent = detected_aruco_value;
+    obs_emergency.textContent = obs_emergency_value;
+    slam_ref_id.textContent = slam_ref_id_value;
+    slam_lc_id.textContent = slam_lc_id_value;
+    slam_prox_id.textContent = slam_prox_id_value;
+    slam_lm_id.textContent = slam_lm_id_value;
 
     ui_control_controller();
 }, 50);

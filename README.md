@@ -9,6 +9,8 @@ sudo apt install libyaml-cpp-dev
 sudo apt install ros-humble-joy
 sudo apt install ros-humble-pcl-ros
 sudo apt install ros-humble-diagnostic-updater
+sudo apt install ros-humble-rtabmap
+sudo apt install ros-humble-rtabmap-ros
 
 cd Livox-SDK2_local && mkdir build && cmake .. && make && sudo make install
 cd SOEM_local && mkdir build && cmake .. && make && sudo make install

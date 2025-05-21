@@ -45,3 +45,24 @@ Detection:
     high_h: 194
     high_l: 255
     high_s: 255
+  lane:
+    low_h: 130
+    low_l: 44
+    low_s: 24
+    high_h: 168
+    high_l: 255
+    high_s: 215
+  aruco:
+    low_h: 27
+    low_l: 153
+    low_s: 0
+    high_h: 255
+    high_l: 255
+    high_s: 25
+  aruco_detection:
+    low_h: 27
+    low_l: 153
+    low_s: 0
+    high_h: 255
+    high_l: 255
+    high_s: 255

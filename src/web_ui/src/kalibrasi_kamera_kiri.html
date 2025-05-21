@@ -40,17 +40,23 @@
                 <a class="navbar-item" href="./diagnosa_error.html">
                     Diagnosa Error
                 </a>
-                <a class="navbar-item" href="./kalibrasi_kamera_kiri.html">
+                <!-- <a class="navbar-item" href="./kalibrasi_kamera_kiri.html">
                     Kalibrasi Kamera Kiri
                 </a>
                 <a class="navbar-item" href="./kalibrasi_kamera_kanan.html">
                     Kalibrasi Kamera Kanan
+                </a> -->
+                <a class="navbar-item" href="./kalibrasi_kamera.html">
+                    Kalibrasi Kamera
                 </a>
                 <a class="navbar-item" href="./ROS_if.html">
                     ROS Interface
                 </a>
                 <a class="navbar-item" href="./ROS_if_imv.html">
                     ROS Image Viewer
+                </a>
+                <a class="navbar-item" href="./slam.html">
+                    SLAM
                 </a>
             </div>
         </div>
@@ -59,10 +65,8 @@
     <br>
     <div class="grid">
         <div class="cell">
-            <img id="frame_binary" src="http://localhost:8080/stream?topic=/lane_kiri/frame_binary" alt="MJPEG Stream"
-                style="width: 100%; max-width: 800px;">
-            <img id="frame_kamera" src="http://localhost:8080/stream?topic=/lane_kiri/frame_display" alt="MJPEG Stream"
-                style="width: 100%; max-width: 800px;">
+            <img id="frame_binary" src="" alt="MJPEG Stream" style="width: 100%; max-width: 800px;">
+            <img id="frame_kamera" src="" alt="MJPEG Stream" style="width: 100%; max-width: 800px;">
         </div>
         <div class="cell">
             <div class="columns">
@@ -119,8 +123,7 @@
                 </div>
             </div>
 
-            <img id="frame_aruco" src="http://localhost:8080/stream?topic=/aruco_kiri/frame_display" alt="MJPEG Stream"
-                style="width: 100%; max-width: 800px;">
+            <img id="frame_aruco" src="" alt="MJPEG Stream" style="width: 100%; max-width: 800px;">
 
         </div>
         <div class="cell">

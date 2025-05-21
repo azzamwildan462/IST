@@ -1,0 +1,3 @@
+type, id, x, y, theta, max_vx, max_vy, max_vtheta, radius_area, lookahead_distance, obs_scan_r
+0, 0, 0, 0, 0, 0.9, 0.9, 0.2, 3, 1.2, 1.5
+0, 1, 0, 0, 0, 0.9, 0.9, 0.2, 3, 1.2, 1.5

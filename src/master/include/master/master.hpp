@@ -2,17 +2,20 @@
 #define MASTER_HPP
 
 #include "rclcpp/rclcpp.hpp"
+#include "sensor_msgs/msg/point_cloud.hpp"
 #include "geometry_msgs/msg/point.hpp"
 #include "geometry_msgs/msg/pose_with_covariance_stamped.hpp"
 #include "geometry_msgs/msg/quaternion.hpp"
 #include "nav_msgs/msg/odometry.hpp"
 #include "ros2_interface/msg/point_array.hpp"
+#include "ros2_interface/msg/terminal_array.hpp"
 #include "ros2_utils/global_definitions.hpp"
 #include "ros2_utils/help_logger.hpp"
 #include "ros2_utils/help_marker.hpp"
 #include "ros2_utils/pid.hpp"
 #include "ros2_utils/simple_fsm.hpp"
 #include "sensor_msgs/msg/joy.hpp"
+#include "sensor_msgs/msg/laser_scan.hpp"
 #include "std_msgs/msg/bool.hpp"
 #include "std_msgs/msg/float32.hpp"
 #include "std_msgs/msg/float32_multi_array.hpp"
@@ -20,8 +23,17 @@
 #include "std_msgs/msg/u_int16.hpp"
 #include "std_msgs/msg/u_int8.hpp"
 #include "std_msgs/msg/u_int8_multi_array.hpp"
+#include "rtabmap_msgs/msg/info.hpp"
+#include "nav_msgs/msg/occupancy_grid.hpp"
 #include "tf2/LinearMath/Quaternion.h"
+#include "tf2/LinearMath/Transform.h"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
+#include "std_srvs/srv/set_bool.hpp"
+#include "vector"
+#include "boost/filesystem.hpp"
+#include <boost/algorithm/string.hpp>
+#include "boost/thread/mutex.hpp"
+#include "fstream"
 
 #define FSM_GLOBAL_INIT 0
 #define FSM_GLOBAL_PREOP 1
@@ -30,16 +42,61 @@
 #define FSM_GLOBAL_OP_4 4
 #define FSM_GLOBAL_OP_5 5
 #define FSM_GLOBAL_OP_2 6
+#define FSM_GLOBAL_RECORD_ROUTE 7
+#define FSM_GLOBAL_MAPPING 8
 
 #define FSM_LOCAL_PRE_FOLLOW_LANE 0
 #define FSM_LOCAL_FOLLOW_LANE 1
 #define FSM_LOCAL_MENUNGGU_STATION_1 2
 #define FSM_LOCAL_MENUNGGU_STATION_2 3
+#define FSM_LOCAL_MENUNGGU_STOP 4
 
 #define TRANSMISSION_AUTO 0
 #define TRANSMISSION_NEUTRAL 1
 #define TRANSMISSION_FORWARD 3
 #define TRANSMISSION_REVERSE 5
+
+#define ARUCO_TERMINAL_1 1
+#define ARUCO_TERMINAL_2 2
+#define ARUCO_TERMINAL_3 3
+#define ARUCO_START_BELOKAN 4
+#define ARUCO_START_LURUS 5
+
+#define IN_TR_FORWARD 0b01
+#define IN_TR_REVERSE 0b10
+#define IN_BRAKE_ACTIVE 0b100
+#define IN_EPS_nFAULT 0b1000
+#define IN_MASK_BUMPER 0b11110000
+// #define IN_START_OP3 0b100000000
+// #define IN_STOP_OP3 0b1000000000
+// #define IN_START_GAS_MANUAL 0b10000000000
+#define IN_START_OP3 (0b100000 << 16)
+#define IN_STOP_OP3 (0b100 << 16)
+#define IN_START_GAS_MANUAL (0b10 << 16)
+#define IN_NEXT_TERMINAL (0b10000 << 16)
+#define IN_SYSTEM_FULL_ENABLE (0b01 << 16)
+
+#define TERMINAL_TYPE_STOP 0x01
+#define TERMINAL_TYPE_BELOKAN 0x02
+#define TERMINAL_TYPE_STOP1 0x04
+#define TERMINAL_TYPE_STOP2 0x08
+#define TERMINAL_TYPE_STOP3 0x0C
+#define TERMINAL_TYPE_STOP4 0x10
+
+typedef struct
+{
+    float x;
+    float y;
+    float theta;
+    float fb_velocity;
+    float fb_steering;
+} waypoint_t;
+
+typedef struct
+{
+    float x;
+    float y;
+} point_t;
 
 class Master : public rclcpp::Node
 {
@@ -52,44 +109,47 @@ public:
     rclcpp::Publisher<std_msgs::msg::Float32MultiArray>::SharedPtr pub_actuator;
     rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr pub_transmission_master;
     rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr pub_pose_offset;
+    rclcpp::Publisher<sensor_msgs::msg::PointCloud>::SharedPtr pub_waypoints;
+    rclcpp::Publisher<ros2_interface::msg::TerminalArray>::SharedPtr pub_terminals;
+    rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr pub_obs_find;
+
     rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr sub_CAN_eps_encoder;
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr sub_beckhoff_sensor;
     rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr sub_obs_find;
     rclcpp::Subscription<ros2_interface::msg::PointArray>::SharedPtr sub_lane_kiri;
     rclcpp::Subscription<ros2_interface::msg::PointArray>::SharedPtr sub_lane_tengah;
     rclcpp::Subscription<ros2_interface::msg::PointArray>::SharedPtr sub_lane_kanan;
-    rclcpp::Subscription<ros2_interface::msg::PointArray>::SharedPtr sub_lane_kiri_single_cam;
-    rclcpp::Subscription<ros2_interface::msg::PointArray>::SharedPtr sub_lane_kanan_single_cam;
-    rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr sub_hasil_perhitungan_kiri;
-    rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr sub_hasil_perhitungan_kanan;
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr sub_odometry;
-    rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr sub_aruco_kanan_detected;
-    rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr sub_aruco_kiri_detected;
     rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_error_code_beckhoff;
-    rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_error_code_lidar;
-    rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_error_code_cam_kiri;
-    rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_error_code_cam_kanan;
     rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_error_code_pose_estimator;
     rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_error_code_obstacle_filter;
-    rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_error_code_aruco_kiri;
-    rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_error_code_aruco_kanan;
     rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_error_code_can;
+    rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_error_code_lane_detection;
+    rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_error_code_aruco_detection;
     rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr sub_joy;
     rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr sub_encoder_meter;
     rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_key_pressed;
     rclcpp::Subscription<std_msgs::msg::UInt16>::SharedPtr sub_ui_control_btn;
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr sub_ui_control_velocity_and_steering;
-    rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_aruco_marker_id_kanan;
-    rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_aruco_marker_id_kiri;
     rclcpp::Subscription<std_msgs::msg::UInt8>::SharedPtr sub_CAN_eps_mode_fb;
     rclcpp::Subscription<std_msgs::msg::UInt8MultiArray>::SharedPtr sub_beckhoff_digital_input;
+    rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_aruco_nearest_marker_id;
+    rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr sub_lidar_depan_scan;
+    rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr sub_lidar_belakang_scan;
+    rclcpp::Subscription<rtabmap_msgs::msg::Info>::SharedPtr sub_rtabmap_info;
+    rclcpp::Subscription<nav_msgs::msg::OccupancyGrid>::SharedPtr sub_map;
+    rclcpp::Subscription<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr sub_localization_pose;
+
+    rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr srv_set_record_route_mode;
+    rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr srv_set_terminal; // Aktif -> add terminal, InActive -> save terminal
+    rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr srv_rm_terminal;  // Aktif -> add terminal, InActive -> save terminal
 
     // Configs
     // ===============================================================================================
     bool use_ekf_odometry = false;
     float profile_max_acceleration = 30;
     float profile_max_decceleration = 60;
-    float profile_max_velocity = 2.5; // m/s (1 m/s == 3.6 km/h)
+    float profile_max_velocity = 1.5; // m/s (1 m/s == 3.6 km/h)
     float profile_max_accelerate_jerk = 100;
     float profile_max_decelerate_jerk = 1000;
     float profile_max_braking = 3;
@@ -97,6 +157,18 @@ public:
     float profile_max_braking_jerk = 3000;
     float max_obs_find_value = 100;
     float profile_max_steering_rad = 0.785; // Ini adalah arah roda depannya
+    std::vector<double> pid_terms;
+    std::string waypoint_file_path;
+    std::string terminal_file_path;
+    float wheelbase = 0.75;
+    int metode_following = 0;
+    bool enable_obs_detection = false;
+    float timeout_terminal_1 = 10;
+    float timeout_terminal_2 = 10;
+    bool transform_map2odom = false;
+    float toribay_ready_threshold = 0.5;
+
+    float offset_sudut_steering = 0;
 
     // Vars
     // ===============================================================================================
@@ -107,23 +179,13 @@ public:
     PID pid_vx;
 
     int16_t error_code_beckhoff = 0;
-    int16_t error_code_lidar = 0;
-    int16_t error_code_cam_kiri = 0;
-    int16_t error_code_cam_kanan = 0;
     int16_t error_code_pose_estimator = 0;
     int16_t error_code_obstacle_filter = 0;
-    int16_t error_code_aruco_kiri = 0;
-    int16_t error_code_aruco_kanan = 0;
     int16_t error_code_can = 0;
+    int16_t error_code_lane_detection = 0;
+    int16_t error_code_aruco_detection = 0;
 
-    float cam_kiri_pid_output = 0;
-    float cam_kiri_pid_setpoint = 0;
-    float cam_kiri_pid_fb = 0;
-    float cam_kiri_velocity_gain = 0;
-    float cam_kanan_pid_output = 0;
-    float cam_kanan_pid_setpoint = 0;
-    float cam_kanan_pid_fb = 0;
-    float cam_kanan_velocity_gain = 0;
+    uint8_t status_perjalanan = 0;
 
     float actuation_ax = 0;
     float actuation_ay = 0;
@@ -142,13 +204,7 @@ public:
     ros2_interface::msg::PointArray lane_kiri;
     ros2_interface::msg::PointArray lane_tengah;
     ros2_interface::msg::PointArray lane_kanan;
-    ros2_interface::msg::PointArray lane_kiri_single_cam;
-    ros2_interface::msg::PointArray lane_kanan_single_cam;
-
-    bool aruco_kiri_detected = false;
-    bool aruco_kanan_detected = false;
-    int16_t aruco_kiri_marker_id = -1;
-    int16_t aruco_kanan_marker_id = -1;
+    int16_t aruco_nearest_marker_id = -1;
 
     float fb_encoder_meter = 0;
     float fb_final_pose_xyo[3];
@@ -156,11 +212,7 @@ public:
     float fb_steering_angle = 0;
     uint8_t fb_eps_mode = 0;
 
-    /**
-     * Start Stop button bit 0
-     * Transmisi R-N-F bit 1-2-3
-     */
-    uint8_t fb_beckhoff_digital_input[2] = {0};
+    uint32_t fb_beckhoff_digital_input = 0;
 
     float dt = 0.02;
 
@@ -171,18 +223,31 @@ public:
     rclcpp::Time current_time;
     rclcpp::Time last_time_CANbus;
     rclcpp::Time last_time_beckhoff;
-    rclcpp::Time last_time_lidar;
-    rclcpp::Time last_time_cam_kiri;
-    rclcpp::Time last_time_cam_kanan;
     rclcpp::Time last_time_pose_estimator;
     rclcpp::Time last_time_obstacle_filter;
-    rclcpp::Time last_time_aruco_kiri;
-    rclcpp::Time last_time_aruco_kanan;
     rclcpp::Time last_time_joy;
     rclcpp::Time last_time_key_pressed;
     rclcpp::Time last_time_ui_control_btn;
+    rclcpp::Time last_time_error_code_aruco_detection;
+    rclcpp::Time last_time_error_code_lane_detection;
     rclcpp::Time time_start_operation;
     rclcpp::Time time_start_follow_lane;
+
+    std::vector<waypoint_t> waypoints;
+    ros2_interface::msg::TerminalArray terminals;
+    std::vector<point_t> area_special;
+
+    sensor_msgs::msg::LaserScan lidar_depan_points;
+    boost::mutex mutex_lidar_depan_points;
+    sensor_msgs::msg::LaserScan lidar_belakang_points;
+    bool is_rtabmap_ready = false;
+    bool is_pose_corrected = false;
+    bool prev_is_rtabmap_ready = false;
+    float map2odom_offset_x = 0;
+    float map2odom_offset_y = 0;
+    float map2odom_offset_theta = 0;
+    tf2::Transform manual_map2odom_tf;
+    bool is_toribay_ready = false;
 
     Master();
     ~Master();
@@ -198,44 +263,57 @@ public:
     void callback_sub_lane_kanan(const ros2_interface::msg::PointArray::SharedPtr msg);
     void callback_sub_obs_find(const std_msgs::msg::Float32::SharedPtr msg);
     void callback_sub_odometry(const nav_msgs::msg::Odometry::SharedPtr msg);
-    void callback_sub_hasil_perhitungan_kiri(const std_msgs::msg::Float32MultiArray::SharedPtr msg);
-    void callback_sub_hasil_perhitungan_kanan(const std_msgs::msg::Float32MultiArray::SharedPtr msg);
-    void callback_sub_lane_kiri_single_cam(const ros2_interface::msg::PointArray::SharedPtr msg);
-    void callback_sub_lane_kanan_single_cam(const ros2_interface::msg::PointArray::SharedPtr msg);
-    void callback_sub_aruco_kiri_detected(const std_msgs::msg::Bool::SharedPtr msg);
-    void callback_sub_aruco_kanan_detected(const std_msgs::msg::Bool::SharedPtr msg);
     void callback_sub_error_code_beckhoff(const std_msgs::msg::Int16::SharedPtr msg);
-    void callback_sub_error_code_lidar(const std_msgs::msg::Int16::SharedPtr msg);
-    void callback_sub_error_code_cam_kiri(const std_msgs::msg::Int16::SharedPtr msg);
-    void callback_sub_error_code_cam_kanan(const std_msgs::msg::Int16::SharedPtr msg);
     void callback_sub_error_code_pose_estimator(const std_msgs::msg::Int16::SharedPtr msg);
     void callback_sub_error_code_obstacle_filter(const std_msgs::msg::Int16::SharedPtr msg);
-    void callback_sub_error_code_aruco_kiri(const std_msgs::msg::Int16::SharedPtr msg);
-    void callback_sub_error_code_aruco_kanan(const std_msgs::msg::Int16::SharedPtr msg);
     void callback_sub_error_code_can(const std_msgs::msg::Int16::SharedPtr msg);
+    void callback_error_code_lane_detection(const std_msgs::msg::Int16::SharedPtr msg);
+    void callback_error_code_aruco_detection(const std_msgs::msg::Int16::SharedPtr msg);
     void callback_sub_encoder_meter(const std_msgs::msg::Float32::SharedPtr msg);
     void callback_sub_key_pressed(const std_msgs::msg::Int16::SharedPtr msg);
     void callback_sub_ui_control_btn(const std_msgs::msg::UInt16::SharedPtr msg);
     void callback_sub_ui_control_velocity_and_steering(const std_msgs::msg::Float32MultiArray::SharedPtr msg);
-    void callback_sub_aruco_marker_id_kanan(const std_msgs::msg::Int16::SharedPtr msg);
-    void callback_sub_aruco_marker_id_kiri(const std_msgs::msg::Int16::SharedPtr msg);
+    void callback_sub_aruco_nearest_marker_id(const std_msgs::msg::Int16::SharedPtr msg);
     void callback_sub_CAN_eps_mode_fb(const std_msgs::msg::UInt8::SharedPtr msg);
     void callback_sub_beckhoff_digital_input(const std_msgs::msg::UInt8MultiArray::SharedPtr msg);
+    void callback_sub_lidar_depan_scan(const sensor_msgs::msg::LaserScan::SharedPtr msg);
+    void callback_sub_lidar_belakang_scan(const sensor_msgs::msg::LaserScan::SharedPtr msg);
+    void callback_sub_rtabmap_info(const rtabmap_msgs::msg::Info::SharedPtr msg);
+    void callback_sub_map(const nav_msgs::msg::OccupancyGrid::SharedPtr msg);
+    void callback_sub_localization_pose(const geometry_msgs::msg::PoseWithCovarianceStamped msg);
+    void callback_srv_set_record_route_mode(const std_srvs::srv::SetBool::Request::SharedPtr request, std_srvs::srv::SetBool::Response::SharedPtr response);
+    void callback_srv_set_terminal(const std_srvs::srv::SetBool::Request::SharedPtr request, std_srvs::srv::SetBool::Response::SharedPtr response);
+    void callback_srv_rm_terminal(const std_srvs::srv::SetBool::Request::SharedPtr request, std_srvs::srv::SetBool::Response::SharedPtr response);
 
     // Process
     // ===============================================================================================
     void process_marker();
     void process_local_fsm();
     void process_transmitter();
+    void process_record_route();
+    void process_add_terminal();
+    void process_load_waypoints();
+    void process_save_waypoints();
+    void process_load_terminals();
+    void process_save_terminals();
 
     // Motion
     // ===============================================================================================
     void manual_motion(float vx, float vy, float wz);
     void follow_lane(float vx, float vy, float wz);
-    void follow_lane_2_cam(float vx, float vy, float wz);
-    void follow_lane_2_cam_gas_manual(float vx, float vy, float wz);
-    void follow_lane_2_cam_steer_manual(float vx, float vy, float wz);
+    void follow_lane_gas_manual(float vx, float vy, float wz);
+    void follow_lane_steer_manual(float vx, float vy, float wz);
+    void follow_waypoints(float vx, float vy, float wz, float lookahead_distance, bool is_loop = false);
+    void follow_waypoints_gas_manual(float vx, float vy, float wz, float lookahead_distance, bool is_loop = false);
+    void follow_waypoints_steer_manual(float vx, float vy, float wz, float lookahead_distance, bool is_loop = false);
+    void fusion_follow_lane_waypoints(float vx, float vy, float wz, float lookahead_distance, bool is_loop = false);
+    void fusion_follow_lane_waypoints_gas_manual(float vx, float vy, float wz, float lookahead_distance, bool is_loop = false);
+    void fusion_follow_lane_waypoints_steer_manual(float vx, float vy, float wz, float lookahead_distance, bool is_loop = false);
+    void wp2velocity_steering(float lookahead_distance, float *pvelocity, float *psteering, bool is_loop = false);
+    void lane2velocity_steering(float *pvelocity, float *psteering, float *pconfidence);
+    float pythagoras(float x1, float y1, float x2, float y2);
     float obstacle_influence(float gain);
+    float local_obstacle_influence(float obs_scan_r, float gain = 0.5);
 
     // Misc
     // ===============================================================================================

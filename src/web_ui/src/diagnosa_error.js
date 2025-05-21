@@ -30,11 +30,11 @@ const nodes = [
         }
     },
     {
-        id: 'cam_kanan',
-        topic: '/cam_kanan/error_code',
+        id: 'lane_detection',
+        topic: '/lane_detection/error_code',
         messageType: 'std_msgs/Int16',
-        sectionId: 'cam_kanan-section',
-        tableId: 'cam_kanan-error-body',
+        sectionId: 'lane_detection-section',
+        tableId: 'lane_detection-error-body',
         errorCodes: {
             99: 'Node is not running',
             0: 'No error',
@@ -57,11 +57,11 @@ const nodes = [
         }
     },
     {
-        id: 'cam_kiri',
-        topic: '/cam_kiri/error_code',
+        id: 'aruco_detection',
+        topic: '/aruco_detection/error_code',
         messageType: 'std_msgs/Int16',
-        sectionId: 'cam_kiri-section',
-        tableId: 'cam_kiri-error-body',
+        sectionId: 'aruco_detection-section',
+        tableId: 'aruco_detection-error-body',
         errorCodes: {
             99: 'Node is not running',
             0: 'No error',
@@ -81,139 +81,6 @@ const nodes = [
             4: 'Check camera settings',
             11: 'Check camera connection',
             // Add more Camera error codes and solutions
-        }
-    },
-    {
-        id: 'lane-kanan-detection',
-        topic: '/lane_kanan/error_code',
-        messageType: 'std_msgs/Int16',
-        sectionId: 'lane_kanan-detection-section',
-        tableId: 'lane_kanan-detection-error-body',
-        errorCodes: {
-            99: 'Node is not running',
-            0: 'No error',
-            1: 'Failed to load config',
-            2: 'Failed to save config',
-            3: 'Failed to convert image',
-            4: 'Failed to clone image',
-            5: 'No data',
-            // Add more Detection error codes and descriptions
-        },
-        errorSolutions: {
-            99: 'Start the node',
-            0: 'No action needed',
-            1: 'Check config file',
-            2: 'Check config file',
-            3: 'Check image conversion',
-            4: 'Check image cloning',
-            5: 'Check data source',
-            // Add more Detection error codes and solutions
-        }
-    },
-    {
-        id: 'lane-kiri-detection',
-        topic: '/lane_kiri/error_code',
-        messageType: 'std_msgs/Int16',
-        sectionId: 'lane_kiri-detection-section',
-        tableId: 'lane_kiri-detection-error-body',
-        errorCodes: {
-            99: 'Node is not running',
-            0: 'No error',
-            1: 'Failed to load config',
-            2: 'Failed to save config',
-            3: 'Failed to convert image',
-            4: 'Failed to clone image',
-            5: 'No data',
-            // Add more Detection error codes and descriptions
-        },
-        errorSolutions: {
-            99: 'Start the node',
-            0: 'No action needed',
-            1: 'Check config file',
-            2: 'Check config file',
-            3: 'Check image conversion',
-            4: 'Check image cloning',
-            5: 'Check data source',
-            // Add more Detection error codes and solutions
-        }
-    },
-    {
-        id: 'aruco-kanan-detection',
-        topic: '/aruco_kanan/error_code',
-        messageType: 'std_msgs/Int16',
-        sectionId: 'aruco_kanan-detection-section',
-        tableId: 'aruco_kanan-detection-error-body',
-        errorCodes: {
-            99: 'Node is not running',
-            0: 'No error',
-            1: 'Failed to load config',
-            2: 'Failed to save config',
-            3: 'Failed to convert image',
-            4: 'Failed to clone image',
-            5: 'No data',
-            // Add more Detection error codes and descriptions
-        },
-        errorSolutions: {
-            99: 'Start the node',
-            0: 'No action needed',
-            1: 'Check config file',
-            2: 'Check config file',
-            3: 'Check image conversion',
-            4: 'Check image cloning',
-            5: 'Check data source',
-            // Add more Detection error codes and solutions
-        }
-    },
-    {
-        id: 'aruco-kiri-detection',
-        topic: '/aruco_kiri/error_code',
-        messageType: 'std_msgs/Int16',
-        sectionId: 'aruco_kiri-detection-section',
-        tableId: 'aruco_kiri-detection-error-body',
-        errorCodes: {
-            99: 'Node is not running',
-            0: 'No error',
-            1: 'Failed to load config',
-            2: 'Failed to save config',
-            3: 'Failed to convert image',
-            4: 'Failed to clone image',
-            5: 'No data',
-            // Add more Detection error codes and descriptions
-        },
-        errorSolutions: {
-            99: 'Start the node',
-            0: 'No action needed',
-            1: 'Check config file',
-            2: 'Check config file',
-            3: 'Check image conversion',
-            4: 'Check image cloning',
-            5: 'Check data source',
-            // Add more Detection error codes and solutions
-        }
-    },
-    {
-        id: 'lidar',
-        topic: '/lidar/error_code',
-        messageType: 'std_msgs/Int16',
-        sectionId: 'lidar-section',
-        tableId: 'lidar-error-body',
-        errorCodes: {
-            99: 'Node is not running',
-            0: 'No error',
-            1: 'Connection error',
-            2: 'Not connected',
-            3: 'Measurement error',
-            4: 'No data',
-            // Add more Lidar error codes and descriptions
-        },
-        errorSolutions: {
-            99: 'Start the node',
-            0: 'No action needed',
-            1: 'Check connection',
-            2: 'Check connection',
-            3: 'Check measurement',
-            4: 'Check data source',
-            // Add more Lidar error codes and solutions
         }
     },
     {
@@ -340,7 +207,7 @@ function subscribeToTopic(node) {
 // Create table row
 function createErrorRow(errorCode, errorCodes, errorSolutions) {
     const tr = document.createElement('tr');
-    
+
     const errorTd = document.createElement('td');
     const errorInput = document.createElement('input');
     errorInput.className = 'input';
@@ -359,7 +226,7 @@ function createErrorRow(errorCode, errorCodes, errorSolutions) {
 
     tr.appendChild(errorTd);
     tr.appendChild(solutionTd);
-    
+
     // Add animation to new rows
     anime({
         targets: tr,
@@ -389,10 +256,10 @@ function updateErrorTable(tableId, errorCode, nodeErrorCodes, nodeErrorSolutions
 
 // For testing purposes
 
-setTimeout(() => {
-    // updateErrorTable('beckhoff-error-body', 0, nodes[0].errorCodes, nodes[0].errorSolutions);
-    // document.getElementById('beckhoff-section').style.display = 'block';
+// setTimeout(() => {
+//     // updateErrorTable('beckhoff-error-body', 0, nodes[0].errorCodes, nodes[0].errorSolutions);
+//     // document.getElementById('beckhoff-section').style.display = 'block';
 
-    // updateErrorTable('cam_kanan-error-body', 1, nodes[1].errorCodes, nodes[1].errorSolutions);
-    // document.getElementById('cam_kanan-section').style.display = 'block';
-}, 1000);
+//     // updateErrorTable('cam_kanan-error-body', 1, nodes[1].errorCodes, nodes[1].errorSolutions);
+//     // document.getElementById('cam_kanan-section').style.display = 'block';
+// }, 1000);
