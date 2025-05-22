@@ -220,7 +220,7 @@ def generate_launch_description():
                 "enable_sync": True,
                 "unite_imu_method": 2,
                 "align_depth.enable": True,
-                "pointcloud.enable": False,
+                "pointcloud.enable": True,
                 "initial_reset": False,
                 "rgb_camera.profile": "640x360x15",
             }
@@ -463,15 +463,30 @@ def generate_launch_description():
         prefix='nice -n -20 chrt -f 98'
     )
 
-    CANbus_HAL_socket_can = Node(
+    CANbus_HAL_socket_can0 = Node(
         package='hardware',
         executable='CANbus_HAL',
-        name='CANbus_HAL',
+        name='CANbus_HAL_socket_can0',
         output='screen',
         parameters=[{
             "if_name": "can0",
             "bitrate": 125000,
             "use_socket_can": True,
+            "can_to_car": True,
+        }],
+        respawn=True,
+        prefix='nice -n -20 chrt -f 98'
+    )
+    CANbus_HAL_socket_can1 = Node(
+        package='hardware',
+        executable='CANbus_HAL',
+        name='CANbus_HAL_socket_can1',
+        output='screen',
+        parameters=[{
+            "if_name": "can1",
+            "bitrate": 125000,
+            "use_socket_can": True,
+            "can_to_car": False,
         }],
         respawn=True,
         prefix='nice -n -20 chrt -f 98'
@@ -846,7 +861,7 @@ def generate_launch_description():
         executable="static_transform_publisher",
         name="tf_base_link_to_camera_link",
         # fmt: off
-        arguments=["1.428","0.00","0.97","0.00","0.06","0.00","base_link","camera_link",
+        arguments=["1.428","0.00","0.97","0.00","0.12","0.00","base_link","camera_link",
             "--ros-args","--log-level","error",],
         # fmt: on
         respawn=True,
@@ -893,35 +908,86 @@ def generate_launch_description():
                 # "odom_tf_angular_variance": 0.0000000001,
                 "publish_tf": False,
                 "publish_map": True,
-                "subscribe_scan": True,
-                "subscribe_scan_cloud": False,
-                "subscribe_stereo": False,
-                "subscribe_rgbd": False,
-                "frame_id": "base_link",
-                "map_frame_id": "map",
-                "odom_frame_id": "odom",
-                "odom_tf_linear_variance": 0.01,
-                "odom_tf_angular_variance": 0.01,
-                "publish_tf": False,
-                # "approx_sync": True,
-                "Grid/CellSize": "0.025",  # Added by Pandu
-                "Grid/FootprintHeight": "1.5",  # Added by Pandu
-                "Grid/FootprintLength": "0.5",  # Added by Pandu
-                "Grid/FootprintWidth": "0.5",  # Added by Pandu
-                "Grid/FromDepth": "False",  # Added from documentation
-                "Grid/Sensor": "2",  # Added to suppress warning
-                "Icp/MaxCorrespondenceDistance": "0.1",  # Added from documentation
-                "Icp/VoxelSize": "0.05",  # Added from documentation
-                "Mem/IncrementalMemory": "False",  # Added by Pandu
-                "RGBD/AngularUpdate": "0.01",  # Added from documentation # 0.01
-                "RGBD/LinearUpdate": "0.01",  # Added from documentation
+                "approx_sync": True,
+                "use_saved_map": False,
+                "sync_queue_size": 30,
+                "topic_queue_size": 10,
+
+                "Rtabmap/DetectionRate": "5.0", # Added by Azzam
+                "Rtabmap/CreateIntermediateNodes": "True",
+                "Rtabmap/LoopThr": "0.11", # Routine period untuk cek loop closure
+
+                "Mem/STMSize": "50",  # Short-term memory size
+                "Mem/IncrementalMemory": "False",  # 
+                "Mem/InitWMWithAllNodes": "True",  # 
+                "Mem/RehearsalSimilaritys": "0.9",  #
+                "Mem/UseOdomFeatures": "True",  #
+                'Mem/NotLinkedNodesKept': "False",  # Keep unlinked nodes
+                # "Mem/UseOdomFeatures": "False", # (percobaan) untuk disable odometry untuk mencari loop closure
+
+                "Kp/MaxFeatures": "2000",
+
+                "RGBD/Enabled": "True",
+                "RGBD/OptimizeFromGraphEnd": "False", # True agar robot tidak lompat 
                 "RGBD/NeighborLinkRefining": "True",  # Added from documentation
-                "RGBD/OptimizeFromGraphEnd": "False",  # Added from documentation # False
+                "RGBD/AngularUpdate": "0.01",  # Added from documentation
+                "RGBD/LinearUpdate": "0.01",  # Added from documentation
+                "RGBD/OptimizeMaxError": "3.0",  # Added from documentation
+                "RGBD/InvertedReg": "False",  # Added from documentation
+                "RGBD/ProximityPathMaxNeighbors": "20",
+                "RGBD/ProximityMaxGraphDepth": "50",
+                "RGBD/ProximityByTime": "False",
                 "RGBD/ProximityBySpace": "True",  # Added from documentation
-                "RGBD/ProximityPathMaxNeighbors": "10",  # Added to suppress warning
-                # "Vis/MinInliers": "10",  # Baru
-                "Reg/Force3DoF": "true",  # Added from documentation
-                "Reg/Strategy": "1",  # Added from documentation
+
+                "Optimizer/Strategy": "2",  # Added by Azzam
+                "Optimizer/Iterations": "40",  # Added by Azzam
+                "Optimizer/Epsilon": "0.00001",  # Added by Azzam
+                "Optimizer/Robust": "False",  # Added by Azzam
+                'Optimizer/GravitySigma':'0', # Disable imu constraints (we are already in 2D)
+                "Optimizer/VarianceIgnored": "True",
+                "GTSAM/Incremental": "True",
+
+                "Bayes/PredictionMargin": "0", # Added by Azzam
+                "Bayes/FullPredictionUpdate": "False", # Added by Azzam
+                "Bayes/PredictionLC": "0.1", # Added by Azzam
+
+                "Odom/Strategy": "0",  # Added by Azzam
+                "Odom/ResetCountdown": "0",  # Added by Azzam
+                "Odom/Holonomic": "False",  # Added by Azzam
+                "Odom/ScanKeyFrameThr": "0.9",  # Added by Azzam, semakin kecil semakin sering lidar update
+                "Odom/AlignWithGround": "True",  # Added by Azzam
+                # "OdomF2M/ScanSubtractAngle": "0.0",  # Added by Azzam
+                # "OdomF2M/BundleAdjustment": "0",
+                # "OdomF2M/ScanMaxSize": "20000",
+
+                "Reg/Strategy": "1",  # Added by Azzam
+                "Reg/Force3DoF": "True",  # Added by Azzam
+
+                "Icp/Strategy": "1",  # Added by Azzam
+                "Icp/MaxTranslation": "1.0", # Added by Azzam
+                "Icp/MaxRotation": "0.1", # Added by Azzam
+                "Icp/RangeMin": "0.0", # Added by Azzam
+                "Icp/RangeMax": "25.0", # Added by Azzam
+                "Icp/MaxCorrespondenceDistance": "1.0", # Added by Azzam
+                "Icp/Iterations": "30", # Added by Azzam
+                "Icp/PointToPlane": "True", # Added by Azzam
+                "Icp/VoxelSize": "0.05", # Added by Azzam
+                'Icp/PointToPlaneMinComplexity':'0.23', # to be more robust to long corridors with low geometry
+                'Icp/PointToPlaneLowComplexityStrategy':'1', # to be more robust to long corridors with low geometry
+
+                "Vis/MaxDepth": "20.0",
+                "Vis/MinInliers": "20",
+
+                "Grid/Sensor": "2",  # Added to suppress warning
+                "Grid/RangeMin": "0.0",  # Added by Azzam
+                "Grid/RangeMax": "100.0",  # Added by Azzam
+                'Grid/UpdateRate': "1.0",  # Update map every 1 second (default is often higher)
+                'Grid/CellSize': "1.0",  # Increase cell size to reduce map density
+                "Grid/FromDepth": "False",  # Added from documentation
+                "Grid/IncrementalMapping": "True",  # Added from documentation
+                "Grid/Scan2dUnknownSpaceFilled": "False",  # Added by Azzam
+                "GridGlobal/UpdateError": "0.04", # Added by Azzam
+                "Grid/RayTracing": "False", # Added by Azzam
 
                 "use_sim_time": False,
                 "Threads": 10, # Added by Azzam
@@ -1020,19 +1086,28 @@ def generate_launch_description():
         respawn=True,
     )
 
-    # return LaunchDescription(
-    #     [
-    #         # DeclareLaunchArgument('auto_start', default_value='true'),
-    #         # hokuyo1_lidar_driver,
-    #         # hokuyo1_lidar_configure,
-    #         # hokuyo1_lidar_activate,
-    #         # hokuyo2_lidar_driver,
-    #         # hokuyo2_lidar_configure,
-    #         # hokuyo2_lidar_activate,
-    #         beckhoff,
-    #         # CANbus_HAL,
-    #     ]
-    # )
+    return LaunchDescription(
+        [
+            # DeclareLaunchArgument('auto_start', default_value='true'),
+            # hokuyo1_lidar_driver,
+            # hokuyo1_lidar_configure,
+            # hokuyo1_lidar_activate,
+            # hokuyo2_lidar_driver,
+            # hokuyo2_lidar_configure,
+            # hokuyo2_lidar_activate,
+            # beckhoff,
+            # CANbus_HAL,
+
+            tf_base_link_to_lidar2_link,
+            tf_base_link_to_body_link,
+            tf_base_link_to_lidar1_link,
+            tf_base_link_to_imu_link,
+            tf_base_link_to_camera_link,
+
+            rs2_cam_main,
+            rviz2,
+        ]
+    )
 
     # ==============================================================================
 
@@ -1084,8 +1159,9 @@ def generate_launch_description():
             # ),
 
             beckhoff,
-            CANbus_HAL,
-            # CANbus_HAL_socket_can, # Untuk PC tanpa embedded CAN
+            # CANbus_HAL,
+            CANbus_HAL_socket_can0, # Untuk PC tanpa embedded CAN
+            CANbus_HAL_socket_can1, # Untuk PC tanpa embedded CAN
 
             # # =============================================================================
 

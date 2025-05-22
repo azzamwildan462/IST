@@ -27,6 +27,8 @@
 #include <termios.h>
 #include "hardware/jhctech_291.h"
 
+#include <thread>
+
 #define COB_ID_CAR_ENCODER 0x388
 #define COB_ID_CAR_BATTERY 0x109
 #define COB_ID_CAR_FB_ACCELERATOR 0x101
@@ -61,6 +63,7 @@ public:
     std::string if_name;
     int bitrate = 125000;
     bool use_socket_can = true;
+    bool can_to_car = false;
     int jhctech_can_id = -1; // Jika -1, masuk default, 1 untuk EPS, 2 untuk mobil
 
     int socket_can = -1;
@@ -80,6 +83,8 @@ public:
 
     sensor_msgs::msg::Imu imu_msg;
 
+    std::thread thread_routine;
+
     CANbus_HAL()
         : Node("CANbus_HAL")
     {
@@ -95,19 +100,31 @@ public:
         this->declare_parameter("jhctech_can_id", -1);
         this->get_parameter("jhctech_can_id", jhctech_can_id);
 
+        this->declare_parameter("can_to_car", false);
+        this->get_parameter("can_to_car", can_to_car);
+
         //----Publiher
-        pub_battery = this->create_publisher<std_msgs::msg::Int16>("/can/battery", 1);
-        pub_encoder = this->create_publisher<std_msgs::msg::Int32>("/can/encoder", 1);
-        pub_fb_tps_accelerator = this->create_publisher<std_msgs::msg::UInt8>("/can/fb_tps_accelerator", 1);
-        pub_fb_transmission = this->create_publisher<std_msgs::msg::UInt8>("/can/fb_transmission", 1);
-        pub_error_code = this->create_publisher<std_msgs::msg::Int16>("/can/error_code", 1);
-        pub_eps_encoder = this->create_publisher<std_msgs::msg::Float32>("/can/eps_encoder", 1);
-        pub_fb_eps_mode = this->create_publisher<std_msgs::msg::UInt8>("/can/eps_mode", 1);
-        pub_imu_can = this->create_publisher<sensor_msgs::msg::Imu>("/can/imu", 1);
+        if (can_to_car)
+        {
+            pub_battery = this->create_publisher<std_msgs::msg::Int16>("/can/battery", 1);
+            pub_encoder = this->create_publisher<std_msgs::msg::Int32>("/can/encoder", 1);
+            pub_fb_tps_accelerator = this->create_publisher<std_msgs::msg::UInt8>("/can/fb_tps_accelerator", 1);
+            pub_fb_transmission = this->create_publisher<std_msgs::msg::UInt8>("/can/fb_transmission", 1);
+            pub_error_code = this->create_publisher<std_msgs::msg::Int16>("/can/error_code", 1);
+        }
+        else
+        {
+            pub_eps_encoder = this->create_publisher<std_msgs::msg::Float32>("/can/eps_encoder", 1);
+            pub_fb_eps_mode = this->create_publisher<std_msgs::msg::UInt8>("/can/eps_mode", 1);
+            pub_imu_can = this->create_publisher<sensor_msgs::msg::Imu>("/can/imu", 1);
+        }
 
         //----Timer
         if (use_socket_can)
-            tim_50hz = this->create_wall_timer(std::chrono::milliseconds(1), std::bind(&CANbus_HAL::callback_routine, this));
+        {
+            // tim_50hz = this->create_wall_timer(std::chrono::milliseconds(1), std::bind(&CANbus_HAL::callback_routine, this));
+            thread_routine = std::thread(std::bind(&CANbus_HAL::callback_routine, this));
+        }
         else
             tim_50hz = this->create_wall_timer(std::chrono::milliseconds(10), std::bind(&CANbus_HAL::callback_routine, this));
 
@@ -178,19 +195,22 @@ public:
 
         if (use_socket_can)
         {
-            struct can_frame frame;
-            frame.can_id = COB_ID_EPS_ACTUATION;
-            frame.can_dlc = 3;
-
-            static const float ENC_RAD2CNTR = EPS_ENCODER_MAX_COUNTER / EPS_ENCODER_MAX_RAD;
-            int16_t eps_actuation_cntr = eps_actuation * ENC_RAD2CNTR;
-
-            memcpy(&frame.data[0], &eps_flag, 1);
-            memcpy(&frame.data[1], &eps_actuation_cntr, 2);
-
-            if (write(socket_can, &frame, sizeof(struct can_frame)) != sizeof(struct can_frame))
+            if (!can_to_car)
             {
-                logger.warn("SOCKET CAN SEND FAILED\n");
+                struct can_frame frame;
+                frame.can_id = COB_ID_EPS_ACTUATION;
+                frame.can_dlc = 3;
+
+                static const float ENC_RAD2CNTR = EPS_ENCODER_MAX_COUNTER / EPS_ENCODER_MAX_RAD;
+                int16_t eps_actuation_cntr = eps_actuation * ENC_RAD2CNTR;
+
+                memcpy(&frame.data[0], &eps_flag, 1);
+                memcpy(&frame.data[1], &eps_actuation_cntr, 2);
+
+                if (write(socket_can, &frame, sizeof(struct can_frame)) != sizeof(struct can_frame))
+                {
+                    logger.warn("SOCKET CAN SEND FAILED\n");
+                }
             }
 
             parse_can_frame(); // Ini blocking
@@ -220,38 +240,43 @@ public:
             parse_can_jhctech(); // Ini blocking
         }
 
-        std_msgs::msg::Int16 msg_battery;
-        msg_battery.data = battery;
-        pub_battery->publish(msg_battery);
-
-        if (prev_epoch_encoder != epoch_encoder)
+        if (can_to_car)
         {
-            std_msgs::msg::Int32 msg_encoder;
-            msg_encoder.data = encoder;
-            pub_encoder->publish(msg_encoder);
+            std_msgs::msg::Int16 msg_battery;
+            msg_battery.data = battery;
+            pub_battery->publish(msg_battery);
+
+            if (prev_epoch_encoder != epoch_encoder)
+            {
+                std_msgs::msg::Int32 msg_encoder;
+                msg_encoder.data = encoder;
+                pub_encoder->publish(msg_encoder);
+            }
+
+            std_msgs::msg::UInt8 msg_fb_tps_accelerator;
+            msg_fb_tps_accelerator.data = fb_tps_accelerator;
+            pub_fb_tps_accelerator->publish(msg_fb_tps_accelerator);
+
+            std_msgs::msg::UInt8 msg_fb_transmission;
+            msg_fb_transmission.data = fb_transmission;
+            pub_fb_transmission->publish(msg_fb_transmission);
+
+            std_msgs::msg::Int16 msg_error_code;
+            msg_error_code.data = error_code;
+            pub_error_code->publish(msg_error_code);
         }
+        else
+        {
+            std_msgs::msg::Float32 msg_eps_encoder;
+            msg_eps_encoder.data = eps_encoder_fb;
+            pub_eps_encoder->publish(msg_eps_encoder);
 
-        std_msgs::msg::UInt8 msg_fb_tps_accelerator;
-        msg_fb_tps_accelerator.data = fb_tps_accelerator;
-        pub_fb_tps_accelerator->publish(msg_fb_tps_accelerator);
+            std_msgs::msg::UInt8 msg_fb_eps_mode;
+            msg_fb_eps_mode.data = eps_mode_fb;
+            pub_fb_eps_mode->publish(msg_fb_eps_mode);
 
-        std_msgs::msg::UInt8 msg_fb_transmission;
-        msg_fb_transmission.data = fb_transmission;
-        pub_fb_transmission->publish(msg_fb_transmission);
-
-        std_msgs::msg::Int16 msg_error_code;
-        msg_error_code.data = error_code;
-        pub_error_code->publish(msg_error_code);
-
-        std_msgs::msg::Float32 msg_eps_encoder;
-        msg_eps_encoder.data = eps_encoder_fb;
-        pub_eps_encoder->publish(msg_eps_encoder);
-
-        std_msgs::msg::UInt8 msg_fb_eps_mode;
-        msg_fb_eps_mode.data = eps_mode_fb;
-        pub_fb_eps_mode->publish(msg_fb_eps_mode);
-
-        pub_imu_can->publish(imu_msg);
+            pub_imu_can->publish(imu_msg);
+        }
     }
 
     void parse_can_jhctech()

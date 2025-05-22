@@ -93,7 +93,7 @@
                 "Grid/RangeMin": "0.0",  # Added by Azzam
                 "Grid/RangeMax": "100.0",  # Added by Azzam
                 'Grid/UpdateRate': "1.0",  # Update map every 1 second (default is often higher)
-                'Grid/CellSize': "0.1",  # Increase cell size to reduce map density
+                'Grid/CellSize': "1.0",  # Increase cell size to reduce map density
                 "Grid/FromDepth": "False",  # Added from documentation
                 "Grid/IncrementalMapping": "True",  # Added from documentation
                 "Grid/Scan2dUnknownSpaceFilled": "False",  # Added by Azzam
@@ -103,3 +103,62 @@
                 "use_sim_time": False,
                 "Threads": 10, # Added by Azzam
          
+
+
+
+# =====================================================================================================================================================================================
+
+
+                         "frame_id": "base_link",
+                "map_frame_id": "map",
+                "odom_frame_id": "odom",
+                "subscribe_depth": True,
+                "subscribe_scan": True,
+                "subscribe_scan_cloud": False,
+                "subscribe_stereo": False,
+                "subscribe_rgbd": False,
+                "subscribe_rgb": False,
+                "subscribe_Odometry": True,
+                'scan_max_range': 50.0,  # LiDAR max range (meters)
+                'scan_voxel_size': 0.05,  # Downsampling resolution (meters)
+                "qos_scan": 1,
+                "wait_for_transform": 2.0,
+
+                "odom_tf_linear_variance": 0.0001,
+                "odom_tf_angular_variance": 0.0001,
+                # "odom_tf_linear_variance": 0.0000000001,
+                # "odom_tf_angular_variance": 0.0000000001,
+                "publish_tf": False,
+                "publish_map": True,
+                "subscribe_scan": True,
+                "subscribe_scan_cloud": False,
+                "subscribe_stereo": False,
+                "subscribe_rgbd": False,
+                "frame_id": "base_link",
+                "map_frame_id": "map",
+                "odom_frame_id": "odom",
+                "odom_tf_linear_variance": 0.01,
+                "odom_tf_angular_variance": 0.01,
+                "publish_tf": False,
+                "approx_sync": True,
+                "Grid/CellSize": "0.025",  # Added by Pandu
+                "Grid/FootprintHeight": "1.5",  # Added by Pandu
+                "Grid/FootprintLength": "0.5",  # Added by Pandu
+                "Grid/FootprintWidth": "0.5",  # Added by Pandu
+                "Grid/FromDepth": "False",  # Added from documentation
+                "Grid/Sensor": "2",  # Added to suppress warning
+                "Icp/MaxCorrespondenceDistance": "0.1",  # Added from documentation
+                "Icp/VoxelSize": "0.05",  # Added from documentation
+                "Mem/IncrementalMemory": "False",  # Added by Pandu
+                "RGBD/AngularUpdate": "0.01",  # Added from documentation # 0.01
+                "RGBD/LinearUpdate": "0.01",  # Added from documentation
+                "RGBD/NeighborLinkRefining": "True",  # Added from documentation
+                "RGBD/OptimizeFromGraphEnd": "False",  # Added from documentation # False
+                "RGBD/ProximityBySpace": "True",  # Added from documentation
+                "RGBD/ProximityPathMaxNeighbors": "10",  # Added to suppress warning
+                # "Vis/MinInliers": "10",  # Baru
+                "Reg/Force3DoF": "true",  # Added from documentation
+                "Reg/Strategy": "1",  # Added from documentation
+
+                "use_sim_time": False,
+                "Threads": 10, # Added by Azzam
