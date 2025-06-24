@@ -11,6 +11,12 @@ sudo apt install ros-humble-pcl-ros
 sudo apt install ros-humble-diagnostic-updater
 sudo apt install ros-humble-rtabmap
 sudo apt install ros-humble-rtabmap-ros
+sudo apt install ros-humble-robot-localization
+sudo apt install ros-humble-rviz2
+sudo apt install python3-pip
+
+pip install httpserver
+
 
 cd Livox-SDK2_local && mkdir build && cmake .. && make && sudo make install
 cd SOEM_local && mkdir build && cmake .. && make && sudo make install

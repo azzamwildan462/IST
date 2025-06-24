@@ -161,7 +161,7 @@ def generate_launch_description():
         namespace='lidar2',
         parameters=[
             {
-                "ip_address": "172.16.32.32",
+                "ip_address": "172.172.32.32",
                 "frame_id": "lidar2_link",
                 "angle_min": -1.57,
                 "angle_max": 1.57,
@@ -382,13 +382,57 @@ def generate_launch_description():
             "pid_terms": [0.0070, 0.000000, 0, 0.02, -1.4, 0.4, -0.0005, 0.0005],
             "metode_following": 0,
             "enable_obs_detection": True,
+            "enable_obs_detection_camera": False,
             "timeout_terminal_1": 10.0,
             "timeout_terminal_2": 10.0,
             "wheelbase": 0.9,
-            "profile_max_velocity": 1.5,
+            "profile_max_velocity": 1.0,
+            "complementary_terms": [0.60, 0.03, 0.01, 0.94],
+            "use_filtered_pose": False,
+            "camera_scan_min_x_": 0.2,
+            "camera_scan_max_x_": 3.0,
+            "camera_scan_min_y_": -1.0,
+            "camera_scan_max_y_": 1.0,
+            "threshold_icp_score": 7.5,
         }],
         respawn=True,
         prefix='nice -n -8 chrt -f 95'
+    )
+
+    camera_obstacle_detector = Node(
+        package='world_model',
+        executable='camera_obstacle_detector',
+        name='camera_obstacle_detector',
+        output='screen',
+        parameters=[{
+            "roi_min_x": 0.0,
+            "roi_max_x": 3.0,
+            "roi_min_y": -1.0,
+            "roi_max_y": 1.0,
+        }],
+        respawn=True,
+        # remappings=[('/hardware/imu', '/can/imu')],
+        # prefix='nice -n -9 chrt -f 80'
+    )
+
+    lidar_obstacle_filter = Node(
+        package='world_model',
+        executable='lidar_obstacle_filter',
+        name='lidar_obstacle_filter',
+        output='screen',
+        parameters=[{
+            "scan_min_y": -1.0,
+            "scan_max_y": 1.0,
+            "scan_range": 3.5,
+            "obstacle_error_tolerance": 0.4,
+            "pgm_path": "/root/.ros/rtabmap.pgm",
+            "resolution": 0.3,
+            "origin_x": -211.59,
+            "origin_y": -22.645,
+        }],
+        respawn=True,
+        # remappings=[('/hardware/imu', '/can/imu')],
+        # prefix='nice -n -9 chrt -f 80'
     )
 
     pose_estimator = Node(
@@ -401,7 +445,8 @@ def generate_launch_description():
             # "encoder_to_meter" : 0.000013215227 * 7.1 / 7,
             # "encoder_to_meter" : 0.0000123550127, # sama navis
             # "encoder_to_meter" : 0.0000279741933,
-            "encoder_to_meter" : 0.0000282567609,
+            # "encoder_to_meter" : 0.0000282567609, # Hari pertama sebelum di IST
+            "encoder_to_meter" : 0.0000279741933, # Hari pertama sebelum di IST
             "offset_sudut_steering": -0.04,
             "gyro_type": 0,
             "timer_period": 40,
@@ -410,6 +455,35 @@ def generate_launch_description():
         # remappings=[('/hardware/imu', '/can/imu')],
         prefix='nice -n -9 chrt -f 80'
     )
+
+    # pose_estimator_icp = Node(
+    #     package='world_model',
+    #     executable='pose_estimator_icp',
+    #     name='pose_estimator_icp',
+    #     namespace="manual_icp",
+    #     output='screen',
+    #     parameters=[{
+    #         "encoder_to_meter" : 0.0000279741933, # Hari pertama sebelum di IST
+    #         "offset_sudut_steering": -0.04,
+    #         "gyro_type": 0,
+    #         "timer_period": 40,
+    #         "lidar_frame_id": "lidar2_link",
+    #         "lidar_topic": "/scan",
+    #         "icp_minimal_travel": 0.5,
+    #         "icp_max_correspondence_distance": 0.1,
+    #         "icp_max_translation_distance": 0.1,
+    #         "icp_max_linear_correction": 0.5,
+    #         "icp_max_angular_correction": 0.5,
+    #         "icp_gain": 0.005,
+    #         "map_file": os.path.join(ws_path, "tools/rtabmap3.pcd"),
+    #         "icp_max_iterations": 50,
+    #         "icp_transformation_epsilon": 1e-8,
+    #         "threshold_icp_score": 20.0,
+    #     }],
+    #     respawn=True,
+    #     # remappings=[('/hardware/imu', '/can/imu')],
+    #     prefix='nice -n -9 chrt -f 80'
+    # )
 
     obstacle_filter = Node(
         package='world_model',
@@ -440,10 +514,12 @@ def generate_launch_description():
         name='beckhoff',
         output='screen',
         parameters=[{
-            "if_name": "enp5s0",
+            "if_name": "enp45s0",
+            # "if_name": "enp5s0",
             # "if_name": "enxf8e43b8f7f88",
             "po2so_config": 0,
             "dac_velocity_maximum": 4.0,
+            "brake_idle_position": -50000,
         }],
         respawn=True,
         prefix='nice -n -20 chrt -f 99'
@@ -472,9 +548,10 @@ def generate_launch_description():
             "if_name": "can0",
             "bitrate": 125000,
             "use_socket_can": True,
-            "can_to_car": True,
+            "can_to_car": False,
         }],
         respawn=True,
+        remappings=[('/can/imu', '/hardware/imu')],
         prefix='nice -n -20 chrt -f 98'
     )
     CANbus_HAL_socket_can1 = Node(
@@ -486,10 +563,10 @@ def generate_launch_description():
             "if_name": "can1",
             "bitrate": 125000,
             "use_socket_can": True,
-            "can_to_car": False,
+            "can_to_car": True,
         }],
         respawn=True,
-        prefix='nice -n -20 chrt -f 98'
+        prefix='nice -n -20 chrt -f 97'
     )
 
 
@@ -831,6 +908,10 @@ def generate_launch_description():
         arguments=["1.378","0.00","0.22","0.00","0.00","3.1415","base_link","lidar1_link",
             "--ros-args","--log-level","error",],
         # fmt: on
+        # # fmt: off
+        # arguments=["1.378","0.00","0.22","0.00","0.00","3.1415","base_link","lidar1_link",
+        #     "--ros-args","--log-level","error",],
+        # # fmt: on
         respawn=True,
     )
 
@@ -902,8 +983,10 @@ def generate_launch_description():
                 "qos_scan": 1,
                 "wait_for_transform": 2.0,
 
-                "odom_tf_linear_variance": 0.0001,
-                "odom_tf_angular_variance": 0.0001,
+                "odom_tf_linear_variance": 0.01,
+                "odom_tf_angular_variance": 0.01,
+                # "odom_tf_linear_variance": 0.0001,
+                # "odom_tf_angular_variance": 0.0001,
                 # "odom_tf_linear_variance": 0.0000000001,
                 # "odom_tf_angular_variance": 0.0000000001,
                 "publish_tf": False,
@@ -922,7 +1005,7 @@ def generate_launch_description():
                 "Mem/InitWMWithAllNodes": "True",  # 
                 "Mem/RehearsalSimilaritys": "0.9",  #
                 "Mem/UseOdomFeatures": "True",  #
-                'Mem/NotLinkedNodesKept': "False",  # Keep unlinked nodes
+                'Mem/NotLinkedNodesKept': "True",  # Keep unlinked nodes
                 # "Mem/UseOdomFeatures": "False", # (percobaan) untuk disable odometry untuk mencari loop closure
 
                 "Kp/MaxFeatures": "2000",
@@ -937,15 +1020,146 @@ def generate_launch_description():
                 "RGBD/ProximityPathMaxNeighbors": "20",
                 "RGBD/ProximityMaxGraphDepth": "50",
                 "RGBD/ProximityByTime": "False",
-                "RGBD/ProximityBySpace": "True",  # Added from documentation
+                "RGBD/ProximityBySpace": "True",  # Added from documentation,
+                "RGBD/LocalBundleOnLoopClosure": "False",
 
                 "Optimizer/Strategy": "2",  # Added by Azzam
-                "Optimizer/Iterations": "40",  # Added by Azzam
+                "Optimizer/Iterations": "70",  # Added by Azzam
                 "Optimizer/Epsilon": "0.00001",  # Added by Azzam
                 "Optimizer/Robust": "False",  # Added by Azzam
-                'Optimizer/GravitySigma':'0', # Disable imu constraints (we are already in 2D)
-                "Optimizer/VarianceIgnored": "True",
-                "GTSAM/Incremental": "True",
+                'Optimizer/GravitySigma':'0.3', 
+                "Optimizer/VarianceIgnored": "False",
+                "Optimizer/LandmarksIgnored": "False",  # Added by Azzam
+                "Optimizer/PriorsIgnored": "True",  # Added by Azzam
+                "GTSAM/Incremental": "False",  # Added by Azzam
+
+                "Bayes/PredictionMargin": "0", # Added by Azzam
+                "Bayes/FullPredictionUpdate": "False", # Added by Azzam
+                "Bayes/PredictionLC": "0.1", # Added by Azzam
+
+                "Odom/Strategy": "1",  # Added by Azzam
+                "Odom/ResetCountdown": "0",  # Added by Azzam
+                "Odom/Holonomic": "False",  # Added by Azzam
+                "Odom/ScanKeyFrameThr": "0.9",  # Added by Azzam, semakin kecil semakin sering lidar update
+                "Odom/AlignWithGround": "True",  # Added by Azzam
+                "Odom/FilteringStrategy": "1",
+                # "OdomF2M/ScanSubtractAngle": "0.0",  # Added by Azzam
+                # "OdomF2M/BundleAdjustment": "0",
+                # "OdomF2M/ScanMaxSize": "20000",
+
+                "Reg/Strategy": "1",  # Added by Azzam
+                "Reg/Force3DoF": "True",  # Added by Azzam
+
+                "Icp/Strategy": "1",  # Added by Azzam
+                "Icp/MaxTranslation": "1.5", # Added by Azzam
+                "Icp/MaxRotation": "0.7", # Added by Azzam
+                "Icp/RangeMin": "0.0", # Added by Azzam
+                "Icp/RangeMax": "25.0", # Added by Azzam
+                "Icp/MaxCorrespondenceDistance": "1.0", # Added by Azzam
+                "Icp/Iterations": "30", # Added by Azzam
+                "Icp/PointToPlane": "True", # Added by Azzam
+                "Icp/VoxelSize": "0.05", # Added by Azzam
+                'Icp/PointToPlaneMinComplexity':'0.19', # to be more robust to long corridors with low geometry
+                'Icp/PointToPlaneLowComplexityStrategy':'1', # to be more robust to long corridors with low geometry
+
+                "Vis/MaxDepth": "20.0",
+                "Vis/MinInliers": "15",
+
+                "Grid/Sensor": "0",  # Added to suppress warning
+                "Grid/RangeMin": "0.0",  # Added by Azzam
+                "Grid/RangeMax": "150.0",  # Added by Azzam
+                'Grid/UpdateRate': "1.0",  # Update map every 1 second (default is often higher)
+                'Grid/CellSize': "0.3",  # Increase cell size to reduce map density
+                "Grid/FromDepth": "False",  # Added from documentation
+                "Grid/IncrementalMapping": "True",  # Added from documentation
+                "Grid/Scan2dUnknownSpaceFilled": "False",  # Added by Azzam
+                "GridGlobal/UpdateError": "0.04", # Added by Azzam
+                "Grid/RayTracing": "False", # Added by Azzam
+
+                "use_sim_time": False,
+                "Threads": 10, # Added by Azzam
+            }
+        ],
+        remappings=[
+            ("scan", "/scan"),
+            ('rgb/image', '/camera/rs2_cam_main/color/image_raw'),
+            ('rgb/camera_info', '/camera/rs2_cam_main/color/camera_info'),
+            ('depth/image', '/camera/rs2_cam_main/aligned_depth_to_color/image_raw')
+        ],
+        arguments=["--ros-args", "--log-level", "warn"],
+        # prefix='nice -n -9 chrt -f 90',
+        respawn=True,
+    )
+
+    rtabmap_slam_robust = Node(
+        package="rtabmap_slam",
+        executable="rtabmap",
+        name="rtabmap",
+        namespace="slam",
+        parameters=[
+            {
+                "frame_id": "base_link",
+                "map_frame_id": "map",
+                "odom_frame_id": "odom",
+                "subscribe_depth": True,
+                "subscribe_scan": True,
+                "subscribe_scan_cloud": False,
+                "subscribe_stereo": False,
+                "subscribe_rgbd": False,
+                "subscribe_rgb": False,
+                "subscribe_Odometry": True,
+                'scan_max_range': 50.0,  # LiDAR max range (meters)
+                'scan_voxel_size': 0.05,  # Downsampling resolution (meters)
+                "qos_scan": 1,
+                "wait_for_transform": 2.0,
+
+                "odom_tf_linear_variance": 0.0000000001,
+                "odom_tf_angular_variance": 0.0000000001,
+                "publish_tf": False,
+                "publish_map": True,
+                "approx_sync": True,
+                "use_saved_map": False,
+                "sync_queue_size": 30,
+                "topic_queue_size": 10,
+                "icp_odometry": False, 
+                "visual_odometry": False,
+
+                "Rtabmap/DetectionRate": "5.0", # Added by Azzam
+                "Rtabmap/CreateIntermediateNodes": "True",
+                "Rtabmap/LoopThr": "0.11", # Routine period untuk cek loop closure
+
+                "Mem/STMSize": "50",  # Short-term memory size
+                "Mem/IncrementalMemory": "False",  # 
+                "Mem/InitWMWithAllNodes": "True",  # 
+                "Mem/RehearsalSimilaritys": "0.9",  #
+                "Mem/UseOdomFeatures": "True",  #
+                'Mem/NotLinkedNodesKept': "True",  # Keep unlinked nodes
+                # "Mem/UseOdomFeatures": "False", # (percobaan) untuk disable odometry untuk mencari loop closure
+
+                "Kp/MaxFeatures": "2000",
+
+                "RGBD/Enabled": "True",
+                "RGBD/OptimizeFromGraphEnd": "False", # True agar robot tidak lompat 
+                "RGBD/NeighborLinkRefining": "False",  # Added from documentation
+                "RGBD/AngularUpdate": "1.0",  # Added from documentation
+                "RGBD/LinearUpdate": "1.0",  # Added from documentation
+                "RGBD/OptimizeMaxError": "3.0",  # Added from documentation
+                "RGBD/InvertedReg": "False",  # Added from documentation
+                "RGBD/ProximityPathMaxNeighbors": "10",
+                "RGBD/ProximityMaxGraphDepth": "50",
+                "RGBD/ProximityByTime": "False",
+                "RGBD/ProximityBySpace": "False",  
+                # "RGBD/LocalBundleOnLoopClosure": "True",
+
+                "Optimizer/Strategy": "2",  # Added by Azzam
+                "Optimizer/Iterations": "10",  # Added by Azzam
+                "Optimizer/Epsilon": "0.00001",  # Added by Azzam
+                "Optimizer/Robust": "False",  # Added by Azzam
+                'Optimizer/GravitySigma':'0.3', 
+                "Optimizer/VarianceIgnored": "False",
+                "Optimizer/LandmarksIgnored": "False",  # Added by Azzam
+                "Optimizer/PriorsIgnored": "True",  # Added by Azzam
+                "GTSAM/Incremental": "False",  # Added by Azzam
 
                 "Bayes/PredictionMargin": "0", # Added by Azzam
                 "Bayes/FullPredictionUpdate": "False", # Added by Azzam
@@ -956,6 +1170,7 @@ def generate_launch_description():
                 "Odom/Holonomic": "False",  # Added by Azzam
                 "Odom/ScanKeyFrameThr": "0.9",  # Added by Azzam, semakin kecil semakin sering lidar update
                 "Odom/AlignWithGround": "True",  # Added by Azzam
+                "Odom/FilteringStrategy": "1",
                 # "OdomF2M/ScanSubtractAngle": "0.0",  # Added by Azzam
                 # "OdomF2M/BundleAdjustment": "0",
                 # "OdomF2M/ScanMaxSize": "20000",
@@ -964,25 +1179,25 @@ def generate_launch_description():
                 "Reg/Force3DoF": "True",  # Added by Azzam
 
                 "Icp/Strategy": "1",  # Added by Azzam
-                "Icp/MaxTranslation": "1.0", # Added by Azzam
-                "Icp/MaxRotation": "0.1", # Added by Azzam
+                "Icp/MaxTranslation": "1.5", # Added by Azzam
+                "Icp/MaxRotation": "0.7", # Added by Azzam
                 "Icp/RangeMin": "0.0", # Added by Azzam
                 "Icp/RangeMax": "25.0", # Added by Azzam
                 "Icp/MaxCorrespondenceDistance": "1.0", # Added by Azzam
                 "Icp/Iterations": "30", # Added by Azzam
                 "Icp/PointToPlane": "True", # Added by Azzam
                 "Icp/VoxelSize": "0.05", # Added by Azzam
-                'Icp/PointToPlaneMinComplexity':'0.23', # to be more robust to long corridors with low geometry
+                'Icp/PointToPlaneMinComplexity':'0.19', # to be more robust to long corridors with low geometry
                 'Icp/PointToPlaneLowComplexityStrategy':'1', # to be more robust to long corridors with low geometry
 
                 "Vis/MaxDepth": "20.0",
-                "Vis/MinInliers": "20",
+                "Vis/MinInliers": "15",
 
-                "Grid/Sensor": "2",  # Added to suppress warning
+                "Grid/Sensor": "0",  # Added to suppress warning
                 "Grid/RangeMin": "0.0",  # Added by Azzam
-                "Grid/RangeMax": "100.0",  # Added by Azzam
+                "Grid/RangeMax": "150.0",  # Added by Azzam
                 'Grid/UpdateRate': "1.0",  # Update map every 1 second (default is often higher)
-                'Grid/CellSize': "1.0",  # Increase cell size to reduce map density
+                'Grid/CellSize': "0.3",  # Increase cell size to reduce map density
                 "Grid/FromDepth": "False",  # Added from documentation
                 "Grid/IncrementalMapping": "True",  # Added from documentation
                 "Grid/Scan2dUnknownSpaceFilled": "False",  # Added by Azzam
@@ -990,7 +1205,7 @@ def generate_launch_description():
                 "Grid/RayTracing": "False", # Added by Azzam
 
                 "use_sim_time": False,
-                "Threads": 10, # Added by Azzam
+                "Threads": 12, # Added by Azzam
             }
         ],
         remappings=[
@@ -1052,6 +1267,7 @@ def generate_launch_description():
                 "smooth_lagged_data": True,
                 "history_length": 1.0,
                 "frequency": 25.0,
+                "publish_tf": False,
 
                 "odom0": "/odom",
                 # fmt: off
@@ -1065,9 +1281,11 @@ def generate_launch_description():
                 # fmt: on
                 "odom0_differential": True,
                 "odom0_relative": True,
+                # "odom0_noise_covariance":    [0.0004, 0.0,    0.0,
+                #                             0.0,    0.0004, 0.0,
+                #                             0.0,    0.0,    0.05],
 
                 "pose0": "localization_pose", # Ini untuk rtabmap
-                # "pose0": "tracked_pose", # Ini untuk cartographer
                 # fmt: off
                 "pose0_config":[
                     True,True,False,
@@ -1079,6 +1297,41 @@ def generate_launch_description():
                 # fmt: on
                 "pose0_differential": False,
                 "pose0_relative": False,
+                # "pose0_noise_covariance":    [0.25,   0.0,    0.0,
+                #                             0.0,    0.25,   0.0,
+                #                             0.0,    0.0,    0.25],
+                                            
+                # Process noise = how fast the filter can change
+                # "process_noise_covariance":  [5e-5,   0.0,    0.0,
+                #                             0.0,    5e-5,   0.0,
+                #                             0.0,    0.0,    0.0001],
+
+                # "odom1": "/slam_vo/odom",
+                # # fmt: off
+                # "odom1_config": [
+                #     True,True,False,
+                #     False,False,True,
+                #     False,False,False,
+                #     False,False,False,
+                #     False,False,False,
+                # ],
+                # # fmt: on
+                # "odom1_differential": True,
+                # "odom1_relative": True,
+
+                # "odom2": "/slam_icp/odom",
+                # # fmt: off
+                # "odom2_config": [
+                #     True,True,False,
+                #     False,False,True,
+                #     False,False,False,
+                #     False,False,False,
+                #     False,False,False,
+                # ],
+                # # fmt: on
+                # "odom2_differential": True,
+                # "odom2_relative": True,
+
             }
         ],
         arguments=["--ros-args", "--log-level", "warn"],
@@ -1086,28 +1339,160 @@ def generate_launch_description():
         respawn=True,
     )
 
-    return LaunchDescription(
-        [
-            # DeclareLaunchArgument('auto_start', default_value='true'),
-            # hokuyo1_lidar_driver,
-            # hokuyo1_lidar_configure,
-            # hokuyo1_lidar_activate,
-            # hokuyo2_lidar_driver,
-            # hokuyo2_lidar_configure,
-            # hokuyo2_lidar_activate,
-            # beckhoff,
-            # CANbus_HAL,
+    rgbd_odom_node = Node(
+        package="rtabmap_odom",
+        executable="rgbd_odometry",
+        name="rgbd_odometry",
+        output="screen",
+        namespace="slam_vo",
+        parameters=[
+            {
+                "frame_id": "base_link",
+                "subscribe_depth": True,
+                "subscribe_imu": True,
+                "use_sim_time": False,
+                "publish_tf": False,
+                "approx_sync": False,
 
-            tf_base_link_to_lidar2_link,
-            tf_base_link_to_body_link,
-            tf_base_link_to_lidar1_link,
-            tf_base_link_to_imu_link,
-            tf_base_link_to_camera_link,
+                "Rtabmap/DetectionRate": "25.0", # Added by Azzam
+                "Rtabmap/CreateIntermediateNodes": "True",
+                "Rtabmap/LoopThr": "0.11", # Routine period untuk cek loop closure
 
-            rs2_cam_main,
-            rviz2,
-        ]
+                "Mem/STMSize": "25",  # Short-term memory size
+                "Mem/IncrementalMemory": "False",  # 
+                "Mem/InitWMWithAllNodes": "True",  # 
+                "Mem/RehearsalSimilaritys": "0.9",  #
+                "Mem/UseOdomFeatures": "True",  #
+                'Mem/NotLinkedNodesKept': "False",  # Keep unlinked nodes
+                # "Mem/UseOdomFeatures": "False", # (percobaan) untuk disable odometry untuk mencari loop closure
+
+                "Odom/Strategy": "1",  # Added by Azzam
+                "Odom/ResetCountdown": "0",  # Added by Azzam
+                "Odom/Holonomic": "False",  # Added by Azzam
+                "Odom/ScanKeyFrameThr": "0.9",  # Added by Azzam, semakin kecil semakin sering lidar update
+                "Odom/AlignWithGround": "True",  # Added by Azzam
+
+                "Reg/Strategy": "0",  # Added by Azzam
+                "Reg/Force3DoF": "True",  # Added by Azzam
+
+                "Kp/MaxFeatures": "2000",
+                "Kp/MaxDepth": "8.0",
+                "Kp/DetectorStrategy": "4",  # 0 = SURF, 1 = SIFT, 2 = ORB
+
+                "Vis/MaxDepth": "8.0",
+                "Vis/MinInliers": "10",
+
+                "use_sim_time": False,
+                "Threads": 10, # Added by Azzam
+
+            } # Added by Azzam
+        ],
+        remappings=[
+            ("scan", "/scan"),
+            ('rgb/image', '/camera/rs2_cam_main/color/image_raw'),
+            ('rgb/camera_info', '/camera/rs2_cam_main/color/camera_info'),
+            ('depth/image', '/camera/rs2_cam_main/aligned_depth_to_color/image_raw'),
+            ("imu", "/hardware/imu"),
+        ],
+        arguments=["--ros-args", "--log-level", "warn"],
     )
+
+    icp_odom_node = Node(
+        package="rtabmap_odom",
+        executable="icp_odometry",
+        name="icp_odometry",
+        output="screen",
+        namespace="slam_icp",
+        parameters=[
+            {
+                "frame_id": "base_link",
+                "subscribe_scan": True,
+                "subscribe_depth": False,
+                "subscribe_imu": True,
+                "use_sim_time": False,
+                "publish_tf": False,
+                "approx_sync": False,
+
+                "Rtabmap/DetectionRate": "25.0", # Added by Azzam
+                "Rtabmap/CreateIntermediateNodes": "True",
+                "Rtabmap/LoopThr": "0.11", # Routine period untuk cek loop closure
+
+                "Mem/STMSize": "25",  # Short-term memory size
+                "Mem/IncrementalMemory": "False",  # 
+                "Mem/InitWMWithAllNodes": "True",  # 
+                "Mem/RehearsalSimilaritys": "0.9",  #
+                "Mem/UseOdomFeatures": "True",  #
+                'Mem/NotLinkedNodesKept': "False",  # Keep unlinked nodes
+                # "Mem/UseOdomFeatures": "False", # (percobaan) untuk disable odometry untuk mencari loop closure
+
+                "Odom/Strategy": "1",  # Added by Azzam
+                "Odom/ResetCountdown": "0",  # Added by Azzam
+                "Odom/Holonomic": "False",  # Added by Azzam
+                "Odom/ScanKeyFrameThr": "0.3",  # Added by Azzam, semakin kecil semakin sering lidar update
+                "Odom/AlignWithGround": "True",  # Added by Azzam
+
+                "Icp/Strategy": "1",  # Added by Azzam
+                "Icp/MaxTranslation": "1.0", # Added by Azzam
+                "Icp/MaxRotation": "0.5", # Added by Azzam
+                "Icp/RangeMin": "0.0", # Added by Azzam
+                "Icp/RangeMax": "25.0", # Added by Azzam
+                "Icp/MaxCorrespondenceDistance": "1.0", # Added by Azzam
+                "Icp/Iterations": "30", # Added by Azzam
+                "Icp/PointToPlane": "False", # Added by Azzam, False karena butuh cepat
+                "Icp/VoxelSize": "0.05", # Added by Azzam
+
+                "Reg/Strategy": "1",  # Added by Azzam
+                "Reg/Force3DoF": "True",  # Added by Azzam
+
+                "use_sim_time": False,
+                "Threads": 10, # Added by Azzam
+            
+            } # Added by Azzam
+        ],
+        remappings=[
+            ("scan", "/scan"),
+            ('rgb/image', '/camera/rs2_cam_main/color/image_raw'),
+            ('rgb/camera_info', '/camera/rs2_cam_main/color/camera_info'),
+            ('depth/image', '/camera/rs2_cam_main/aligned_depth_to_color/image_raw'),
+            ("imu", "/hardware/imu"),
+        ],
+        arguments=["--ros-args", "--log-level", "warn"],
+    )
+
+    # return LaunchDescription(
+    #     [
+    #         # DeclareLaunchArgument('auto_start', default_value='true'),
+    #         # hokuyo1_lidar_driver,
+    #         # hokuyo1_lidar_configure,
+    #         # hokuyo1_lidar_activate,
+    #         # hokuyo2_lidar_driver,
+    #         # hokuyo2_lidar_configure,
+    #         # hokuyo2_lidar_activate,
+    #         # beckhoff,
+    #         # CANbus_HAL,
+
+    #         # tf_base_link_to_lidar2_link,
+    #         # tf_base_link_to_body_link,
+    #         # tf_base_link_to_lidar1_link,
+    #         # tf_base_link_to_imu_link,
+    #         # tf_base_link_to_camera_link,
+
+    #         # rs2_cam_main,
+    #         # rviz2,
+    #         # CANbus_HAL_socket_can0,
+    #         # CANbus_HAL_socket_can1,
+
+    #         # rosapi_node,
+    #         # rosbridge_server, 
+    #         # web_video_server,
+    #         # master,
+    #         # ui_server,
+
+
+    #         # camera_obstacle_detector,
+    #         lidar_obstacle_filter
+    #     ]
+    # )
 
     # ==============================================================================
 
@@ -1138,15 +1523,23 @@ def generate_launch_description():
             
             # # =============================================================================
 
-            DeclareLaunchArgument('auto_start', default_value='true'),
-            hokuyo1_lidar_driver,
-            hokuyo1_lidar_configure,
-            hokuyo1_lidar_activate,
-            hokuyo2_lidar_driver,
-            hokuyo2_lidar_configure,
-            hokuyo2_lidar_activate,
+            TimerAction(
+                period=1.5,
+                actions=[
+                    DeclareLaunchArgument('auto_start', default_value='true'),
+                    hokuyo1_lidar_driver,
+                    hokuyo2_lidar_driver,
+                    hokuyo1_lidar_activate,
+                    hokuyo2_lidar_activate,
+                    hokuyo1_lidar_configure,
+                    hokuyo2_lidar_configure,
+                ],
+            ),
+
 
             # obstacle_filter,
+            # camera_obstacle_detector,
+            lidar_obstacle_filter,
 
             # # =============================================================================
 
@@ -1176,10 +1569,20 @@ def generate_launch_description():
             TimerAction(
                 period=0.5,
                 actions=[
-                    rtabmap_slam_rtabmap3,
+                    # rtabmap_slam_rtabmap3,
+                    rtabmap_slam_robust,
+                    # icp_odom_node,
+                    # rgbd_odom_node,
                     ekf_node,
                 ],
             ),
+
+            # TimerAction(
+            #     period=300.0,
+            #     actions=[
+            #         ekf_node,
+            #     ],
+            # ),
 
             # rviz2,
         ]

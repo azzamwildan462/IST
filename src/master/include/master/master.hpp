@@ -35,6 +35,17 @@
 #include "boost/thread/mutex.hpp"
 #include "fstream"
 
+#include <tf2_ros/transform_listener.h>
+#include <tf2_ros/buffer.h>
+#include <tf2_sensor_msgs/tf2_sensor_msgs.h>
+#include <pcl_conversions/pcl_conversions.h>
+#include <pcl/point_cloud.h>
+#include <pcl/point_types.h>
+#include "pcl/filters/crop_box.h"
+#include <pcl/filters/passthrough.h>
+#include <pcl/filters/voxel_grid.h>
+#include "pcl_ros/transforms.hpp"
+
 #define FSM_GLOBAL_INIT 0
 #define FSM_GLOBAL_PREOP 1
 #define FSM_GLOBAL_SAFEOP 2
@@ -70,9 +81,12 @@
 // #define IN_START_OP3 0b100000000
 // #define IN_STOP_OP3 0b1000000000
 // #define IN_START_GAS_MANUAL 0b10000000000
+#define IN_TRIM_KECEPATAN 0b10000000000000
 #define IN_START_OP3 (0b100000 << 16)
 #define IN_STOP_OP3 (0b100 << 16)
-#define IN_START_GAS_MANUAL (0b10 << 16)
+#define IN_START_GAS_MANUAL (0b1000 << 16)
+#define IN_MANUAL_MUNDUR (0b100 << 16)
+#define IN_MANUAL_MAJU (0b10 << 16)
 #define IN_NEXT_TERMINAL (0b10000 << 16)
 #define IN_SYSTEM_FULL_ENABLE (0b01 << 16)
 
@@ -82,6 +96,9 @@
 #define TERMINAL_TYPE_STOP2 0x08
 #define TERMINAL_TYPE_STOP3 0x0C
 #define TERMINAL_TYPE_STOP4 0x10
+#define TERMINAL_TYPE_LURUS 0x20
+
+// using namespace std::chrono_literals;
 
 typedef struct
 {
@@ -112,6 +129,9 @@ public:
     rclcpp::Publisher<sensor_msgs::msg::PointCloud>::SharedPtr pub_waypoints;
     rclcpp::Publisher<ros2_interface::msg::TerminalArray>::SharedPtr pub_terminals;
     rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr pub_obs_find;
+    rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr pub_pose_filtered;
+    rclcpp::Publisher<std_msgs::msg::UInt8>::SharedPtr pub_slam_status;
+    rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr pub_camera_obs_emergency;
 
     rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr sub_CAN_eps_encoder;
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr sub_beckhoff_sensor;
@@ -139,10 +159,16 @@ public:
     rclcpp::Subscription<rtabmap_msgs::msg::Info>::SharedPtr sub_rtabmap_info;
     rclcpp::Subscription<nav_msgs::msg::OccupancyGrid>::SharedPtr sub_map;
     rclcpp::Subscription<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr sub_localization_pose;
+    rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr sub_camera_pcl;
+    rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr sub_icp_score;
 
     rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr srv_set_record_route_mode;
     rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr srv_set_terminal; // Aktif -> add terminal, InActive -> save terminal
     rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr srv_rm_terminal;  // Aktif -> add terminal, InActive -> save terminal
+
+    std::shared_ptr<rclcpp::SyncParametersClient> lidar_obstacle_param_client;
+
+    rclcpp::CallbackGroup::SharedPtr cloud_cb_group_, timer_cb_group_;
 
     // Configs
     // ===============================================================================================
@@ -163,10 +189,15 @@ public:
     float wheelbase = 0.75;
     int metode_following = 0;
     bool enable_obs_detection = false;
+    bool enable_obs_detection_camera = false;
     float timeout_terminal_1 = 10;
     float timeout_terminal_2 = 10;
     bool transform_map2odom = false;
     float toribay_ready_threshold = 0.5;
+    bool use_filtered_pose = false;
+    float threshold_icp_score = 100.0;
+
+    std::vector<double> complementary_terms = {0.30, 0.03, 0.01, 0.9};
 
     float offset_sudut_steering = 0;
 
@@ -208,6 +239,7 @@ public:
 
     float fb_encoder_meter = 0;
     float fb_final_pose_xyo[3];
+    float fb_filtered_final_pose_xyo[3];
     float fb_final_vel_dxdydo[3];
     float fb_steering_angle = 0;
     uint8_t fb_eps_mode = 0;
@@ -217,6 +249,7 @@ public:
     float dt = 0.02;
 
     float obs_find = 0;
+    float obs_find_baru = 0;
 
     int16_t transmission_joy_master = 0;
 
@@ -248,6 +281,21 @@ public:
     float map2odom_offset_theta = 0;
     tf2::Transform manual_map2odom_tf;
     bool is_toribay_ready = false;
+    float lidar_obs_scan_thr = 1.5;
+
+    geometry_msgs::msg::TransformStamped tf_lidar_base;
+    std::unique_ptr<tf2_ros::Buffer> tf_lidar_base_buffer;
+    std::unique_ptr<tf2_ros::TransformListener> tf_lidar_base_listener;
+    pcl::PassThrough<pcl::PointXYZ> pass_x_, pass_y_;
+    pcl::VoxelGrid<pcl::PointXYZ> voxel_;
+
+    float camera_scan_min_x_, camera_scan_max_x_, camera_scan_min_y_, camera_scan_max_y_;
+    int camera_scan_obs_result = 0;
+
+    uint8_t slam_status = 0;
+    bool tf_is_initialized = false;
+
+    float icp_score = 999999;
 
     Master();
     ~Master();
@@ -281,6 +329,8 @@ public:
     void callback_sub_rtabmap_info(const rtabmap_msgs::msg::Info::SharedPtr msg);
     void callback_sub_map(const nav_msgs::msg::OccupancyGrid::SharedPtr msg);
     void callback_sub_localization_pose(const geometry_msgs::msg::PoseWithCovarianceStamped msg);
+    void callback_sub_camera_pcl(const sensor_msgs::msg::PointCloud2::SharedPtr msg);
+    void callback_sub_icp_score(const std_msgs::msg::Float32::SharedPtr msg);
     void callback_srv_set_record_route_mode(const std_srvs::srv::SetBool::Request::SharedPtr request, std_srvs::srv::SetBool::Response::SharedPtr response);
     void callback_srv_set_terminal(const std_srvs::srv::SetBool::Request::SharedPtr request, std_srvs::srv::SetBool::Response::SharedPtr response);
     void callback_srv_rm_terminal(const std_srvs::srv::SetBool::Request::SharedPtr request, std_srvs::srv::SetBool::Response::SharedPtr response);
@@ -323,6 +373,7 @@ public:
     geometry_msgs::msg::Point get_near(float x, float y, std::vector<geometry_msgs::msg::Point> ps);
     void set_initialpose(float x, float y, float yaw);
     void set_pose_offset(float x, float y, float yaw);
+    void set_lidar_obstacle_filter_param(double scan_range, double min_y, double max_y, double obstacle_error_tolerance);
 };
 
 #endif // MASTER_HPP

@@ -16,7 +16,12 @@ set(var_dependencies
     ros2_interface
     tf2_geometry_msgs
     rtabmap_msgs
-    tf2_ros)
+    tf2_ros
+    tf2_sensor_msgs
+    pcl_conversions
+    pcl_ros
+    tf2_eigen
+    )
     
 foreach(var_dependency ${var_dependencies})
   find_package(${var_dependency} REQUIRED)
@@ -24,11 +29,17 @@ endforeach()
 
 find_package(Boost REQUIRED COMPONENTS filesystem)
 
+
+find_package(PCL REQUIRED)
+include_directories(${PCL_INCLUDE_DIRS})
+link_directories(${PCL_LIBRARY_DIRS})
+add_definitions(${PCL_DEFINITIONS})
+
 include_directories(include)
 
 add_executable(master src/master.cpp src/master_definition.cpp src/motion.cpp)
 ament_target_dependencies(master ${var_dependencies})
-target_link_libraries(master Boost::filesystem)
+target_link_libraries(master Boost::filesystem ${PCL_LIBRARIES})
 
 install(TARGETS
   master

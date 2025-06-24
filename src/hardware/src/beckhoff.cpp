@@ -4,6 +4,8 @@
 #include "std_msgs/msg/float32_multi_array.hpp"
 #include "std_msgs/msg/int16.hpp"
 #include "std_msgs/msg/string.hpp"
+#include "std_msgs/msg/u_int8.hpp"
+#include "std_msgs/msg/float32.hpp"
 #include "std_msgs/msg/u_int8_multi_array.hpp"
 
 #include <soem/ethercat.h>
@@ -19,6 +21,7 @@
 #define DO_LAMPU_BELAKANG_KUNING 0b10000000000000
 #define DO_LAMPU_BELAKANG_HIJAU 0b100000000000000
 #define DO_BUZZER_BELAKANG 0b1000000000000000
+#define DO_SIRINE 0b1000000000
 
 #define EL6751_ID 0x1a5f3052 // CANopen
 #define EL2889_ID 0x0b493052 // Digital output
@@ -50,6 +53,9 @@
 #define IN_STOP_OP3 0b1000000000
 #define IN_START_GAS_MANUAL 0b10000000000
 #define IN_LS_BRAKE 0b1000000000000
+#define IN_TRIM_KECEPATAN 0b10000000000000
+#define IN_SELECTOR_SIRINE 0b10000000000000
+#define IN_SELECTOR_DISABLE_SIRINE 0b100000000000000
 
 PACKED_BEGIN
 typedef struct
@@ -340,6 +346,10 @@ public:
     rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_master_local_fsm;
     rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_master_global_fsm;
     rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_transmission_master;
+    rclcpp::Subscription<std_msgs::msg::UInt8>::SharedPtr sub_slam_status;
+    rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr sub_master_camera_obs;
+    rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr sub_master_lidar_obs;
+    rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_car_battery;
 
     // Configs
     // =======================================================
@@ -403,6 +413,14 @@ public:
     uint8_t prev_status_braking = 0;
     uint16_t counter_unbrake = 0;
     int32_t brake_maximum_position = 0;
+    float master_camera_obs = 0;
+    float master_lidar_obs = 0;
+
+    uint8_t master_slam_status = 0;
+
+    rclcpp::Time last_time_update_can_mobil;
+    rclcpp::Time current_time;
+    bool status_mobil_connected = false;
 
     Beckhoff()
         : Node("beckhoff")
@@ -456,6 +474,34 @@ public:
             "/master/global_fsm", 1, std::bind(&Beckhoff::callback_sub_master_global_fsm, this, std::placeholders::_1));
         sub_transmission_master = this->create_subscription<std_msgs::msg::Int16>(
             "/master/transmission", 1, std::bind(&Beckhoff::callback_sub_transmission_master, this, std::placeholders::_1));
+        sub_slam_status = this->create_subscription<std_msgs::msg::UInt8>(
+            "/master/slam_status", 1, std::bind(&Beckhoff::callback_sub_slam_status, this, std::placeholders::_1));
+        sub_master_camera_obs = this->create_subscription<std_msgs::msg::Float32>(
+            "/master/camera_obs_emergency", 1, std::bind(&Beckhoff::callback_sub_master_camera_obs, this, std::placeholders::_1));
+        sub_master_lidar_obs = this->create_subscription<std_msgs::msg::Float32>(
+            "/master/obs_find", 1, std::bind(&Beckhoff::callback_sub_master_lidar_obs, this, std::placeholders::_1));
+        sub_car_battery = this->create_subscription<std_msgs::msg::Int16>(
+            "/can/battery", 1, std::bind(&Beckhoff::callback_sub_car_battery, this, std::placeholders::_1));
+    }
+
+    void callback_sub_car_battery(const std_msgs::msg::Int16::SharedPtr msg)
+    {
+        last_time_update_can_mobil = rclcpp::Clock(RCL_SYSTEM_TIME).now();
+    }
+
+    void callback_sub_master_lidar_obs(const std_msgs::msg::Float32::SharedPtr msg)
+    {
+        master_lidar_obs = msg->data;
+    }
+
+    void callback_sub_master_camera_obs(const std_msgs::msg::Float32::SharedPtr msg)
+    {
+        master_camera_obs = msg->data;
+    }
+
+    void callback_sub_slam_status(const std_msgs::msg::UInt8::SharedPtr msg)
+    {
+        master_slam_status = msg->data;
     }
 
     void callback_sub_transmission_master(const std_msgs::msg::Int16::SharedPtr msg)
@@ -541,13 +587,24 @@ public:
         if (wkc >= expectedWKC)
         {
             counter_beckhoff_disconnect = 0;
+            current_time = rclcpp::Clock(RCL_SYSTEM_TIME).now();
+            rclcpp::Duration dt_can_mobil = current_time - last_time_update_can_mobil;
+
+            if (dt_can_mobil.seconds() < 1)
+            {
+                status_mobil_connected = true;
+            }
+            else
+            {
+                status_mobil_connected = false;
+            }
 
             // ===================================================================================
 
             // Ketika brake siap
             if (brake_slave_id != 255 && fsm_brake_calibration == 4)
             {
-                if (master_target_volt_hat < -1.0 - __FLT_EPSILON__)
+                if (master_target_volt_hat < -1.0 - __FLT_EPSILON__ /*&& fabsf(buffer_dac_velocity - dac_velocity_minimum) < 0.1*/)
                 {
                     (void)brake_control_position(brake_maximum_position, 10000);
                 }
@@ -615,11 +672,21 @@ public:
             }
 
             // Kontrol Lampu belakang
-            if (master_global_fsm == 0 || master_global_fsm == 1)
+            static uint16_t counter_kedip_lampu_kuning = 0;
+            static uint16_t counter_kedip_lampu_hijau = 0;
+            if (!status_mobil_connected)
             {
                 digital_out->data &= ~DO_LAMPU_BELAKANG_HIJAU;
                 digital_out->data &= ~DO_LAMPU_BELAKANG_KUNING;
                 digital_out->data |= DO_LAMPU_BELAKANG_MERAH;
+            }
+            else if (master_global_fsm == 0 || master_global_fsm == 1)
+            {
+                digital_out->data &= ~DO_LAMPU_BELAKANG_HIJAU;
+                digital_out->data &= ~DO_LAMPU_BELAKANG_KUNING;
+                digital_out->data |= DO_LAMPU_BELAKANG_MERAH;
+                counter_kedip_lampu_kuning = 0;
+                counter_kedip_lampu_hijau = 0;
             }
             else if (master_global_fsm == 7 || master_global_fsm == 8)
             {
@@ -627,11 +694,97 @@ public:
                 digital_out->data &= ~DO_LAMPU_BELAKANG_MERAH;
                 digital_out->data |= DO_LAMPU_BELAKANG_KUNING;
             }
+            else if (master_global_fsm == 3)
+            {
+                if (counter_kedip_lampu_kuning > 40)
+                {
+                    digital_out->data &= ~DO_LAMPU_BELAKANG_HIJAU;
+                    digital_out->data &= ~DO_LAMPU_BELAKANG_MERAH;
+                    digital_out->data |= DO_LAMPU_BELAKANG_KUNING;
+                    counter_kedip_lampu_kuning = 0;
+                }
+                else if (counter_kedip_lampu_kuning > 20)
+                {
+                    digital_out->data &= ~DO_LAMPU_BELAKANG_HIJAU;
+                    digital_out->data &= ~DO_LAMPU_BELAKANG_MERAH;
+                    digital_out->data &= ~DO_LAMPU_BELAKANG_KUNING;
+                }
+                counter_kedip_lampu_kuning++;
+                counter_kedip_lampu_hijau = 0;
+            }
             else
             {
-                digital_out->data &= ~DO_LAMPU_BELAKANG_KUNING;
-                digital_out->data &= ~DO_LAMPU_BELAKANG_MERAH;
-                digital_out->data |= DO_LAMPU_BELAKANG_HIJAU;
+                // Jika posisi sudah benar
+                if ((master_slam_status & 0b1001) == 0b1001)
+                {
+                    digital_out->data &= ~DO_LAMPU_BELAKANG_KUNING;
+                    digital_out->data &= ~DO_LAMPU_BELAKANG_MERAH;
+                    digital_out->data |= DO_LAMPU_BELAKANG_HIJAU;
+                    counter_kedip_lampu_kuning = 0;
+                    counter_kedip_lampu_hijau = 0;
+                }
+                // Jika map sudah ada tapi posisi belum benar
+                else if ((master_slam_status & 0b01) == 0b01)
+                {
+                    if (counter_kedip_lampu_hijau > 40)
+                    {
+                        digital_out->data &= ~DO_LAMPU_BELAKANG_KUNING;
+                        digital_out->data &= ~DO_LAMPU_BELAKANG_MERAH;
+                        digital_out->data |= DO_LAMPU_BELAKANG_HIJAU;
+                        counter_kedip_lampu_hijau = 0;
+                    }
+                    else if (counter_kedip_lampu_hijau > 20)
+                    {
+                        digital_out->data &= ~DO_LAMPU_BELAKANG_KUNING;
+                        digital_out->data &= ~DO_LAMPU_BELAKANG_MERAH;
+                        digital_out->data &= ~DO_LAMPU_BELAKANG_HIJAU;
+                    }
+                    counter_kedip_lampu_hijau++;
+                    counter_kedip_lampu_kuning = 0;
+                }
+                else
+                {
+                    digital_out->data &= ~DO_LAMPU_BELAKANG_HIJAU;
+                    digital_out->data &= ~DO_LAMPU_BELAKANG_MERAH;
+                    digital_out->data |= DO_LAMPU_BELAKANG_KUNING;
+                    counter_kedip_lampu_hijau = 0;
+                }
+            }
+
+            if (master_global_fsm == 3)
+            {
+                if ((digital_in1->data & IN_SELECTOR_DISABLE_SIRINE) == IN_SELECTOR_DISABLE_SIRINE)
+                    digital_out->data |= DO_SIRINE;
+                else
+                    digital_out->data &= ~DO_SIRINE;
+            }
+            else
+            {
+                digital_out->data &= ~DO_SIRINE;
+            }
+
+            if ((digital_in1->data & IN_SELECTOR_SIRINE) == IN_SELECTOR_SIRINE)
+            {
+                digital_out->data |= DO_SIRINE;
+            }
+
+            static uint16_t counter = 0;
+            if ((master_camera_obs > 100000) || master_lidar_obs > 0.05)
+            {
+                if (counter > 20)
+                {
+                    digital_out->data |= DO_BUZZER_BELAKANG;
+                    counter = 0;
+                }
+                else if (counter > 10)
+                {
+                    digital_out->data &= ~DO_BUZZER_BELAKANG;
+                }
+                counter++;
+            }
+            else
+            {
+                digital_out->data &= ~DO_BUZZER_BELAKANG;
             }
 
             // Always enable

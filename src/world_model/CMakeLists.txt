@@ -16,9 +16,13 @@ set(var_dependencies
     nav_msgs
     ros2_utils
     tf2_geometry_msgs
+    tf2_sensor_msgs
     pcl_conversions
     pcl_ros
     sensor_msgs
+    tf2_eigen
+    OpenCV
+    laser_geometry
     tf2_ros)
     
 foreach(var_dependency ${var_dependencies})
@@ -41,9 +45,24 @@ add_executable(icp src/icp.cpp)
 ament_target_dependencies(icp ${var_dependencies})
 target_link_libraries(icp ${PCL_LIBRARIES})
 
+# add_executable(pose_estimator_icp src/pose_estimator_icp.cpp)
+# ament_target_dependencies(pose_estimator_icp ${var_dependencies})
+# target_link_libraries(pose_estimator_icp ${PCL_LIBRARIES})
+
+add_executable(camera_obstacle_detector src/camera_obstacle_detector.cpp)
+ament_target_dependencies(camera_obstacle_detector ${var_dependencies})
+target_link_libraries(camera_obstacle_detector ${PCL_LIBRARIES})
+
+add_executable(lidar_obstacle_filter src/lidar_obstacle_filter.cpp)
+ament_target_dependencies(lidar_obstacle_filter ${var_dependencies})
+target_link_libraries(lidar_obstacle_filter ${PCL_LIBRARIES})
+
 install(TARGETS
   pose_estimator
   obstacle_filter
+  # pose_estimator_icp
+  camera_obstacle_detector
+  lidar_obstacle_filter
   DESTINATION lib/${PROJECT_NAME}
 )
 

@@ -262,6 +262,23 @@ robotTopic.subscribe(function (message) {
 }
 );
 
+const robotTopic2 = new ROSLIB.Topic({
+    ros: ros,
+    name: '/master/pose_filtered',
+    messageType: 'nav_msgs/Odometry'
+});
+
+robotTopic2.subscribe(function (message) {
+    const x = message.pose.pose.position.x;
+    const y = message.pose.pose.position.y;
+    const q = message.pose.pose.orientation;
+    const theta = Math.atan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y * q.y + q.z * q.z));
+    const radius = 0.35;
+
+    addRobot("1.1.1.1", x, y, theta, radius, 'green');
+}
+);
+
 // const robotTopic2 = new ROSLIB.Topic({
 //     ros: ros,
 //     name: '/slam/localization_pose',
@@ -452,6 +469,8 @@ terminalsTopic.subscribe(function (message) {
             color = 'orange';
         else if (points[i].type == 2)
             color = 'yellow';
+        else if (points[i].type == 32)
+            color = 'green';
 
         const terminalCircle = new Konva.Circle({
             x: x_tf * wtf_skala,
@@ -685,13 +704,39 @@ function rtabmap_reset() {
     modeService.callService(modeRequest, function (response) {
         console.log('Reset:', response);
     });
+
+    const modeRequest_icp = new ROSLIB.ServiceRequest({
+    });
+
+    const modeService_icp = new ROSLIB.Service({
+        ros: ros,
+        name: '/slam_icp/reset_odom',
+        serviceType: 'std_srvs/srv/Empty'
+    });
+
+    modeService_icp.callService(modeRequest_icp, function (response) {
+        console.log('Reset:', response);
+    });
+
+    const modeRequest_rgbd = new ROSLIB.ServiceRequest({
+    });
+
+    const modeService_rgbd = new ROSLIB.Service({
+        ros: ros,
+        name: '/slam_vo/reset_odom',
+        serviceType: 'std_srvs/srv/Empty'
+    });
+
+    modeService_rgbd.callService(modeRequest_rgbd, function (response) {
+        console.log('Reset:', response);
+    });
 }
 
 function rtabmap_reset_map2odom(x, y, theta) {
     // Initialize ROSLIB topic publisher for initialpose
     const initialPoseTopic = new ROSLIB.Topic({
         ros: ros,
-        name: '/rtabmap/initialpose',  // Typically this topic is used for initial pose
+        name: '/slam/rtabmap/initialpose',  // Typically this topic is used for initial pose
         messageType: 'geometry_msgs/PoseWithCovarianceStamped'
     });
 

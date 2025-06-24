@@ -14,3 +14,9 @@ float32 target_lookahead_distance
 float32 obs_scan_r
 
 float32 stop_time_s
+
+float32 scan_min_x
+float32 scan_max_x 
+float32 scan_min_y
+float32 scan_max_y 
+float32 obs_threshold

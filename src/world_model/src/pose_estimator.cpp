@@ -30,6 +30,7 @@ public:
 
     //----TransformBroadcaster
     std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster;
+    std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_pose_filtered;
 
     HelpLogger logger;
 
@@ -100,6 +101,7 @@ public:
         }
 
         tf_broadcaster = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
+        tf_broadcaster_pose_filtered = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
 
         //----Timer
         tim_50hz = this->create_wall_timer(std::chrono::milliseconds(timer_period), std::bind(&PoseEstimator::callback_tim_50hz, this));
@@ -272,6 +274,9 @@ public:
         tf2::Quaternion q;
         q.setRPY(0, 0, final_pose_xyo[2]);
 
+        // tf2::Quaternion q_filtereed;
+        // q_filtereed.setRPY(0, 0, pose_filtered[2]);
+
         nav_msgs::msg::Odometry msg_odom;
         msg_odom.header.stamp = time_now;
         msg_odom.header.frame_id = "odom";
@@ -310,6 +315,18 @@ public:
         tf.transform.rotation.z = q.z();
         tf.transform.rotation.w = q.w();
         tf_broadcaster->sendTransform(tf);
+
+        // geometry_msgs::msg::TransformStamped tf_filtered;
+        // tf_filtered.header.stamp = time_now;
+        // tf_filtered.header.frame_id = "odom_filtered";
+        // tf_filtered.child_frame_id = "base_link";
+        // tf_filtered.transform.translation.x = pose_filtered[0];
+        // tf_filtered.transform.translation.y = pose_filtered[1];
+        // tf_filtered.transform.rotation.x = q_filtereed.x();
+        // tf_filtered.transform.rotation.y = q_filtereed.y();
+        // tf_filtered.transform.rotation.z = q_filtereed.z();
+        // tf_filtered.transform.rotation.w = q_filtereed.w();
+        // tf_broadcaster_pose_filtered->sendTransform(tf_filtered);
 
         std_msgs::msg::Int16 msg_error_code;
         msg_error_code.data = error_code;

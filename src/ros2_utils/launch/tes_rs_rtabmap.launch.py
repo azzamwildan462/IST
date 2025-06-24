@@ -76,3 +76,78 @@ def generate_launch_description():
                          'publish_tf':False}],
             remappings=[('imu/data_raw', '/camera/imu')]),
     ])
+
+
+
+    # rgbd_odom_node = Node(
+    #     package="rtabmap_odom",
+    #     executable="rgbd_odometry",
+    #     name="rgbd_odometry",
+    #     output="screen",
+    #     namespace="slam_vo",
+    #     parameters=[
+    #         {"frame_id": "base_link"},
+    #         {'guess_frame_id':'odom'},
+    #         {'subscribe_depth':True},
+    #         {"subscribe_imu": True},
+    #         {"approx_sync": False},
+    #         {"Vis/MinInliers": "8"},
+    #         {
+    #             "use_sim_time": False,
+    #             "Odom/Strategy": "1",
+    #             "Odom/ResetCountdown": "0",
+
+    #             "Rtabmap/DetectionRate": "25.0", # Added by Azzam
+    #             "Rtabmap/CreateIntermediateNodes": "True",
+    #             "Rtabmap/LoopThr": "0.11", # Routine period untuk cek loop closure
+
+    #             "Mem/STMSize": "25",  # Short-term memory size
+    #             "Mem/IncrementalMemory": "False",  # 
+    #             "Mem/InitWMWithAllNodes": "True",  # 
+    #             "Mem/RehearsalSimilaritys": "0.9",  #
+    #             "Mem/UseOdomFeatures": "True",  #
+    #             'Mem/NotLinkedNodesKept': "False",  # Keep unlinked nodes
+    #             # "Mem/UseOdomFeatures": "False", # (percobaan) untuk disable odometry untuk mencari loop closure
+
+    #             "Odom/Strategy": "1",  # Added by Azzam
+    #             "Odom/ResetCountdown": "0",  # Added by Azzam
+    #             "Odom/Holonomic": "False",  # Added by Azzam
+    #             "Odom/ScanKeyFrameThr": "0.9",  # Added by Azzam, semakin kecil semakin sering lidar update
+    #             "Odom/AlignWithGround": "True",  # Added by Azzam
+    #             # "OdomF2M/ScanSubtractAngle": "0.0",  # Added by Azzam
+    #             # "OdomF2M/BundleAdjustment": "0",
+    #             # "OdomF2M/ScanMaxSize": "20000",
+
+    #             "Reg/Strategy": "0",  # Added by Azzam
+    #             "Reg/Force3DoF": "True",  # Added by Azzam
+
+    #             "Icp/Strategy": "1",  # Added by Azzam
+    #             "Icp/MaxTranslation": "0.3", # Added by Azzam
+    #             "Icp/MaxRotation": "0.1", # Added by Azzam
+    #             "Icp/RangeMin": "0.0", # Added by Azzam
+    #             "Icp/RangeMax": "2.0", # Added by Azzam
+    #             "Icp/MaxCorrespondenceDistance": "1.0", # Added by Azzam
+    #             "Icp/Iterations": "30", # Added by Azzam
+    #             "Icp/PointToPlane": "True", # Added by Azzam
+    #             "Icp/VoxelSize": "0.05", # Added by Azzam
+    #             'Icp/PointToPlaneMinComplexity':'0.23', # to be more robust to long corridors with low geometry
+    #             'Icp/PointToPlaneLowComplexityStrategy':'2', # to be more robust to long corridors with low geometry
+
+    #             "Vis/MaxDepth": "2.0",
+    #             "Vis/MinInliers": "3",
+
+    #             "use_sim_time": False,
+    #             "Threads": 10, # Added by Azzam
+
+            
+    #         } # Added by Azzam
+    #     ],
+    #     remappings=[
+    #         ("rgb/image", "/camera/rs2_cam_main/color/image_raw"),
+    #         ("depth/image", "/camera/rs2_cam_main/aligned_depth_to_color/image_raw"),
+    #         ("rgb/camera_info", "/camera/rs2_cam_main/color/camera_info"),
+    #         ("imu", "/hardware/imu"),
+    #         # ("odom", "vo")
+    #     ],
+    #     arguments=["--ros-args", "--log-level", "warn"],
+    # )

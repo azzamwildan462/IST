@@ -28,6 +28,9 @@ Master::Master()
     this->declare_parameter("enable_obs_detection", false);
     this->get_parameter("enable_obs_detection", enable_obs_detection);
 
+    this->declare_parameter("enable_obs_detection_camera", false);
+    this->get_parameter("enable_obs_detection_camera", enable_obs_detection_camera);
+
     this->declare_parameter("timeout_terminal_1", 10.0);
     this->get_parameter("timeout_terminal_1", timeout_terminal_1);
 
@@ -43,11 +46,32 @@ Master::Master()
     this->declare_parameter("toribay_ready_threshold", 0.5);
     this->get_parameter("toribay_ready_threshold", toribay_ready_threshold);
 
+    this->declare_parameter("use_filtered_pose", false);
+    this->get_parameter("use_filtered_pose", use_filtered_pose);
+
+    this->declare_parameter("threshold_icp_score", 100.0);
+    this->get_parameter("threshold_icp_score", threshold_icp_score);
+
+    this->declare_parameter<std::vector<double>>("complementary_terms", {0.30, 0.03, 0.01, 0.9});
+    this->get_parameter("complementary_terms", complementary_terms);
+
+    this->declare_parameter("camera_scan_min_x_", 0.2);
+    this->get_parameter("camera_scan_min_x_", camera_scan_min_x_);
+    this->declare_parameter("camera_scan_max_x_", 2.0);
+    this->get_parameter("camera_scan_max_x_", camera_scan_max_x_);
+    this->declare_parameter("camera_scan_min_y_", -1.0);
+    this->get_parameter("camera_scan_min_y_", camera_scan_min_y_);
+    this->declare_parameter("camera_scan_max_y_", 1.0);
+    this->get_parameter("camera_scan_max_y_", camera_scan_max_y_);
+
     if (!logger.init())
     {
         RCLCPP_ERROR(this->get_logger(), "Failed to initialize logger");
         rclcpp::shutdown();
     }
+
+    cloud_cb_group_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+    timer_cb_group_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
 
     pub_initialpose = this->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>("slam/initialpose", 10);
     pub_global_fsm = this->create_publisher<std_msgs::msg::Int16>("/master/global_fsm", 1);
@@ -59,9 +83,15 @@ Master::Master()
     pub_waypoints = this->create_publisher<sensor_msgs::msg::PointCloud>("/master/waypoints", 1);
     pub_terminals = this->create_publisher<ros2_interface::msg::TerminalArray>("/master/terminals", 1);
     pub_obs_find = this->create_publisher<std_msgs::msg::Float32>("/master/obs_find", 1);
+    pub_pose_filtered = this->create_publisher<nav_msgs::msg::Odometry>("/master/pose_filtered", 1);
+    pub_slam_status = this->create_publisher<std_msgs::msg::UInt8>("/master/slam_status", 1);
+    pub_camera_obs_emergency = this->create_publisher<std_msgs::msg::Float32>("/master/camera_obs_emergency", 1);
+
+    auto sub_opts = rclcpp::SubscriptionOptions();
+    sub_opts.callback_group = cloud_cb_group_;
 
     sub_obs_find = this->create_subscription<std_msgs::msg::Float32>(
-        "/obstacle_filter/obs_find", 1, std::bind(&Master::callback_sub_obs_find, this, std::placeholders::_1));
+        "/lidar_obstacle_filter/obs_find", 1, std::bind(&Master::callback_sub_obs_find, this, std::placeholders::_1));
     sub_CAN_eps_encoder = this->create_subscription<std_msgs::msg::Float32>(
         "/can/eps_encoder", 1, std::bind(&Master::callback_sub_CAN_eps_encoder, this, std::placeholders::_1));
     sub_beckhoff_sensor = this->create_subscription<std_msgs::msg::Float32MultiArray>(
@@ -110,6 +140,10 @@ Master::Master()
         "/slam/map", 1, std::bind(&Master::callback_sub_map, this, std::placeholders::_1));
     sub_localization_pose = this->create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>(
         "/slam/localization_pose", 1, std::bind(&Master::callback_sub_localization_pose, this, std::placeholders::_1));
+    sub_camera_pcl = this->create_subscription<sensor_msgs::msg::PointCloud2>(
+        "/camera/rs2_cam_main/depth/color/points", 1, std::bind(&Master::callback_sub_camera_pcl, this, std::placeholders::_1), sub_opts);
+    sub_icp_score = this->create_subscription<std_msgs::msg::Float32>(
+        "/lidar_obstacle_filter/icp_score", 1, std::bind(&Master::callback_sub_icp_score, this, std::placeholders::_1), sub_opts);
 
     srv_set_record_route_mode = this->create_service<std_srvs::srv::SetBool>(
         "/master/set_record_route_mode", std::bind(&Master::callback_srv_set_record_route_mode, this, std::placeholders::_1, std::placeholders::_2));
@@ -127,8 +161,34 @@ Master::Master()
         sub_odometry = this->create_subscription<nav_msgs::msg::Odometry>(
             "/odom", 1, std::bind(&Master::callback_sub_odometry, this, std::placeholders::_1));
 
+    lidar_obstacle_param_client = std::make_shared<rclcpp::SyncParametersClient>(
+        this, "lidar_obstacle_filter");
+
+    tf_lidar_base_buffer = std::make_unique<tf2_ros::Buffer>(this->get_clock());
+    tf_lidar_base_listener = std::make_unique<tf2_ros::TransformListener>(*tf_lidar_base_buffer);
+
+    while (!tf_is_initialized)
+    {
+        sleep(1);
+        try
+        {
+            tf_lidar_base = tf_lidar_base_buffer->lookupTransform("base_link", "camera_depth_optical_frame", tf2::TimePointZero);
+            tf_is_initialized = true;
+        }
+        catch (tf2::TransformException &ex)
+        {
+            logger.error("tunggu");
+            tf_is_initialized = false;
+        }
+    }
+
+    pass_x_.setFilterFieldName("x");
+    pass_y_.setFilterFieldName("y");
+
+    voxel_.setLeafSize(0.03f, 0.03f, 0.03f); // optional downsample
+
     //----Timer
-    tim_50hz = this->create_wall_timer(std::chrono::milliseconds(20), std::bind(&Master::callback_tim_50hz, this));
+    tim_50hz = this->create_wall_timer(std::chrono::milliseconds(20), std::bind(&Master::callback_tim_50hz, this), timer_cb_group_);
 
     // pid_vx.init(0.0030, 0.000000, 0, dt, -0.04, 0.4, -0.0005, 0.0005);
     pid_vx.init(pid_terms[0], pid_terms[1], pid_terms[2], pid_terms[3], pid_terms[4], pid_terms[5], pid_terms[6], pid_terms[7]);
@@ -140,10 +200,61 @@ Master::~Master()
 {
 }
 
+void Master::callback_sub_icp_score(const std_msgs::msg::Float32::SharedPtr msg)
+{
+    icp_score = msg->data;
+}
+
+void Master::callback_sub_camera_pcl(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
+{
+    if (!tf_is_initialized)
+    {
+        return;
+    }
+
+    static pcl::PointCloud<pcl::PointXYZ> points_lidar_;
+    static pcl::PointCloud<pcl::PointXYZ> points_lidar2base_;
+    static pcl::PointCloud<pcl::PointXYZ> points_lidar2base_filtered_;
+    static pcl::PointCloud<pcl::PointXYZ> temp_;
+    static pcl::PointCloud<pcl::PointXYZ> filtered_;
+
+    pass_x_.setFilterLimits(camera_scan_min_x_, camera_scan_max_x_);
+    pass_y_.setFilterLimits(camera_scan_min_y_, camera_scan_max_y_);
+
+    pcl::fromROSMsg(*msg, points_lidar_);
+
+    if (points_lidar_.empty())
+    {
+        points_lidar2base_.clear();
+        filtered_.clear();
+    }
+    else
+    {
+        pcl_ros::transformPointCloud(points_lidar_, points_lidar2base_, tf_lidar_base);
+
+        // voxel_.setInputCloud(points_lidar2base_.makeShared());
+        // voxel_.filter(points_lidar2base_);
+
+        pass_x_.setInputCloud(points_lidar2base_.makeShared());
+        pass_x_.filter(temp_);
+
+        pass_y_.setInputCloud(temp_.makeShared());
+        pass_y_.filter(filtered_);
+    }
+
+    camera_scan_obs_result = filtered_.size();
+
+    std_msgs::msg::Float32 out;
+    out.data = static_cast<float>(filtered_.size());
+    pub_camera_obs_emergency->publish(out);
+}
+
 void Master::callback_sub_localization_pose(const geometry_msgs::msg::PoseWithCovarianceStamped msg)
 {
     (void)msg;
     is_pose_corrected = true;
+
+    slam_status |= 0b100;
 }
 
 void Master::callback_sub_map(const nav_msgs::msg::OccupancyGrid::SharedPtr msg)
@@ -160,6 +271,8 @@ void Master::callback_sub_map(const nav_msgs::msg::OccupancyGrid::SharedPtr msg)
 
     manual_map2odom_tf.setOrigin(tf2::Vector3(map2odom_offset_x, map2odom_offset_y, 0));
     manual_map2odom_tf.setRotation(q);
+
+    slam_status |= 0b01;
 }
 
 void Master::callback_sub_rtabmap_info(const rtabmap_msgs::msg::Info::SharedPtr msg)
@@ -168,6 +281,8 @@ void Master::callback_sub_rtabmap_info(const rtabmap_msgs::msg::Info::SharedPtr 
     {
         is_rtabmap_ready = true;
     }
+
+    slam_status |= 0b10;
 }
 
 void Master::callback_sub_lidar_depan_scan(const sensor_msgs::msg::LaserScan::SharedPtr msg)
@@ -175,6 +290,11 @@ void Master::callback_sub_lidar_depan_scan(const sensor_msgs::msg::LaserScan::Sh
     mutex_lidar_depan_points.lock();
     lidar_depan_points = *msg;
     mutex_lidar_depan_points.unlock();
+
+    std_msgs::msg::Float32 msg_obs_find;
+    msg_obs_find.data = local_obstacle_influence(lidar_obs_scan_thr, 4.0);
+    obs_find_baru = msg_obs_find.data;
+    pub_obs_find->publish(msg_obs_find);
 }
 
 void Master::callback_sub_lidar_belakang_scan(const sensor_msgs::msg::LaserScan::SharedPtr msg)
@@ -477,9 +597,36 @@ void Master::callback_sub_odometry(const nav_msgs::msg::Odometry::SharedPtr msg)
     tf2::fromMsg(msg->pose.pose.orientation, q);
     tf2::Matrix3x3(q).getRPY(roll, pitch, yaw);
 
+    static float prev_msg_x = 0;
+    static float prev_msg_y = 0;
+    static float prev_msg_theta = 0;
+
     fb_final_pose_xyo[0] = msg->pose.pose.position.x;
     fb_final_pose_xyo[1] = msg->pose.pose.position.y;
     fb_final_pose_xyo[2] = yaw;
+
+    float distance = pythagoras(prev_msg_x, prev_msg_y, msg->pose.pose.position.x, msg->pose.pose.position.y);
+
+    float normalized_distance = (distance - complementary_terms[0]) / (complementary_terms[1] - complementary_terms[0]);
+    if (normalized_distance < 0)
+        normalized_distance = 0;
+    else if (normalized_distance > 1)
+        normalized_distance = 1;
+
+    float new_pose_gain = normalized_distance * (complementary_terms[2] - complementary_terms[1]) + complementary_terms[1];
+
+    fb_filtered_final_pose_xyo[0] = fb_filtered_final_pose_xyo[0] * (1 - new_pose_gain) + msg->pose.pose.position.x * new_pose_gain;
+    fb_filtered_final_pose_xyo[1] = fb_filtered_final_pose_xyo[1] * (1 - new_pose_gain) + msg->pose.pose.position.y * new_pose_gain;
+    fb_filtered_final_pose_xyo[2] = fb_filtered_final_pose_xyo[2] * (1 - new_pose_gain) + yaw * new_pose_gain;
+
+    while (fb_filtered_final_pose_xyo[2] > M_PI)
+        fb_filtered_final_pose_xyo[2] -= M_PI * 2;
+    while (fb_filtered_final_pose_xyo[2] < -M_PI)
+        fb_filtered_final_pose_xyo[2] += M_PI * 2;
+
+    prev_msg_x = fb_filtered_final_pose_xyo[0];
+    prev_msg_y = fb_filtered_final_pose_xyo[1];
+    prev_msg_theta = fb_filtered_final_pose_xyo[2];
 
     // if (transform_map2odom)
     // {
@@ -585,24 +732,42 @@ void Master::callback_tim_50hz()
             global_fsm.value = FSM_GLOBAL_PREOP;
         }
 
+        /* Untuk manual maju mundur */
+        if ((fb_beckhoff_digital_input & IN_MANUAL_MAJU) == IN_MANUAL_MAJU || (fb_beckhoff_digital_input & IN_MANUAL_MUNDUR) == IN_MANUAL_MUNDUR)
+        {
+            if ((fb_beckhoff_digital_input & IN_MANUAL_MAJU) == IN_MANUAL_MAJU)
+            {
+                transmission_joy_master = TRANSMISSION_AUTO;
+            }
+            else if ((fb_beckhoff_digital_input & IN_MANUAL_MUNDUR) == IN_MANUAL_MUNDUR)
+            {
+                transmission_joy_master = TRANSMISSION_REVERSE;
+            }
+        }
         /* Handle transmisi dari hardware */
-        if ((fb_beckhoff_digital_input & IN_TR_FORWARD) == IN_TR_FORWARD)
+        else
         {
-            transmission_joy_master = TRANSMISSION_FORWARD;
-        }
-        else if ((fb_beckhoff_digital_input & IN_TR_REVERSE) == IN_TR_REVERSE)
-        {
-            transmission_joy_master = TRANSMISSION_REVERSE;
-        }
-        else if ((fb_beckhoff_digital_input & 0b011) == 0)
-        {
-            transmission_joy_master = TRANSMISSION_AUTO;
+            if ((fb_beckhoff_digital_input & IN_TR_FORWARD) == IN_TR_FORWARD)
+            {
+                transmission_joy_master = TRANSMISSION_FORWARD;
+            }
+            else if ((fb_beckhoff_digital_input & IN_TR_REVERSE) == IN_TR_REVERSE)
+            {
+                transmission_joy_master = TRANSMISSION_REVERSE;
+            }
+            else if ((fb_beckhoff_digital_input & 0b011) == 0)
+            {
+                transmission_joy_master = TRANSMISSION_AUTO;
+            }
         }
 
         local_fsm.value = 0;
 
-        // logger.info("fb_beckhoff_digital_input: %d %d", fb_beckhoff_digital_input, is_rtabmap_ready);
-        // logger.info("%d %d %d %d", (fb_beckhoff_digital_input & IN_START_OP3), is_rtabmap_ready, is_pose_corrected, ((fb_beckhoff_digital_input & IN_EPS_nFAULT) == IN_EPS_nFAULT));
+        if (icp_score < threshold_icp_score)
+            slam_status |= 0b1000; // Set status SLAM ready
+        else
+            slam_status &= ~0b1000; // Clear status SLAM ready
+
         if ((fb_beckhoff_digital_input & IN_START_OP3) == IN_START_OP3)
         {
             rclcpp::Duration dt_pose_estimator = current_time - last_time_pose_estimator;
@@ -610,7 +775,7 @@ void Master::callback_tim_50hz()
             rclcpp::Duration dt_CANbus = current_time - last_time_CANbus;
 
             // Jika sudah berhasil menerima semua data yang diperlukan
-            if (dt_pose_estimator.seconds() < 1 && dt_beckhoff.seconds() < 1 && dt_CANbus.seconds() < 1 && is_rtabmap_ready && is_pose_corrected && ((fb_beckhoff_digital_input & IN_EPS_nFAULT) == IN_EPS_nFAULT))
+            if (dt_pose_estimator.seconds() < 1 && dt_beckhoff.seconds() < 1 && dt_CANbus.seconds() < 1 && is_rtabmap_ready && is_pose_corrected && ((fb_beckhoff_digital_input & IN_EPS_nFAULT) == IN_EPS_nFAULT) && icp_score < threshold_icp_score)
             {
                 target_velocity_joy_x = 0;
                 target_velocity_joy_y = 0;
@@ -635,14 +800,32 @@ void Master::callback_tim_50hz()
             if ((fb_beckhoff_digital_input & IN_MASK_BUMPER) != IN_MASK_BUMPER)
                 manual_motion(-profile_max_braking, target_velocity_joy_y, target_velocity_joy_wz);
             else
-                manual_motion(target_velocity_joy_x, target_velocity_joy_y, target_velocity_joy_wz);
+            {
+                if ((fb_beckhoff_digital_input & IN_MANUAL_MAJU) == IN_MANUAL_MAJU || (fb_beckhoff_digital_input & IN_MANUAL_MUNDUR) == IN_MANUAL_MUNDUR)
+                {
+                    manual_motion(0.48, target_velocity_joy_y, target_velocity_joy_wz);
+                }
+                else
+                {
+                    manual_motion(target_velocity_joy_x, target_velocity_joy_y, target_velocity_joy_wz);
+                }
+            }
         }
         else
         {
             if ((fb_beckhoff_digital_input & IN_MASK_BUMPER) != IN_MASK_BUMPER)
                 manual_motion(-profile_max_braking, target_velocity_joy_y, target_velocity_joy_wz);
             else
-                manual_motion(-1, 0, 0);
+            {
+                if ((fb_beckhoff_digital_input & IN_MANUAL_MAJU) == IN_MANUAL_MAJU || (fb_beckhoff_digital_input & IN_MANUAL_MUNDUR) == IN_MANUAL_MUNDUR)
+                {
+                    manual_motion(0.48, target_velocity_joy_y, target_velocity_joy_wz);
+                }
+                else
+                {
+                    manual_motion(-1, 0, 0);
+                }
+            }
         }
         break;
 
@@ -658,6 +841,12 @@ void Master::callback_tim_50hz()
         }
 
         if ((fb_beckhoff_digital_input & IN_SYSTEM_FULL_ENABLE) == 0)
+        {
+            global_fsm.value = FSM_GLOBAL_SAFEOP;
+            break;
+        }
+
+        if ((fb_beckhoff_digital_input & IN_STOP_OP3) == IN_STOP_OP3)
         {
             global_fsm.value = FSM_GLOBAL_SAFEOP;
             break;
@@ -708,7 +897,7 @@ void Master::callback_tim_50hz()
             fusion_follow_lane_waypoints_gas_manual(target_velocity_joy_x, 0, 0, 1.5, true);
         }
 
-        if ((fb_beckhoff_digital_input & IN_SYSTEM_FULL_ENABLE) == 0)
+        if ((fb_beckhoff_digital_input & IN_STOP_OP3) == IN_STOP_OP3)
         {
             global_fsm.value = FSM_GLOBAL_SAFEOP;
             break;

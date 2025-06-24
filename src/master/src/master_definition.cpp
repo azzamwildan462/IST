@@ -31,7 +31,7 @@ void Master::process_local_fsm()
 
         if (metode_following == 0)
         {
-            follow_waypoints(2, 0, 0.8, 3, true);
+            follow_waypoints(2, 0, 1.5, 1.5, true);
         }
         else if (metode_following == 1)
         {
@@ -57,28 +57,37 @@ void Master::process_local_fsm()
 
             for (size_t i = 0; i < terminals.terminals.size(); i++)
             {
-                float jarak_robot_terminal = pythagoras(fb_final_pose_xyo[0], fb_final_pose_xyo[1], terminals.terminals[i].target_pose_x, terminals.terminals[i].target_pose_y);
-                if (jarak_robot_terminal < terminals.terminals[i].radius_area)
+                float error_arah_hadap = terminals.terminals[i].target_pose_theta - fb_final_pose_xyo[2];
+                while (error_arah_hadap > M_PI)
+                    error_arah_hadap -= 2 * M_PI;
+                while (error_arah_hadap < -M_PI)
+                    error_arah_hadap += 2 * M_PI;
+
+                if (fabs(error_arah_hadap) < 0.87)
                 {
-                    if (terminals.terminals[i].type == TERMINAL_TYPE_STOP1)
+                    float jarak_robot_terminal = pythagoras(fb_final_pose_xyo[0], fb_final_pose_xyo[1], terminals.terminals[i].target_pose_x, terminals.terminals[i].target_pose_y);
+                    if (jarak_robot_terminal < terminals.terminals[i].radius_area)
                     {
-                        local_fsm.resetUptimeTimeout();
-                        local_fsm.value = FSM_LOCAL_MENUNGGU_STATION_1;
-                        stop_time_s = terminals.terminals[i].stop_time_s;
+                        if (terminals.terminals[i].type == TERMINAL_TYPE_STOP1)
+                        {
+                            local_fsm.resetUptimeTimeout();
+                            local_fsm.value = FSM_LOCAL_MENUNGGU_STATION_1;
+                            stop_time_s = terminals.terminals[i].stop_time_s;
+                        }
+                        else if (terminals.terminals[i].type == TERMINAL_TYPE_STOP2)
+                        {
+                            local_fsm.resetUptimeTimeout();
+                            local_fsm.value = FSM_LOCAL_MENUNGGU_STATION_2;
+                            stop_time_s = terminals.terminals[i].stop_time_s;
+                        }
+                        else if (terminals.terminals[i].type == TERMINAL_TYPE_STOP)
+                        {
+                            local_fsm.resetUptimeTimeout();
+                            local_fsm.value = FSM_LOCAL_MENUNGGU_STOP;
+                            stop_time_s = terminals.terminals[i].stop_time_s;
+                        }
+                        break;
                     }
-                    else if (terminals.terminals[i].type == TERMINAL_TYPE_STOP2)
-                    {
-                        local_fsm.resetUptimeTimeout();
-                        local_fsm.value = FSM_LOCAL_MENUNGGU_STATION_2;
-                        stop_time_s = terminals.terminals[i].stop_time_s;
-                    }
-                    else if (terminals.terminals[i].type == TERMINAL_TYPE_STOP)
-                    {
-                        local_fsm.resetUptimeTimeout();
-                        local_fsm.value = FSM_LOCAL_MENUNGGU_STOP;
-                        stop_time_s = terminals.terminals[i].stop_time_s;
-                    }
-                    break;
                 }
             }
         }
@@ -178,6 +187,21 @@ void Master::process_transmitter()
     msg_transmission_master.data = transmission_joy_master;
     pub_transmission_master->publish(msg_transmission_master);
 
+    tf2::Quaternion q;
+    q.setRPY(0, 0, fb_filtered_final_pose_xyo[2]);
+    nav_msgs::msg::Odometry msg_pose_filtered;
+    msg_pose_filtered.pose.pose.position.x = fb_filtered_final_pose_xyo[0];
+    msg_pose_filtered.pose.pose.position.y = fb_filtered_final_pose_xyo[1];
+    msg_pose_filtered.pose.pose.orientation.x = q.x();
+    msg_pose_filtered.pose.pose.orientation.y = q.y();
+    msg_pose_filtered.pose.pose.orientation.z = q.z();
+    msg_pose_filtered.pose.pose.orientation.w = q.w();
+    pub_pose_filtered->publish(msg_pose_filtered);
+
+    std_msgs::msg::UInt8 msg_slam_status;
+    msg_slam_status.data = slam_status;
+    pub_slam_status->publish(msg_slam_status);
+
     static uint16_t divider_waypoint_pub_counter = 0;
     if (divider_waypoint_pub_counter++ >= 25)
     {
@@ -236,6 +260,11 @@ void Master::process_load_terminals()
                 terminal.target_lookahead_distance = std::stof(tokens[9]);
                 terminal.obs_scan_r = std::stof(tokens[10]);
                 terminal.stop_time_s = std::stof(tokens[11]);
+                terminal.scan_min_x = std::stof(tokens[12]);
+                terminal.scan_max_x = std::stof(tokens[13]);
+                terminal.scan_min_y = std::stof(tokens[14]);
+                terminal.scan_max_y = std::stof(tokens[15]);
+                terminal.obs_threshold = std::stof(tokens[16]);
 
                 if (transform_map2odom)
                 {
@@ -287,12 +316,12 @@ void Master::process_save_terminals()
         fout.open(terminal_file_path, std::ios::out);
         if (fout.is_open())
         {
-            fout << "type, id, x, y, theta, max_vx, max_vy, max_vtheta, radius_area, lookahead_distance, obs_scan_r" << std::endl;
+            fout << "type, id, x, y, theta, max_vx, max_vy, max_vtheta, radius_area, lookahead_distance, obs_scan_r, stop_time_s, scan_min_x, scan_max_x, scan_min_y, scan_max_y, obs_threshold" << std::endl;
             for (auto terminal : terminals.terminals)
             {
                 int terminal_type_integer = terminal.type;
                 int terminal_id_integer = terminal.id;
-                fout << terminal_type_integer << ", " << terminal_id_integer << ", " << terminal.target_pose_x << ", " << terminal.target_pose_y << ", " << terminal.target_pose_theta << ", " << terminal.target_max_velocity_x << ", " << terminal.target_max_velocity_y << ", " << terminal.target_max_velocity_theta << ", " << terminal.radius_area << ", " << terminal.target_lookahead_distance << ", " << terminal.obs_scan_r << ", " << terminal.stop_time_s << std::endl;
+                fout << terminal_type_integer << ", " << terminal_id_integer << ", " << terminal.target_pose_x << ", " << terminal.target_pose_y << ", " << terminal.target_pose_theta << ", " << terminal.target_max_velocity_x << ", " << terminal.target_max_velocity_y << ", " << terminal.target_max_velocity_theta << ", " << terminal.radius_area << ", " << terminal.target_lookahead_distance << ", " << terminal.obs_scan_r << ", " << terminal.stop_time_s << ", " << terminal.scan_min_x << ", " << terminal.scan_max_x << ", " << terminal.scan_min_y << ", " << terminal.scan_max_y << ", " << terminal.obs_threshold << std::endl;
             }
             fout.close();
 
@@ -431,6 +460,19 @@ void Master::process_add_terminal()
         terminals.terminals.push_back(terminal);
         logger.info("Add Terminal Success");
     }
+}
+
+void Master::set_lidar_obstacle_filter_param(double scan_range, double min_y, double max_y, double obstacle_error_tolerance)
+{
+    // Prepare parameter changes
+    std::vector<rclcpp::Parameter> params;
+    params.emplace_back("scan_range", scan_range);
+    params.emplace_back("scan_min_y", min_y);
+    params.emplace_back("scan_max_y", max_y);
+    params.emplace_back("obstacle_error_tolerance", obstacle_error_tolerance);
+
+    // Apply parameters atomically
+    auto result = lidar_obstacle_param_client->set_parameters(params);
 }
 
 //==================================================================================================

@@ -88,6 +88,14 @@ public:
     CANbus_HAL()
         : Node("CANbus_HAL")
     {
+        if (!logger.init())
+        {
+            RCLCPP_ERROR(this->get_logger(), "Failed to initialize logger");
+            rclcpp::shutdown();
+        }
+
+        logger.info("CANbus_HAL init");
+
         this->declare_parameter("if_name", "can0");
         this->get_parameter("if_name", if_name);
 
@@ -123,7 +131,7 @@ public:
         if (use_socket_can)
         {
             // tim_50hz = this->create_wall_timer(std::chrono::milliseconds(1), std::bind(&CANbus_HAL::callback_routine, this));
-            thread_routine = std::thread(std::bind(&CANbus_HAL::callback_routine, this));
+            thread_routine = std::thread(std::bind(&CANbus_HAL::callback_routine_multi_thread, this), this);
         }
         else
             tim_50hz = this->create_wall_timer(std::chrono::milliseconds(10), std::bind(&CANbus_HAL::callback_routine, this));
@@ -134,16 +142,11 @@ public:
         sub_master_global_fsm = this->create_subscription<std_msgs::msg::Int16>(
             "/master/global_fsm", 1, std::bind(&CANbus_HAL::callback_sub_master_global_fsm, this, std::placeholders::_1));
 
-        if (!logger.init())
-        {
-            RCLCPP_ERROR(this->get_logger(), "Failed to initialize logger");
-            rclcpp::shutdown();
-        }
-
         if (use_socket_can)
         {
             char cmd[100];
             sprintf(cmd, "sudo ip link set %s up type can bitrate %d", if_name.c_str(), bitrate);
+            logger.info("Executing command: %s", cmd);
             system(cmd);
 
             socket_can = can_init(if_name.c_str());
@@ -183,6 +186,15 @@ public:
     void callback_sub_master_actuator(const std_msgs::msg::Float32MultiArray::SharedPtr msg)
     {
         eps_actuation = msg->data[1];
+    }
+
+    void callback_routine_multi_thread()
+    {
+        while (rclcpp::ok())
+        {
+            callback_routine();
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
     }
 
     void callback_routine()
@@ -443,6 +455,8 @@ public:
             logger.error("CAN connection broken");
             return;
         }
+
+        error_code = 0;
 
         // Check if the response is from the expected node
         if (frame.can_id == COB_ID_CAR_ENCODER)
