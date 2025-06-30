@@ -394,6 +394,7 @@ def generate_launch_description():
             "camera_scan_min_y_": -1.0,
             "camera_scan_max_y_": 1.0,
             "threshold_icp_score": 7.5,
+            "debug_motion": True,
         }],
         respawn=True,
         prefix='nice -n -8 chrt -f 95'
@@ -1113,8 +1114,10 @@ def generate_launch_description():
                 "qos_scan": 1,
                 "wait_for_transform": 2.0,
 
-                "odom_tf_linear_variance": 0.0000000001,
-                "odom_tf_angular_variance": 0.0000000001,
+                "odom_tf_linear_variance": 0.0001,
+                "odom_tf_angular_variance": 0.0001,
+                # "odom_tf_linear_variance": 0.0000000001,
+                # "odom_tf_angular_variance": 0.0000000001,
                 "publish_tf": False,
                 "publish_map": True,
                 "approx_sync": True,

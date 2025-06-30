@@ -336,6 +336,9 @@ void Master::process_save_terminals()
 
 void Master::process_load_waypoints()
 {
+    static float prev_wp_x = 0;
+    static float prev_wp_y = 0;
+
     waypoints.clear();
 
     if (!boost::filesystem::exists(waypoint_file_path))
@@ -380,6 +383,13 @@ void Master::process_load_waypoints()
                 wp.x = tf_transformed.getOrigin().getX();
                 wp.y = tf_transformed.getOrigin().getY();
             }
+
+            float dx = wp.x - prev_wp_x;
+            float dy = wp.y - prev_wp_y;
+            wp.arah = atan2f(dy, dx);
+
+            prev_wp_x = wp.x;
+            prev_wp_y = wp.y;
 
             waypoints.push_back(wp);
         }

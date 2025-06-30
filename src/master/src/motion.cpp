@@ -270,9 +270,9 @@ void Master::wp2velocity_steering(float lookahead_distance, float *pvelocity, fl
     static const float threshold_error_sangat_besar = 1.5;
     static const float thresholad_error_kecil = 0.4;
     static const int16_t error_kecil_window_index_search = 5;
-    static const float offset_fb_velocity = 1;
-    static const float threshold_error_arah_hadap_waypoint = 0.35;
-    static const float threshold_error_arah_hadap_terminal = 0.35;
+    static const float offset_fb_velocity = 3;
+    static const float threshold_error_arah_hadap_waypoint = 1.57;
+    static const float threshold_error_arah_hadap_terminal = 1.37;
     static int16_t terminal_now = 0;
     static int16_t prev_terminal = 0;
 
@@ -292,31 +292,20 @@ void Master::wp2velocity_steering(float lookahead_distance, float *pvelocity, fl
         uint32_t index_terdekat = 0;
         for (size_t i = 0; i < waypoints.size(); i++)
         {
-            // int next_i = i + 3;
+            float error_arah_hadap = waypoints[i].arah - fb_final_pose_xyo[2];
+            while (error_arah_hadap > M_PI)
+                error_arah_hadap -= 2 * M_PI;
+            while (error_arah_hadap < -M_PI)
+                error_arah_hadap += 2 * M_PI;
 
-            // if (next_i >= waypoints.size())
-            // {
-            //     next_i -= waypoints.size();
-            // }
-
-            // float dy = waypoints[next_i].y - waypoints[i].y;
-            // float dx = waypoints[next_i].x - waypoints[i].x;
-            // float direction = atan2(dy, dx);
-
-            // float error_arah_hadap = direction - fb_final_pose_xyo[2];
-            // while (error_arah_hadap > M_PI)
-            //     error_arah_hadap -= 2 * M_PI;
-            // while (error_arah_hadap < -M_PI)
-            //     error_arah_hadap += 2 * M_PI;
-
-            // if (fabsf(error_arah_hadap) < threshold_error_arah_hadap_waypoint)
-            // {
-            // }
-            float error = pythagoras(pose_used_x, pose_used_y, waypoints[i].x, waypoints[i].y);
-            if (error < min_error)
+            if (fabsf(error_arah_hadap) < threshold_error_arah_hadap_waypoint)
             {
-                min_error = error;
-                index_terdekat = i;
+                float error = pythagoras(pose_used_x, pose_used_y, waypoints[i].x, waypoints[i].y);
+                if (error < min_error)
+                {
+                    min_error = error;
+                    index_terdekat = i;
+                }
             }
         }
         index_sekarang = index_terdekat;
@@ -327,31 +316,20 @@ void Master::wp2velocity_steering(float lookahead_distance, float *pvelocity, fl
         uint32_t index_terdekat = 0;
         for (size_t i = index_sekarang - error_kecil_window_index_search; i < index_sekarang + error_kecil_window_index_search * 2; i++)
         {
-            // int next_i = i + 3;
+            float error_arah_hadap = waypoints[i].arah - fb_final_pose_xyo[2];
+            while (error_arah_hadap > M_PI)
+                error_arah_hadap -= 2 * M_PI;
+            while (error_arah_hadap < -M_PI)
+                error_arah_hadap += 2 * M_PI;
 
-            // if (next_i >= waypoints.size())
-            // {
-            //     next_i -= waypoints.size();
-            // }
-
-            // float dy = waypoints[next_i].y - waypoints[i].y;
-            // float dx = waypoints[next_i].x - waypoints[i].x;
-            // float direction = atan2(dy, dx);
-
-            // float error_arah_hadap = direction - fb_final_pose_xyo[2];
-            // while (error_arah_hadap > M_PI)
-            //     error_arah_hadap -= 2 * M_PI;
-            // while (error_arah_hadap < -M_PI)
-            //     error_arah_hadap += 2 * M_PI;
-
-            // if (fabsf(error_arah_hadap) < threshold_error_arah_hadap_waypoint)
-            // {
-            // }
-            float error = pythagoras(pose_used_x, pose_used_y, waypoints[i].x, waypoints[i].y);
-            if (error < min_error)
+            if (fabsf(error_arah_hadap) < threshold_error_arah_hadap_waypoint)
             {
-                min_error = error;
-                index_terdekat = i;
+                float error = pythagoras(pose_used_x, pose_used_y, waypoints[i].x, waypoints[i].y);
+                if (error < min_error)
+                {
+                    min_error = error;
+                    index_terdekat = i;
+                }
             }
         }
         index_sekarang = index_terdekat;
@@ -439,6 +417,11 @@ void Master::wp2velocity_steering(float lookahead_distance, float *pvelocity, fl
         }
     }
 
+    if (debug_motion)
+    {
+        logger.info("Pose: %.2f %.2f %.2f || idx %d %d || term %d %.2f %.2f %d || %.2f %.2f || %.2f %.2f", pose_used_x, pose_used_y, fb_final_pose_xyo[2], index_sekarang, index_lookahead, terminal_now, lookahead_distance, obs_scan_r, lidar_obs_scan_thr, obs_scan_camera_thr_terminal, waypoints[index_sekarang].x, waypoints[index_sekarang].y, waypoints[index_lookahead].x, waypoints[index_lookahead].y);
+    }
+
     /* Jika sudah mencapai waypoint terakhir */
     if (index_lookahead == waypoints.size() - 1)
     {
@@ -520,6 +503,11 @@ void Master::wp2velocity_steering(float lookahead_distance, float *pvelocity, fl
     //     target_steering_angle += 2 * M_PI;
 
     // logger.info("%.2f %.2f || %.2f %.2f", pose_used_x, pose_used_y, target_velocity, target_steering_angle);
+
+    if (debug_motion)
+    {
+        logger.info("vstr %.2f %.2f || obs %.2f %d", target_velocity, target_steering_angle, obs_find_baru, camera_scan_obs_result);
+    }
 
     /* Menghitung obstacle */
     if (enable_obs_detection)

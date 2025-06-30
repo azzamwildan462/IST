@@ -1,4 +1,4 @@
-import csv
+qimport csv
 import matplotlib
 matplotlib.use('TkAgg')  # Pastikan backend GUI stabil di Windows
 
@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 import os
 
-csv_file = "/home/wildan/Desktop/map_baru/waypoint.csv"
+csv_file = "./waypoint_new_2.csv"
 
 def read_csv(file_path):
     x_vals, y_vals = [], []

@@ -49,6 +49,9 @@ Master::Master()
     this->declare_parameter("use_filtered_pose", false);
     this->get_parameter("use_filtered_pose", use_filtered_pose);
 
+    this->declare_parameter("debug_motion", false);
+    this->get_parameter("debug_motion", debug_motion);
+
     this->declare_parameter("threshold_icp_score", 100.0);
     this->get_parameter("threshold_icp_score", threshold_icp_score);
 
@@ -193,7 +196,7 @@ Master::Master()
     // pid_vx.init(0.0030, 0.000000, 0, dt, -0.04, 0.4, -0.0005, 0.0005);
     pid_vx.init(pid_terms[0], pid_terms[1], pid_terms[2], pid_terms[3], pid_terms[4], pid_terms[5], pid_terms[6], pid_terms[7]);
 
-    logger.info("Master init success");
+    logger.info("Master init success %.2f", threshold_icp_score);
     global_fsm.value = FSM_GLOBAL_INIT;
 }
 Master::~Master()
@@ -763,12 +766,17 @@ void Master::callback_tim_50hz()
 
         local_fsm.value = 0;
 
+        if (debug_motion)
+        {
+            logger.info("icp %.2f %.2f %d", icp_score, threshold_icp_score, fb_beckhoff_digital_input);
+        }
+
         if (icp_score < threshold_icp_score)
             slam_status |= 0b1000; // Set status SLAM ready
         else
             slam_status &= ~0b1000; // Clear status SLAM ready
 
-        if ((fb_beckhoff_digital_input & IN_START_OP3) == IN_START_OP3)
+        if (((fb_beckhoff_digital_input & IN_START_OP3) == IN_START_OP3) || ((fb_beckhoff_digital_input & IN_START_OP3_HANDLER) == IN_START_OP3_HANDLER))
         {
             rclcpp::Duration dt_pose_estimator = current_time - last_time_pose_estimator;
             rclcpp::Duration dt_beckhoff = current_time - last_time_beckhoff;
@@ -846,7 +854,13 @@ void Master::callback_tim_50hz()
             break;
         }
 
-        if ((fb_beckhoff_digital_input & IN_STOP_OP3) == IN_STOP_OP3)
+        // if ((fb_beckhoff_digital_input & IN_STOP_OP3) == IN_STOP_OP3)
+        // {
+        //     global_fsm.value = FSM_GLOBAL_SAFEOP;
+        //     break;
+        // }
+
+        if ((fb_beckhoff_digital_input & IN_STOP_OP3_HANDLER) == IN_STOP_OP3_HANDLER)
         {
             global_fsm.value = FSM_GLOBAL_SAFEOP;
             break;

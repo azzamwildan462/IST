@@ -78,8 +78,10 @@
 #define IN_BRAKE_ACTIVE 0b100
 #define IN_EPS_nFAULT 0b1000
 #define IN_MASK_BUMPER 0b11110000
-// #define IN_START_OP3 0b100000000
-// #define IN_STOP_OP3 0b1000000000
+// #define IN_START_OP3_HANDLER 0b100000000
+// #define IN_STOP_OP3_HANDLER 0b1000000000
+#define IN_START_OP3_HANDLER 0b1000000000
+#define IN_STOP_OP3_HANDLER 0b100000000
 // #define IN_START_GAS_MANUAL 0b10000000000
 #define IN_TRIM_KECEPATAN 0b10000000000000
 #define IN_START_OP3 (0b100000 << 16)
@@ -107,6 +109,7 @@ typedef struct
     float theta;
     float fb_velocity;
     float fb_steering;
+    float arah;
 } waypoint_t;
 
 typedef struct
@@ -196,6 +199,7 @@ public:
     float toribay_ready_threshold = 0.5;
     bool use_filtered_pose = false;
     float threshold_icp_score = 100.0;
+    bool debug_motion = false;
 
     std::vector<double> complementary_terms = {0.30, 0.03, 0.01, 0.9};
 
