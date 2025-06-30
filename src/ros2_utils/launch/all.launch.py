@@ -227,7 +227,7 @@ def generate_launch_description():
         ],
         arguments=["--ros-args", "--log-level", "error"],
         respawn=True,
-        prefix='nice -n -20 chrt -f 96',
+        prefix='nice -n -14 chrt -f 60',
     )
 
     rs2_cam_kiri = Node(
@@ -255,7 +255,7 @@ def generate_launch_description():
                     ("/cam_kiri/rs2_cam_kiri/color/image_raw", "/cam_kiri/image_bgr"),],
         arguments=["--ros-args", "--log-level", "error"],
         respawn=True,
-        prefix='nice -n -20 chrt -f 96',
+        prefix='nice -n -20 chrt -f 86',
     )
 
     rs2_cam_kanan = Node(
@@ -282,7 +282,7 @@ def generate_launch_description():
                     ("/cam_kanan/rs2_cam_kanan/color/image_raw", "/cam_kanan/image_bgr"),],
         arguments=["--ros-args", "--log-level", "error"],
         respawn=True,
-        prefix='nice -n -20 chrt -f 96',
+        prefix='nice -n -20 chrt -f 86',
     )
 
     witty_lidar = Node(
@@ -397,7 +397,7 @@ def generate_launch_description():
             "debug_motion": True,
         }],
         respawn=True,
-        prefix='nice -n -8 chrt -f 95'
+        prefix='nice -n -8 chrt -f 70'
     )
 
     camera_obstacle_detector = Node(
@@ -413,7 +413,7 @@ def generate_launch_description():
         }],
         respawn=True,
         # remappings=[('/hardware/imu', '/can/imu')],
-        # prefix='nice -n -9 chrt -f 80'
+        # prefix='nice -n -9 chrt -f 60'
     )
 
     lidar_obstacle_filter = Node(
@@ -433,7 +433,7 @@ def generate_launch_description():
         }],
         respawn=True,
         # remappings=[('/hardware/imu', '/can/imu')],
-        # prefix='nice -n -9 chrt -f 80'
+        # prefix='nice -n -9 chrt -f 60'
     )
 
     pose_estimator = Node(
@@ -454,7 +454,7 @@ def generate_launch_description():
         }],
         respawn=True,
         # remappings=[('/hardware/imu', '/can/imu')],
-        prefix='nice -n -9 chrt -f 80'
+        prefix='nice -n -9 chrt -f 60'
     )
 
     # pose_estimator_icp = Node(
@@ -483,7 +483,7 @@ def generate_launch_description():
     #     }],
     #     respawn=True,
     #     # remappings=[('/hardware/imu', '/can/imu')],
-    #     prefix='nice -n -9 chrt -f 80'
+    #     prefix='nice -n -9 chrt -f 60'
     # )
 
     obstacle_filter = Node(
@@ -523,7 +523,7 @@ def generate_launch_description():
             "brake_idle_position": -50000,
         }],
         respawn=True,
-        prefix='nice -n -20 chrt -f 99'
+        prefix='nice -n -20 chrt -f 89'
     )
 
     CANbus_HAL = Node(
@@ -537,7 +537,7 @@ def generate_launch_description():
         }],
         remappings=[('/can/imu', '/hardware/imu')],
         respawn=True,
-        prefix='nice -n -20 chrt -f 98'
+        prefix='nice -n -19 chrt -f 88'
     )
 
     CANbus_HAL_socket_can0 = Node(
@@ -553,7 +553,7 @@ def generate_launch_description():
         }],
         respawn=True,
         remappings=[('/can/imu', '/hardware/imu')],
-        prefix='nice -n -20 chrt -f 98'
+        prefix='nice -n -18 chrt -f 88'
     )
     CANbus_HAL_socket_can1 = Node(
         package='hardware',
@@ -567,7 +567,7 @@ def generate_launch_description():
             "can_to_car": True,
         }],
         respawn=True,
-        prefix='nice -n -20 chrt -f 97'
+        prefix='nice -n -17 chrt -f 87'
     )
 
 
@@ -586,7 +586,7 @@ def generate_launch_description():
             "port": "/dev/serial/by-id/usb-FTDI_FT232R_USB_UART_A10KUSZ2-if00-port0"
         }],
         respawn=True,
-        # prefix='nice -n -20 chrt -f 90'
+        # prefix='nice -n -20 chrt -f 80'
     )
 
     keyboard_input = Node(
@@ -689,7 +689,7 @@ def generate_launch_description():
             {"rgb_height": 480},
             {"fps": 25},
         ],
-        prefix='nice -n -8 chrt -f 97' 
+        prefix='nice -n -8 chrt -f 87' 
     )
 
     ascamera_kanan = Node(
@@ -711,7 +711,7 @@ def generate_launch_description():
             {"rgb_height": 480},
             {"fps": 25},
         ],
-        prefix='nice -n -8 chrt -f 97' 
+        prefix='nice -n -8 chrt -f 87' 
     )
 
     ascamera_multi = Node(
@@ -783,7 +783,7 @@ def generate_launch_description():
         }
         ],
         respawn=True,
-        prefix='nice -n -19 chrt -f 94'
+        prefix='nice -n -19 chrt -f 84'
     )
 
     aruco_detection_kanan = Node(
@@ -858,7 +858,7 @@ def generate_launch_description():
         }
         ],
         respawn=True,
-        prefix='nice -n -19 chrt -f 94' 
+        prefix='nice -n -19 chrt -f 84' 
     )
 
     aruco_detection_kiri = Node(
@@ -1088,7 +1088,7 @@ def generate_launch_description():
             ('depth/image', '/camera/rs2_cam_main/aligned_depth_to_color/image_raw')
         ],
         arguments=["--ros-args", "--log-level", "warn"],
-        # prefix='nice -n -9 chrt -f 90',
+        # prefix='nice -n -9 chrt -f 80',
         respawn=True,
     )
 
@@ -1218,7 +1218,7 @@ def generate_launch_description():
             ('depth/image', '/camera/rs2_cam_main/aligned_depth_to_color/image_raw')
         ],
         arguments=["--ros-args", "--log-level", "warn"],
-        # prefix='nice -n -9 chrt -f 90',
+        # prefix='nice -n -9 chrt -f 80',
         respawn=True,
     )
 
@@ -1338,7 +1338,7 @@ def generate_launch_description():
             }
         ],
         arguments=["--ros-args", "--log-level", "warn"],
-        prefix='nice -n -9',
+        prefix='nice -n -15 chrt -f 69',
         respawn=True,
     )
 
