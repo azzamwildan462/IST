@@ -34,10 +34,15 @@ add_executable(single_detection src/single_detection.cpp)
 ament_target_dependencies(single_detection ${var_dependencies})
 target_link_libraries(single_detection ${YAML_CPP_LIBRARIES})
 
+add_executable(forklift_detector src/forklift_detector.cpp)
+ament_target_dependencies(forklift_detector ${var_dependencies})
+target_link_libraries(forklift_detector -llept -ltesseract)
+
 install(TARGETS
   vision_capture
   lane_detection
   single_detection
+  forklift_detector
   DESTINATION lib/${PROJECT_NAME}
 )
 

@@ -20,6 +20,7 @@
 #include "std_msgs/msg/float32.hpp"
 #include "std_msgs/msg/float32_multi_array.hpp"
 #include "std_msgs/msg/int16.hpp"
+#include "std_msgs/msg/int8.hpp"
 #include "std_msgs/msg/u_int16.hpp"
 #include "std_msgs/msg/u_int8.hpp"
 #include "std_msgs/msg/u_int8_multi_array.hpp"
@@ -164,6 +165,7 @@ public:
     rclcpp::Subscription<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr sub_localization_pose;
     rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr sub_camera_pcl;
     rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr sub_icp_score;
+    rclcpp::Subscription<std_msgs::msg::Int8>::SharedPtr sub_detected_forklift;
 
     rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr srv_set_record_route_mode;
     rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr srv_set_terminal; // Aktif -> add terminal, InActive -> save terminal
@@ -301,6 +303,9 @@ public:
 
     float icp_score = 999999;
 
+    int8_t detected_forklift_number = -1;
+    int8_t detected_forklift_number_filtered = -1;
+
     Master();
     ~Master();
 
@@ -335,6 +340,7 @@ public:
     void callback_sub_localization_pose(const geometry_msgs::msg::PoseWithCovarianceStamped msg);
     void callback_sub_camera_pcl(const sensor_msgs::msg::PointCloud2::SharedPtr msg);
     void callback_sub_icp_score(const std_msgs::msg::Float32::SharedPtr msg);
+    void callback_sub_detected_forklift(const std_msgs::msg::Int8::SharedPtr msg);
     void callback_srv_set_record_route_mode(const std_srvs::srv::SetBool::Request::SharedPtr request, std_srvs::srv::SetBool::Response::SharedPtr response);
     void callback_srv_set_terminal(const std_srvs::srv::SetBool::Request::SharedPtr request, std_srvs::srv::SetBool::Response::SharedPtr response);
     void callback_srv_rm_terminal(const std_srvs::srv::SetBool::Request::SharedPtr request, std_srvs::srv::SetBool::Response::SharedPtr response);

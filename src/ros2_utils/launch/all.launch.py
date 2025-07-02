@@ -37,6 +37,8 @@ def generate_launch_description():
     # SetEnvironmentVariable(name='RMW_IMPLEMENTATION', value='rmw_cyclonedds_cpp'),
     # SetEnvironmentVariable(name='CYCLONEDDS_URI', value='file://' + path_config + 'cyclonedds.xml'),
 
+    SetEnvironmentVariable('TESSDATA_PREFIX', '/usr/share/tesseract-ocr/4.00'),
+
     rosbridge_server = Node(
         package='rosbridge_server',
         executable='rosbridge_websocket',
@@ -227,7 +229,7 @@ def generate_launch_description():
         ],
         arguments=["--ros-args", "--log-level", "error"],
         respawn=True,
-        prefix='nice -n -14 chrt -f 60',
+##        prefix='nice -n -14 chrt -f 60',
     )
 
     rs2_cam_kiri = Node(
@@ -255,7 +257,7 @@ def generate_launch_description():
                     ("/cam_kiri/rs2_cam_kiri/color/image_raw", "/cam_kiri/image_bgr"),],
         arguments=["--ros-args", "--log-level", "error"],
         respawn=True,
-        prefix='nice -n -20 chrt -f 86',
+##        prefix='nice -n -20 chrt -f 86',
     )
 
     rs2_cam_kanan = Node(
@@ -282,7 +284,7 @@ def generate_launch_description():
                     ("/cam_kanan/rs2_cam_kanan/color/image_raw", "/cam_kanan/image_bgr"),],
         arguments=["--ros-args", "--log-level", "error"],
         respawn=True,
-        prefix='nice -n -20 chrt -f 86',
+##        prefix='nice -n -20 chrt -f 86',
     )
 
     witty_lidar = Node(
@@ -397,7 +399,7 @@ def generate_launch_description():
             "debug_motion": True,
         }],
         respawn=True,
-        prefix='nice -n -8 chrt -f 70'
+##        prefix='nice -n -8 chrt -f 70'
     )
 
     camera_obstacle_detector = Node(
@@ -454,7 +456,7 @@ def generate_launch_description():
         }],
         respawn=True,
         # remappings=[('/hardware/imu', '/can/imu')],
-        prefix='nice -n -9 chrt -f 60'
+##        prefix='nice -n -9 chrt -f 60'
     )
 
     # pose_estimator_icp = Node(
@@ -506,7 +508,7 @@ def generate_launch_description():
             "use_scan_box": False,
         }],
         respawn=True,
-        prefix='nice -n -8'
+##        prefix='nice -n -8'
     )
 
     beckhoff = Node(
@@ -523,7 +525,7 @@ def generate_launch_description():
             "brake_idle_position": -50000,
         }],
         respawn=True,
-        prefix='nice -n -20 chrt -f 89'
+##        prefix='nice -n -20 chrt -f 89'
     )
 
     CANbus_HAL = Node(
@@ -537,7 +539,7 @@ def generate_launch_description():
         }],
         remappings=[('/can/imu', '/hardware/imu')],
         respawn=True,
-        prefix='nice -n -19 chrt -f 88'
+##        prefix='nice -n -19 chrt -f 88'
     )
 
     CANbus_HAL_socket_can0 = Node(
@@ -553,7 +555,7 @@ def generate_launch_description():
         }],
         respawn=True,
         remappings=[('/can/imu', '/hardware/imu')],
-        prefix='nice -n -18 chrt -f 88'
+##        prefix='nice -n -18 chrt -f 88'
     )
     CANbus_HAL_socket_can1 = Node(
         package='hardware',
@@ -567,7 +569,7 @@ def generate_launch_description():
             "can_to_car": True,
         }],
         respawn=True,
-        prefix='nice -n -17 chrt -f 87'
+##        prefix='nice -n -17 chrt -f 87'
     )
 
 
@@ -609,7 +611,16 @@ def generate_launch_description():
             "hardcoded_image": os.path.join(ws_path,"src/vision/assets/coba_kam.png")
         }],
         respawn=True,
-        prefix='nice -n -8'
+##        prefix='nice -n -8'
+    )
+
+    forklift_detector = Node(
+        package='vision',
+        executable='forklift_detector',
+        name='forklift_detector',
+        output='screen',
+        respawn=True,
+##        prefix='nice -n -8'
     )
 
     lane_detection = Node(
@@ -641,7 +652,7 @@ def generate_launch_description():
         }
         ],
         respawn=True,
-        prefix='nice -n -8'
+##        prefix='nice -n -8'
     )
 
     aruco_detection = Node(
@@ -667,7 +678,7 @@ def generate_launch_description():
         }
         ],
         respawn=True,
-        prefix='nice -n -8'
+##        prefix='nice -n -8'
     )
 
     ascamera_kiri = Node(
@@ -689,7 +700,7 @@ def generate_launch_description():
             {"rgb_height": 480},
             {"fps": 25},
         ],
-        prefix='nice -n -8 chrt -f 87' 
+##        prefix='nice -n -8 chrt -f 87' 
     )
 
     ascamera_kanan = Node(
@@ -711,7 +722,7 @@ def generate_launch_description():
             {"rgb_height": 480},
             {"fps": 25},
         ],
-        prefix='nice -n -8 chrt -f 87' 
+##        prefix='nice -n -8 chrt -f 87' 
     )
 
     ascamera_multi = Node(
@@ -733,7 +744,7 @@ def generate_launch_description():
             {"rgb_height": 480},
             {"fps": 30},
         ],
-        prefix='nice -n -20' 
+##        prefix='nice -n -20' 
     )
     
 
@@ -749,7 +760,7 @@ def generate_launch_description():
             # "hardcoded_image": os.path.join(ws_path,"src/vision/assets/cam_kanan.jpeg")
         }],
         respawn=True,
-        prefix='nice -n -8'
+##        prefix='nice -n -8'
     )
 
     lane_detection_kanan = Node(
@@ -783,7 +794,7 @@ def generate_launch_description():
         }
         ],
         respawn=True,
-        prefix='nice -n -19 chrt -f 84'
+##        prefix='nice -n -19 chrt -f 84'
     )
 
     aruco_detection_kanan = Node(
@@ -810,7 +821,7 @@ def generate_launch_description():
         }
         ],
         respawn=True,
-        prefix='nice -n -8'
+##        prefix='nice -n -8'
     )
 
     vision_capture_kiri = Node(
@@ -825,7 +836,7 @@ def generate_launch_description():
             # "hardcoded_image": os.path.join(ws_path,"src/vision/assets/cam_kiri.jpeg")
         }],
         respawn=True,
-        prefix='nice -n -8'
+##        prefix='nice -n -8'
     )
 
     lane_detection_kiri = Node(
@@ -858,7 +869,7 @@ def generate_launch_description():
         }
         ],
         respawn=True,
-        prefix='nice -n -19 chrt -f 84' 
+##        prefix='nice -n -19 chrt -f 84' 
     )
 
     aruco_detection_kiri = Node(
@@ -885,7 +896,7 @@ def generate_launch_description():
         }
         ],
         respawn=True,
-        prefix='nice -n -8'
+##        prefix='nice -n -8'
     )
 
     # =============================================================================
@@ -1114,10 +1125,10 @@ def generate_launch_description():
                 "qos_scan": 1,
                 "wait_for_transform": 2.0,
 
-                "odom_tf_linear_variance": 0.0001,
-                "odom_tf_angular_variance": 0.0001,
-                # "odom_tf_linear_variance": 0.0000000001,
-                # "odom_tf_angular_variance": 0.0000000001,
+                # "odom_tf_linear_variance": 0.0001,
+                # "odom_tf_angular_variance": 0.0001,
+                "odom_tf_linear_variance": 0.0000000001,
+                "odom_tf_angular_variance": 0.0000000001,
                 "publish_tf": False,
                 "publish_map": True,
                 "approx_sync": True,
@@ -1131,7 +1142,7 @@ def generate_launch_description():
                 "Rtabmap/CreateIntermediateNodes": "True",
                 "Rtabmap/LoopThr": "0.11", # Routine period untuk cek loop closure
 
-                "Mem/STMSize": "50",  # Short-term memory size
+                "Mem/STMSize": "20",  # Short-term memory size
                 "Mem/IncrementalMemory": "False",  # 
                 "Mem/InitWMWithAllNodes": "True",  # 
                 "Mem/RehearsalSimilaritys": "0.9",  #
@@ -1144,14 +1155,14 @@ def generate_launch_description():
                 "RGBD/Enabled": "True",
                 "RGBD/OptimizeFromGraphEnd": "False", # True agar robot tidak lompat 
                 "RGBD/NeighborLinkRefining": "False",  # Added from documentation
-                "RGBD/AngularUpdate": "1.0",  # Added from documentation
-                "RGBD/LinearUpdate": "1.0",  # Added from documentation
+                "RGBD/AngularUpdate": "0.1",  # Added from documentation
+                "RGBD/LinearUpdate": "0.1",  # Added from documentation
                 "RGBD/OptimizeMaxError": "3.0",  # Added from documentation
                 "RGBD/InvertedReg": "False",  # Added from documentation
                 "RGBD/ProximityPathMaxNeighbors": "10",
-                "RGBD/ProximityMaxGraphDepth": "50",
+                "RGBD/ProximityMaxGraphDepth": "20",
                 "RGBD/ProximityByTime": "False",
-                "RGBD/ProximityBySpace": "False",  
+                "RGBD/ProximityBySpace": "True",  
                 # "RGBD/LocalBundleOnLoopClosure": "True",
 
                 "Optimizer/Strategy": "2",  # Added by Azzam
@@ -1208,7 +1219,7 @@ def generate_launch_description():
                 "Grid/RayTracing": "False", # Added by Azzam
 
                 "use_sim_time": False,
-                "Threads": 12, # Added by Azzam
+                # "Threads": 12, # Added by Azzam
             }
         ],
         remappings=[
@@ -1338,7 +1349,7 @@ def generate_launch_description():
             }
         ],
         arguments=["--ros-args", "--log-level", "warn"],
-        prefix='nice -n -15 chrt -f 69',
+##        prefix='nice -n -15 chrt -f 69',
         respawn=True,
     )
 
@@ -1493,7 +1504,8 @@ def generate_launch_description():
 
 
     #         # camera_obstacle_detector,
-    #         lidar_obstacle_filter
+    #         # lidar_obstacle_filter,
+    #         forklift_detector
     #     ]
     # )
 
@@ -1543,6 +1555,7 @@ def generate_launch_description():
             # obstacle_filter,
             # camera_obstacle_detector,
             lidar_obstacle_filter,
+            # forklift_detector,
 
             # # =============================================================================
 

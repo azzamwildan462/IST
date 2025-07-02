@@ -276,6 +276,8 @@ void Master::wp2velocity_steering(float lookahead_distance, float *pvelocity, fl
     static int16_t terminal_now = 0;
     static int16_t prev_terminal = 0;
 
+    static bool request_stop = false;
+
     float pose_used_x = fb_final_pose_xyo[0];
     float pose_used_y = fb_final_pose_xyo[1];
     if (use_filtered_pose)

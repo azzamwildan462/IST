@@ -93,6 +93,8 @@ Master::Master()
     auto sub_opts = rclcpp::SubscriptionOptions();
     sub_opts.callback_group = cloud_cb_group_;
 
+    sub_detected_forklift = this->create_subscription<std_msgs::msg::Int8>(
+        "/forklift_number", 1, std::bind(&Master::callback_sub_detected_forklift, this, std::placeholders::_1));
     sub_obs_find = this->create_subscription<std_msgs::msg::Float32>(
         "/lidar_obstacle_filter/obs_find", 1, std::bind(&Master::callback_sub_obs_find, this, std::placeholders::_1));
     sub_CAN_eps_encoder = this->create_subscription<std_msgs::msg::Float32>(
@@ -143,8 +145,8 @@ Master::Master()
         "/slam/map", 1, std::bind(&Master::callback_sub_map, this, std::placeholders::_1));
     sub_localization_pose = this->create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>(
         "/slam/localization_pose", 1, std::bind(&Master::callback_sub_localization_pose, this, std::placeholders::_1));
-    sub_camera_pcl = this->create_subscription<sensor_msgs::msg::PointCloud2>(
-        "/camera/rs2_cam_main/depth/color/points", 1, std::bind(&Master::callback_sub_camera_pcl, this, std::placeholders::_1), sub_opts);
+    // sub_camera_pcl = this->create_subscription<sensor_msgs::msg::PointCloud2>(
+    //     "/camera/rs2_cam_main/depth/color/points", 1, std::bind(&Master::callback_sub_camera_pcl, this, std::placeholders::_1), sub_opts);
     sub_icp_score = this->create_subscription<std_msgs::msg::Float32>(
         "/lidar_obstacle_filter/icp_score", 1, std::bind(&Master::callback_sub_icp_score, this, std::placeholders::_1), sub_opts);
 
@@ -170,20 +172,20 @@ Master::Master()
     tf_lidar_base_buffer = std::make_unique<tf2_ros::Buffer>(this->get_clock());
     tf_lidar_base_listener = std::make_unique<tf2_ros::TransformListener>(*tf_lidar_base_buffer);
 
-    while (!tf_is_initialized)
-    {
-        sleep(1);
-        try
-        {
-            tf_lidar_base = tf_lidar_base_buffer->lookupTransform("base_link", "camera_depth_optical_frame", tf2::TimePointZero);
-            tf_is_initialized = true;
-        }
-        catch (tf2::TransformException &ex)
-        {
-            logger.error("tunggu");
-            tf_is_initialized = false;
-        }
-    }
+    // while (!tf_is_initialized)
+    // {
+    //     sleep(1);
+    //     try
+    //     {
+    //         tf_lidar_base = tf_lidar_base_buffer->lookupTransform("base_link", "camera_depth_optical_frame", tf2::TimePointZero);
+    //         tf_is_initialized = true;
+    //     }
+    //     catch (tf2::TransformException &ex)
+    //     {
+    //         logger.error("tunggu");
+    //         tf_is_initialized = false;
+    //     }
+    // }
 
     pass_x_.setFilterFieldName("x");
     pass_y_.setFilterFieldName("y");
@@ -201,6 +203,43 @@ Master::Master()
 }
 Master::~Master()
 {
+}
+
+void Master::callback_sub_detected_forklift(const std_msgs::msg::Int8::SharedPtr msg)
+{
+    detected_forklift_number = msg->data;
+
+    static uint16_t counter_detected = 0;
+    static uint16_t counter_not_detected = 0;
+
+    if (detected_forklift_number >= 0)
+    {
+        counter_detected++;
+        counter_not_detected = 0;
+    }
+    else
+    {
+        counter_detected = 0;
+        counter_not_detected++;
+    }
+
+    if (counter_detected > 10000)
+    {
+        counter_detected = 10000;
+    }
+    if (counter_not_detected > 10000)
+    {
+        counter_not_detected = 10000;
+    }
+
+    if (counter_detected > 0)
+    {
+        detected_forklift_number_filtered = true;
+    }
+    if (counter_not_detected > 300)
+    {
+        detected_forklift_number_filtered = false;
+    }
 }
 
 void Master::callback_sub_icp_score(const std_msgs::msg::Float32::SharedPtr msg)
