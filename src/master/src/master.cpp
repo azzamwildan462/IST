@@ -149,6 +149,8 @@ Master::Master()
     //     "/camera/rs2_cam_main/depth/color/points", 1, std::bind(&Master::callback_sub_camera_pcl, this, std::placeholders::_1), sub_opts);
     sub_icp_score = this->create_subscription<std_msgs::msg::Float32>(
         "/lidar_obstacle_filter/icp_score", 1, std::bind(&Master::callback_sub_icp_score, this, std::placeholders::_1), sub_opts);
+    sub_detected_forklift_contour = this->create_subscription<std_msgs::msg::Float32>(
+        "/forklift_detector_vision/forklift_detected", 1, std::bind(&Master::callback_sub_detected_forklift_contour, this, std::placeholders::_1), sub_opts);
 
     srv_set_record_route_mode = this->create_service<std_srvs::srv::SetBool>(
         "/master/set_record_route_mode", std::bind(&Master::callback_srv_set_record_route_mode, this, std::placeholders::_1, std::placeholders::_2));
@@ -242,6 +244,10 @@ void Master::callback_sub_detected_forklift(const std_msgs::msg::Int8::SharedPtr
     }
 }
 
+void Master::callback_sub_detected_forklift_contour(const std_msgs::msg::Float32::SharedPtr msg)
+{
+    detected_forklift_contour = msg->data;
+}
 void Master::callback_sub_icp_score(const std_msgs::msg::Float32::SharedPtr msg)
 {
     icp_score = msg->data;

@@ -35,6 +35,7 @@ public:
     rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr pub_obs_find_;
     rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr pub_icp_score_;
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_camera_filtered_pcl_;
+    rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr pub_icp_estimate;
 
     rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr sub_scan_;
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr sub_odom_filtered;
@@ -73,6 +74,14 @@ public:
     pcl::PointXYZ point_batas_kanan_bawah; // Kanannya mobil
     pcl::PointXYZ point_batas_kiri_atas;
     pcl::PointXYZ point_batas_kanan_atas;
+
+    float dx_icp;
+    float dy_icp;
+    float dth_icp;
+
+    float icp_estimate_x = 0;
+    float icp_estimate_y = 0;
+    float icp_estimate_th = 0;
 
     LidarObstacleFilter()
         : Node("lidar_obstacle_filter")
@@ -123,6 +132,7 @@ public:
         pub_obs_find_ = this->create_publisher<std_msgs::msg::Float32>("/lidar_obstacle_filter/obs_find", 1);
         pub_icp_score_ = this->create_publisher<std_msgs::msg::Float32>("/lidar_obstacle_filter/icp_score", 1);
         pub_camera_filtered_pcl_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("/lidar_obstacle_filter/camera_filtered_pcl", 1);
+        pub_icp_estimate = this->create_publisher<nav_msgs::msg::Odometry>("/lidar_obstacle_filter/icp_estimate", 10);
 
         tf_lidar_map_buffer = std::make_shared<tf2_ros::Buffer>(this->get_clock(), tf2::durationFromSec(10));
         tf_lidar_map_listener = std::make_shared<tf2_ros::TransformListener>(*tf_lidar_map_buffer);
@@ -424,6 +434,57 @@ public:
         icp.align(aligned_cloud);
 
         float icp_score = icp.getFitnessScore();
+
+        /**
+         * Get final matrix transformation, this matrix is used to transfrom measured points to reference points,
+         * so we use this transformation to transform our robot pose (from odometry) into new pose based on ICP
+         */
+        Eigen::Matrix4f transformation_matrix = icp.getFinalTransformation();
+
+        /* Get Robot's translation and rotation based on ICP */
+        Eigen::Vector4f point(final_pose_x, final_pose_y, 0, 1);
+        Eigen::Vector4f transformed_point = transformation_matrix * point;
+        dth_icp = atan2(transformation_matrix(1, 0), transformation_matrix(0, 0));
+        dx_icp = transformed_point[0] - final_pose_x;
+        dy_icp = transformed_point[1] - final_pose_y;
+        if (dth_icp > M_PI)
+            dth_icp -= 2 * M_PI;
+        else if (dth_icp < -M_PI)
+            dth_icp += 2 * M_PI;
+
+        icp_estimate_x = final_pose_x * 0.95 + (final_pose_x + dx_icp) * 0.05;
+        icp_estimate_y = final_pose_y * 0.95 + (final_pose_y + dy_icp) * 0.05;
+        icp_estimate_th = final_pose_theta * 0.975 + (final_pose_theta + dth_icp) * 0.025;
+
+        tf2::Quaternion q;
+        q.setRPY(0, 0, icp_estimate_th);
+
+        nav_msgs::msg::Odometry msg_odom;
+        msg_odom.header.stamp = msg->header.stamp;
+        msg_odom.header.frame_id = "odom_icp";
+        msg_odom.child_frame_id = "base_link";
+        msg_odom.pose.pose.position.x = icp_estimate_x;
+        msg_odom.pose.pose.position.y = icp_estimate_y;
+        msg_odom.pose.pose.orientation.x = q.x();
+        msg_odom.pose.pose.orientation.y = q.y();
+        msg_odom.pose.pose.orientation.z = q.z();
+        msg_odom.pose.pose.orientation.w = q.w();
+        msg_odom.pose.covariance[0] = 1e-2;
+        msg_odom.pose.covariance[7] = 1e-2;
+        msg_odom.pose.covariance[14] = 1e6;
+        msg_odom.pose.covariance[21] = 1e6;
+        msg_odom.pose.covariance[28] = 1e6;
+        msg_odom.pose.covariance[35] = 1e-2;
+        msg_odom.twist.twist.linear.x = 0;
+        msg_odom.twist.twist.linear.y = 0;
+        msg_odom.twist.twist.angular.z = 0;
+        msg_odom.twist.covariance[0] = 1e-2;
+        msg_odom.twist.covariance[7] = 1e-2;
+        msg_odom.twist.covariance[14] = 1e6;
+        msg_odom.twist.covariance[21] = 1e6;
+        msg_odom.twist.covariance[28] = 1e6;
+        msg_odom.twist.covariance[35] = 1e-2;
+        pub_icp_estimate->publish(msg_odom);
 
         std_msgs::msg::Float32 msg_obs_find;
         msg_obs_find.data = obs_find_local;

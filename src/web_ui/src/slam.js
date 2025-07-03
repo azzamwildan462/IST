@@ -264,7 +264,7 @@ robotTopic.subscribe(function (message) {
 
 const robotTopic2 = new ROSLIB.Topic({
     ros: ros,
-    name: '/master/pose_filtered',
+    name: '/lidar_obstacle_filter/icp_estimate',
     messageType: 'nav_msgs/Odometry'
 });
 

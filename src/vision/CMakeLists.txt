@@ -32,7 +32,7 @@ target_link_libraries(lane_detection ${YAML_CPP_LIBRARIES})
 
 add_executable(single_detection src/single_detection.cpp)
 ament_target_dependencies(single_detection ${var_dependencies})
-target_link_libraries(single_detection ${YAML_CPP_LIBRARIES})
+target_link_libraries(single_detection ${YAML_CPP_LIBRARIES} -llept -ltesseract)
 
 add_executable(forklift_detector src/forklift_detector.cpp)
 ament_target_dependencies(forklift_detector ${var_dependencies})

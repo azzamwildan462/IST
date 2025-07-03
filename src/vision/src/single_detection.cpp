@@ -8,12 +8,15 @@
 #include "ros2_utils/pid.hpp"
 #include "std_msgs/msg/bool.hpp"
 #include "std_msgs/msg/float32_multi_array.hpp"
+#include "std_msgs/msg/float32.hpp"
 #include "std_msgs/msg/int16.hpp"
 #include <fstream>
 #include <mutex>
 #include <opencv2/aruco.hpp>
 #include <thread>
 #include <yaml-cpp/yaml.h>
+#include <tesseract/baseapi.h>
+#include <leptonica/allheaders.h>
 
 class SingleDetection : public rclcpp::Node
 {
@@ -21,6 +24,7 @@ public:
     rclcpp::TimerBase::SharedPtr tim_50hz;
     rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr sub_image_gray;
     rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr sub_image_bgr;
+    rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr sub_image_depth;
     rclcpp::Publisher<ros2_interface::msg::PointArray>::SharedPtr pub_point_garis;
     rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr pub_frame_display;
     rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr pub_frame_binary;
@@ -28,6 +32,7 @@ public:
     rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr pub_aruco_detected;
     rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr pub_error_code;
     rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr pub_aruco_nearest_marker_id;
+    rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr pub_forklift_detected;
 
     rclcpp::Service<ros2_interface::srv::Params>::SharedPtr srv_params;
 
@@ -64,6 +69,10 @@ public:
     int aruco_out_counter_threshold = 50;
     std::string camera_namespace = "cam_kanan";
     std::string absolute_image_topic = "";
+    std::string absolute_depth_image_topic = "";
+    bool is_detect_forklift = false;
+    int threshold_forklift_px_size = 300; // px
+    std::vector<double> roi_detect_forklift;
 
     bool debug_mode = false;
     float rotation_angle = 0; // rad
@@ -88,6 +97,9 @@ public:
 
     int center_frame_x = 0;
     int center_frame_y = 0;
+
+    // Tesseract engine
+    std::unique_ptr<tesseract::TessBaseAPI> tess_;
 
     SingleDetection()
         : Node("single_detection")
@@ -176,14 +188,26 @@ public:
         this->declare_parameter("debug_mode", false);
         this->get_parameter("debug_mode", debug_mode);
 
+        this->declare_parameter("is_detect_forklift", false);
+        this->get_parameter("is_detect_forklift", is_detect_forklift);
+
+        this->declare_parameter("absolute_depth_image_topic", "/camera/rs2_cam_main/aligned_depth_to_color/image_raw");
+        this->get_parameter("absolute_depth_image_topic", absolute_depth_image_topic);
+
         this->declare_parameter("rotation_angle", 0.0);
         this->get_parameter("rotation_angle", rotation_angle);
 
         this->declare_parameter("maximum_error_jarak_setpoint", 50.0);
         this->get_parameter("maximum_error_jarak_setpoint", maximum_error_jarak_setpoint);
 
+        this->declare_parameter("threshold_forklift_px_size", 300);
+        this->get_parameter("threshold_forklift_px_size", threshold_forklift_px_size);
+
         this->declare_parameter<std::vector<double>>("pid_terms", {0.003, 0.000000, 0, 0.02, -0.1, 0.1, -0.0005, 0.0005});
         this->get_parameter("pid_terms", pid_terms);
+
+        this->declare_parameter<std::vector<double>>("roi_detect_forklift", {100.0, 100.0, 300.0, 300.0});
+        this->get_parameter("roi_detect_forklift", roi_detect_forklift);
 
         node_namespace = this->get_namespace();
         node_namespace = node_namespace.substr(1, node_namespace.size() - 1); // /cam_kanan jadi cam_kanan
@@ -235,6 +259,7 @@ public:
         pub_hasil_kalkulasi = this->create_publisher<std_msgs::msg::Float32MultiArray>("hasil_kalkulasi", 1);
         pub_aruco_detected = this->create_publisher<std_msgs::msg::Bool>("aruco_detected", 1);
         pub_aruco_nearest_marker_id = this->create_publisher<std_msgs::msg::Int16>("aruco_nearest_marker_id", 1);
+        pub_forklift_detected = this->create_publisher<std_msgs::msg::Float32>("forklift_detected", 1);
 
         pub_frame_display = this->create_publisher<sensor_msgs::msg::Image>("frame_display", 1);
         pub_frame_binary = this->create_publisher<sensor_msgs::msg::Image>("frame_binary", 1);
@@ -247,6 +272,18 @@ public:
         tim_50hz = this->create_wall_timer(std::chrono::milliseconds(60), std::bind(&SingleDetection::callback_tim_50hz, this));
 
         pid_point_emergency.init(pid_terms[0], pid_terms[1], pid_terms[2], pid_terms[3], pid_terms[4], pid_terms[5], pid_terms[6], pid_terms[7]);
+
+        // 1) Prepare Tesseract once
+        tess_ = std::make_unique<tesseract::TessBaseAPI>();
+        if (tess_->Init(nullptr, "eng", tesseract::OEM_LSTM_ONLY) != 0)
+        {
+            RCLCPP_FATAL(get_logger(), "Could not initialize tesseract.");
+            rclcpp::shutdown();
+            return;
+        }
+        tess_->SetSourceResolution(300); // or whatever DPI makes sense for your camera
+        tess_->SetPageSegMode(tesseract::PSM_SINGLE_BLOCK);
+        tess_->SetVariable("tessedit_char_whitelist", "E0123456789BYD");
 
         logger.info("SingleDetection %s init success %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f", node_namespace.c_str(), pid_terms[0], pid_terms[1], pid_terms[2], pid_terms[3], pid_terms[4], pid_terms[5], pid_terms[6], pid_terms[7]);
     }
@@ -392,6 +429,109 @@ public:
 
         // process_frame_bgr();
     }
+
+    void forklift_detection_bgr()
+    {
+        if (!is_frame_bgr_available)
+        {
+            // error_code = 5;
+            return;
+        }
+
+        cv::Mat frame_bgr_copy;
+        mutex_frame_bgr.lock();
+        if (!frame_bgr.empty())
+        {
+            try
+            {
+                frame_bgr_copy = frame_bgr.clone();
+                mutex_frame_bgr.unlock();
+            }
+            catch (const cv::Exception &e)
+            {
+                error_code = 4;
+                logger.error("Failed to clone image: %s", e.what());
+                mutex_frame_bgr.unlock();
+            }
+        }
+
+        if (frame_bgr_copy.empty())
+        {
+            // error_code = 5;
+            return;
+        }
+
+        // logger.info("DETECT FORKLIFT");
+
+        error_code = 0;
+
+        cv::Mat frame_hsv;
+        cv::cvtColor(frame_bgr_copy, frame_hsv, cv::COLOR_BGR2HSV);
+
+        cv::Mat image_threshold;
+        cv::inRange(frame_hsv, cv::Scalar(low_h, low_l, low_s), cv::Scalar(high_h, high_l, high_s), image_threshold);
+
+        // Mask dengan roi
+        cv::Mat mask_roi = cv::Mat::zeros(image_threshold.size(), CV_8UC1);
+        cv::rectangle(mask_roi, cv::Point(roi_detect_forklift[0], roi_detect_forklift[1]), cv::Point(roi_detect_forklift[2], roi_detect_forklift[3]), 255, -1);
+
+        cv::bitwise_and(image_threshold, mask_roi, image_threshold);
+
+        if (erode_size > 0 && dilate_size > 0)
+        {
+            cv::Mat element_erode = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(erode_size, erode_size));
+            cv::Mat element_dilate = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(dilate_size, dilate_size));
+            cv::erode(image_threshold, image_threshold, element_erode);
+            cv::dilate(image_threshold, image_threshold, element_dilate);
+        }
+
+        // Morph closing
+        cv::Mat close_kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(9, 9));
+        cv::morphologyEx(image_threshold, image_threshold, cv::MORPH_CLOSE, close_kernel);
+
+        // Find contours
+        std::vector<std::vector<cv::Point>> contours;
+        cv::findContours(image_threshold, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+
+        std::vector<cv::Rect> forklift_rects;
+        float max_size = 0;
+        for (const auto &contour : contours)
+        {
+            if (cv::contourArea(contour) > threshold_forklift_px_size)
+            {
+                cv::Rect rect = cv::boundingRect(contour);
+                forklift_rects.push_back(rect);
+                cv::rectangle(frame_bgr_copy, rect, cv::Scalar(0, 0, 255), 2);
+            }
+            if (cv::contourArea(contour) > max_size)
+            {
+                max_size = cv::contourArea(contour);
+            }
+        }
+
+        cv::rectangle(frame_bgr_copy, cv::Point(roi_detect_forklift[0], roi_detect_forklift[1]), cv::Point(roi_detect_forklift[2], roi_detect_forklift[3]), cv::Scalar(0, 255, 0), 2);
+
+        // // OCR with persistent tess_
+        // tess_->SetSourceResolution(300); // or whatever DPI makes sense for your camera
+        // tess_->SetImage(image_threshold.data, image_threshold.cols, image_threshold.rows, 1, image_threshold.step);
+        // std::unique_ptr<char[]> raw(tess_->GetUTF8Text());
+        // std::string text = raw ? std::string(raw.get()) : "";
+
+        // // Draw OCR text
+        // cv::putText(frame_bgr_copy, text, cv::Point(100, 100), cv::FONT_HERSHEY_SIMPLEX, 1.5, cv::Scalar(0, 255, 0), 2, cv::LINE_AA);
+
+        std_msgs::msg::Float32 msg_forklift_detected;
+        msg_forklift_detected.data = max_size;
+        pub_forklift_detected->publish(msg_forklift_detected);
+
+        auto msg_frame_display = cv_bridge::CvImage(std_msgs::msg::Header(), "bgr8", frame_bgr_copy).toImageMsg();
+        pub_frame_display->publish(*msg_frame_display);
+
+        auto msg_frame_binary = cv_bridge::CvImage(std_msgs::msg::Header(), "mono8", image_threshold).toImageMsg();
+        pub_frame_binary->publish(*msg_frame_binary);
+    }
+
+    // ========================================================================
 
     void aruco_detection_bgr()
     {
@@ -1194,21 +1334,29 @@ public:
             center_frame_y = frame_bgr.rows / 2;
         }
 
-        if (use_frame_bgr && !detect_aruco)
+        // logger.info("%d %d %d", is_detect_forklift, use_frame_bgr, detect_aruco);
+        if (is_detect_forklift)
         {
-            process_frame_bgr();
-        }
-        else if (use_frame_bgr && detect_aruco)
-        {
-            aruco_detection_bgr();
-        }
-        else if (!use_frame_bgr && detect_aruco)
-        {
-            aruco_detection_gray();
+            forklift_detection_bgr();
         }
         else
         {
-            process_frame_gray();
+            if (use_frame_bgr && !detect_aruco)
+            {
+                process_frame_bgr();
+            }
+            else if (use_frame_bgr && detect_aruco)
+            {
+                aruco_detection_bgr();
+            }
+            else if (!use_frame_bgr && detect_aruco)
+            {
+                aruco_detection_gray();
+            }
+            else
+            {
+                process_frame_gray();
+            }
         }
 
         std_msgs::msg::Int16 msg_error_code;

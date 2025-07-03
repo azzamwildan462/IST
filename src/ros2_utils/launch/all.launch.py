@@ -395,7 +395,7 @@ def generate_launch_description():
             "camera_scan_max_x_": 3.0,
             "camera_scan_min_y_": -1.0,
             "camera_scan_max_y_": 1.0,
-            "threshold_icp_score": 7.5,
+            "threshold_icp_score": 1.0,
             "debug_motion": True,
         }],
         respawn=True,
@@ -899,6 +899,43 @@ def generate_launch_description():
 ##        prefix='nice -n -8'
     )
 
+    forklift_detector_vision = Node(
+        package='vision',
+        executable='single_detection',
+        name='forklift_detector_vision',
+        output='screen',
+        namespace='forklift_detector_vision',
+        parameters=[{
+            "use_dynamic_config": True,
+            "config_path": os.path.join(path_config,"dynamic_conf.yaml"),
+            "point_to_velocity_ratio": 0.002,
+            "point_to_velocity_angle_threshold": 0.3,
+            "metode_perhitungan": 3,
+            "setpoint_x": 495,
+            "setpoint_y": 125,
+            # "camera_namespace": "cam_kiri",
+            "right_to_left_scan": False,
+            # "absolute_image_topic": "/cam_kiri/image_bgr",
+            "absolute_image_topic": "/camera/rs2_cam_main/color/image_raw",
+            # "absolute_image_topic": "/ascamera_kiri/ascamera_kiri/rgb0/image",
+            "debug_mode": False, 
+            "rotation_angle": -0.7,
+            "maximum_error_jarak_setpoint": 600.0,
+            "pid_terms": [1.0, 0.000000, 0, 0.02, -0.1, 0.1, -0.0005, 0.0005],
+            "pangkal_x": 100,
+            "pangkal_y": 300,
+            "erode_size": 9,
+            "dilate_size": 9,
+            "is_detect_forklift": True,
+            "detect_aruco": False,
+            "threshold_forklift_px_size": 1000,
+            "roi_detect_forklift": [100.0, 100.0, 1100.0, 700.0],
+        }
+        ],
+        respawn=True,
+##        prefix='nice -n -19 chrt -f 84' 
+    )
+
     # =============================================================================
 
     tf_base_link_to_body_link = Node(
@@ -1125,10 +1162,10 @@ def generate_launch_description():
                 "qos_scan": 1,
                 "wait_for_transform": 2.0,
 
-                # "odom_tf_linear_variance": 0.0001,
-                # "odom_tf_angular_variance": 0.0001,
-                "odom_tf_linear_variance": 0.0000000001,
-                "odom_tf_angular_variance": 0.0000000001,
+                "odom_tf_linear_variance": 0.0001,
+                "odom_tf_angular_variance": 0.0001,
+                # "odom_tf_linear_variance": 0.0000000001,
+                # "odom_tf_angular_variance": 0.0000000001,
                 "publish_tf": False,
                 "publish_map": True,
                 "approx_sync": True,
@@ -1201,7 +1238,7 @@ def generate_launch_description():
                 "Icp/Iterations": "30", # Added by Azzam
                 "Icp/PointToPlane": "True", # Added by Azzam
                 "Icp/VoxelSize": "0.05", # Added by Azzam
-                'Icp/PointToPlaneMinComplexity':'0.19', # to be more robust to long corridors with low geometry
+                'Icp/PointToPlaneMinComplexity':'0.09', # to be more robust to long corridors with low geometry
                 'Icp/PointToPlaneLowComplexityStrategy':'1', # to be more robust to long corridors with low geometry
 
                 "Vis/MaxDepth": "20.0",
@@ -1556,6 +1593,7 @@ def generate_launch_description():
             # camera_obstacle_detector,
             lidar_obstacle_filter,
             # forklift_detector,
+            # forklift_detector_vision,
 
             # # =============================================================================
 

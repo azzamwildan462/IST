@@ -165,6 +165,7 @@ public:
     rclcpp::Subscription<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr sub_localization_pose;
     rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr sub_camera_pcl;
     rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr sub_icp_score;
+    rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr sub_detected_forklift_contour;
     rclcpp::Subscription<std_msgs::msg::Int8>::SharedPtr sub_detected_forklift;
 
     rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr srv_set_record_route_mode;
@@ -305,6 +306,7 @@ public:
 
     int8_t detected_forklift_number = -1;
     int8_t detected_forklift_number_filtered = -1;
+    float detected_forklift_contour = 0;
 
     Master();
     ~Master();
@@ -340,6 +342,7 @@ public:
     void callback_sub_localization_pose(const geometry_msgs::msg::PoseWithCovarianceStamped msg);
     void callback_sub_camera_pcl(const sensor_msgs::msg::PointCloud2::SharedPtr msg);
     void callback_sub_icp_score(const std_msgs::msg::Float32::SharedPtr msg);
+    void callback_sub_detected_forklift_contour(const std_msgs::msg::Float32::SharedPtr msg);
     void callback_sub_detected_forklift(const std_msgs::msg::Int8::SharedPtr msg);
     void callback_srv_set_record_route_mode(const std_srvs::srv::SetBool::Request::SharedPtr request, std_srvs::srv::SetBool::Response::SharedPtr response);
     void callback_srv_set_terminal(const std_srvs::srv::SetBool::Request::SharedPtr request, std_srvs::srv::SetBool::Response::SharedPtr response);

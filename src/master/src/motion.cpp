@@ -277,6 +277,8 @@ void Master::wp2velocity_steering(float lookahead_distance, float *pvelocity, fl
     static int16_t prev_terminal = 0;
 
     static bool request_stop = false;
+    static uint16_t counter_request_stop = 0;
+    static uint16_t counter_request_start_again = 0;
 
     float pose_used_x = fb_final_pose_xyo[0];
     float pose_used_y = fb_final_pose_xyo[1];
@@ -341,7 +343,7 @@ void Master::wp2velocity_steering(float lookahead_distance, float *pvelocity, fl
     static float max_velocity_terminal = profile_max_velocity;
     static float lookahead_distance_terminal = lookahead_distance;
     static float obs_scan_r_terminal = obs_scan_r;
-    static float obs_scan_camera_thr_terminal = 100000;
+    static float obs_scan_camera_thr_terminal = 3000;
 
     for (size_t i = 0; i < terminals.terminals.size(); i++)
     {
@@ -363,6 +365,28 @@ void Master::wp2velocity_steering(float lookahead_distance, float *pvelocity, fl
                 prev_terminal = terminal_now;
                 terminal_now = i;
                 obs_scan_camera_thr_terminal = terminals.terminals[i].obs_threshold;
+
+                /* Deteksi forklift */
+                if (detected_forklift_contour > obs_scan_camera_thr_terminal)
+                {
+                    counter_request_stop++;
+                    counter_request_start_again = 0;
+
+                    if (counter_request_stop > 1000)
+                    {
+                        counter_request_stop = 1000;
+                    }
+                }
+                else
+                {
+                    counter_request_start_again++;
+                    counter_request_stop = 0;
+
+                    if (counter_request_start_again > 1000)
+                    {
+                        counter_request_start_again = 1000;
+                    }
+                }
                 break;
             }
         }
@@ -375,6 +399,16 @@ void Master::wp2velocity_steering(float lookahead_distance, float *pvelocity, fl
         camera_scan_max_x_ = terminals.terminals[terminal_now].scan_max_x;
         camera_scan_min_y_ = terminals.terminals[terminal_now].scan_min_y;
         camera_scan_max_y_ = terminals.terminals[terminal_now].scan_max_y;
+    }
+
+    /* Deteksi forklift */
+    if (counter_request_start_again > 150)
+    {
+        request_stop = false;
+    }
+    if (counter_request_stop > 5)
+    {
+        request_stop = true;
     }
 
     /* Filter lookahed_distance agar tidak langsung berubah */
@@ -421,7 +455,7 @@ void Master::wp2velocity_steering(float lookahead_distance, float *pvelocity, fl
 
     if (debug_motion)
     {
-        logger.info("Pose: %.2f %.2f %.2f || idx %d %d || term %d %.2f %.2f %d || %.2f %.2f || %.2f %.2f", pose_used_x, pose_used_y, fb_final_pose_xyo[2], index_sekarang, index_lookahead, terminal_now, lookahead_distance, obs_scan_r, lidar_obs_scan_thr, obs_scan_camera_thr_terminal, waypoints[index_sekarang].x, waypoints[index_sekarang].y, waypoints[index_lookahead].x, waypoints[index_lookahead].y);
+        logger.info("(%.2f) (%d %.2f %.2f) Pose: %.2f %.2f %.2f || idx %d %d || term %d %.2f %.2f %d || %.2f %.2f || %.2f %.2f", icp_score, request_stop, detected_forklift_contour, obs_scan_camera_thr_terminal, pose_used_x, pose_used_y, fb_final_pose_xyo[2], index_sekarang, index_lookahead, terminal_now, lookahead_distance, obs_scan_r, lidar_obs_scan_thr, obs_scan_camera_thr_terminal, waypoints[index_sekarang].x, waypoints[index_sekarang].y, waypoints[index_lookahead].x, waypoints[index_lookahead].y);
     }
 
     /* Jika sudah mencapai waypoint terakhir */
@@ -447,25 +481,31 @@ void Master::wp2velocity_steering(float lookahead_distance, float *pvelocity, fl
         return;
     }
 
-    /* Safety ketika update lookahed_distance */
-    // if (fabsf(lookahead_distance_terminal - prev_lookahead_distance_terminal) > 0.1)
-    // {
-    //     if (counter_tahan_steer_sebelumnya < 10)
-    //     {
-    //         counter_tahan_steer_sebelumnya++;
-    //         *pvelocity = prev_velocity;
-    //         *psteering = prev_steering;
-    //         return;
-    //     }
-    //     else
-    //     {
-    //         counter_tahan_steer_sebelumnya = 0;
-    //     }
-    // }
-    // else
-    // {
-    //     counter_tahan_steer_sebelumnya = 0;
-    // }
+    /* Jika ada request stop */
+    if (request_stop)
+    {
+        *pvelocity = -1;
+        *psteering = 0;
+        return;
+    }
+
+    static uint16_t counter_posisi_salah = 0;
+
+    if (icp_score > threshold_icp_score)
+    {
+        counter_posisi_salah++;
+    }
+    else
+    {
+        counter_posisi_salah = 0;
+    }
+
+    if (counter_posisi_salah > 100)
+    {
+        *pvelocity = -1;
+        *psteering = 0;
+        return;
+    }
 
     /* Menghitung target velocity */
     float dx = waypoints[index_lookahead].x - pose_used_x;
@@ -486,25 +526,6 @@ void Master::wp2velocity_steering(float lookahead_distance, float *pvelocity, fl
         target_steering_angle -= 2 * M_PI;
     while (target_steering_angle < -M_PI)
         target_steering_angle += 2 * M_PI;
-
-    /* Menghitung expected steering angle (jika robot selalu berada di waypoints) */
-    // float expected_dy = waypoints[index_lookahead].y - waypoints[index_sekarang].y;
-    // float expected_dx = waypoints[index_lookahead].x - waypoints[index_sekarang].x;
-    // float expected_direction = atan2(expected_dy, expected_dx) - fb_final_pose_xyo[2];
-    // float expected_steering_angle = atan2(2 * wheelbase * sinf(expected_direction), lookahead_distance);
-    // while (expected_steering_angle > M_PI)
-    //     expected_steering_angle -= 2 * M_PI;
-    // while (expected_steering_angle < -M_PI)
-    //     expected_steering_angle += 2 * M_PI;
-
-    // /* Menggunakan average weighting untuk menggabungkan hasil steering angle */
-    // target_steering_angle = target_steering_angle * 0.7 + expected_steering_angle * 0.3;
-    // while (target_steering_angle > M_PI)
-    //     target_steering_angle -= 2 * M_PI;
-    // while (target_steering_angle < -M_PI)
-    //     target_steering_angle += 2 * M_PI;
-
-    // logger.info("%.2f %.2f || %.2f %.2f", pose_used_x, pose_used_y, target_velocity, target_steering_angle);
 
     if (debug_motion)
     {
@@ -720,9 +741,9 @@ float Master::local_obstacle_influence(float obs_scan_r, float gain)
     static float obs_find_local = 0;
     static const float max_obs_find_value_local = 100;
     static const float x_min = 0;
-    static const float y_min = -0.5;
+    static const float y_min = -1.0;
     // static const float x_max = 1;
-    static const float y_max = 0.5;
+    static const float y_max = 1.0;
 
     sensor_msgs::msg::LaserScan lidar_depan_points_local;
 

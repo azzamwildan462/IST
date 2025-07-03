@@ -29,13 +29,13 @@ ros.on("close", function () {
 
 // DOM 
 const frame_kamera = document.getElementById("frame_kamera");
-frame_kamera.src = "http://" + window.location.hostname + ":8080/stream?topic=/lane_detection/frame_display&type=ros_compressed&quality=30"
+frame_kamera.src = "http://" + window.location.hostname + ":8080/stream?topic=/forklift_detector_vision/frame_display&type=ros_compressed&quality=30"
 
 const frame_binary = document.getElementById("frame_binary");
-frame_binary.src = "http://" + window.location.hostname + ":8080/stream?topic=/lane_detection/frame_binary&type=ros_compressed&quality=30"
+frame_binary.src = "http://" + window.location.hostname + ":8080/stream?topic=/forklift_detector_vision/frame_binary&type=ros_compressed&quality=30"
 
 const frame_aruco = document.getElementById("frame_aruco");
-frame_aruco.src = "http://" + window.location.hostname + ":8080/stream?topic=/aruco_detection/frame_display&type=ros_compressed&quality=30"
+frame_aruco.src = "http://" + window.location.hostname + ":8080/stream?topic=/forklift_detector_vision/frame_display&type=ros_compressed&quality=30"
 
 const low_h_slider = document.getElementById("low_h_slider");
 low_h_slider.value = 0;
@@ -118,7 +118,7 @@ req_params = new ROSLIB.ServiceRequest({
 
 ser_params = new ROSLIB.Service({
     ros: ros,
-    name: "/lane_detection/params",
+    name: "/forklift_detector_vision/params",
     serviceType: "ros2_interface/srv/Params",
 });
 
