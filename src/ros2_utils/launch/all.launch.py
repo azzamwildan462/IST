@@ -326,6 +326,19 @@ def generate_launch_description():
         respawn=True,
     )
 
+    upload_server = Node(
+        package="web_ui",
+        executable="upload_server.py",
+        name="upload_server",
+        parameters=[
+            {
+                "config_dir": path_config
+            },
+        ],
+        output="screen",
+        respawn=True,
+    )
+
     # =============================================================================
 
     telemetry = Node(
@@ -1510,41 +1523,42 @@ def generate_launch_description():
         arguments=["--ros-args", "--log-level", "warn"],
     )
 
-    # return LaunchDescription(
-    #     [
-    #         # DeclareLaunchArgument('auto_start', default_value='true'),
-    #         # hokuyo1_lidar_driver,
-    #         # hokuyo1_lidar_configure,
-    #         # hokuyo1_lidar_activate,
-    #         # hokuyo2_lidar_driver,
-    #         # hokuyo2_lidar_configure,
-    #         # hokuyo2_lidar_activate,
-    #         # beckhoff,
-    #         # CANbus_HAL,
+    return LaunchDescription(
+        [
+            # DeclareLaunchArgument('auto_start', default_value='true'),
+            # hokuyo1_lidar_driver,
+            # hokuyo1_lidar_configure,
+            # hokuyo1_lidar_activate,
+            # hokuyo2_lidar_driver,
+            # hokuyo2_lidar_configure,
+            # hokuyo2_lidar_activate,
+            # beckhoff,
+            # CANbus_HAL,
 
-    #         # tf_base_link_to_lidar2_link,
-    #         # tf_base_link_to_body_link,
-    #         # tf_base_link_to_lidar1_link,
-    #         # tf_base_link_to_imu_link,
-    #         # tf_base_link_to_camera_link,
+            # tf_base_link_to_lidar2_link,
+            # tf_base_link_to_body_link,
+            # tf_base_link_to_lidar1_link,
+            # tf_base_link_to_imu_link,
+            # tf_base_link_to_camera_link,
 
-    #         # rs2_cam_main,
-    #         # rviz2,
-    #         # CANbus_HAL_socket_can0,
-    #         # CANbus_HAL_socket_can1,
+            # rs2_cam_main,
+            # rviz2,
+            # CANbus_HAL_socket_can0,
+            # CANbus_HAL_socket_can1,
 
-    #         # rosapi_node,
-    #         # rosbridge_server, 
-    #         # web_video_server,
-    #         # master,
-    #         # ui_server,
+            rosapi_node,
+            rosbridge_server, 
+            web_video_server,
+            master,
+            ui_server,
+            upload_server,
 
 
-    #         # camera_obstacle_detector,
-    #         # lidar_obstacle_filter,
-    #         forklift_detector
-    #     ]
-    # )
+            # camera_obstacle_detector,
+            # lidar_obstacle_filter,
+            # forklift_detector
+        ]
+    )
 
     # ==============================================================================
 

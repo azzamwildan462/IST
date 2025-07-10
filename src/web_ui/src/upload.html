@@ -70,67 +70,48 @@
 
     <div class="container is-fluid">
         <div class="grid">
-            <div class="cell mx-auto">
-                <div id="global-fsm">
-                    INIT
-                </div>
+            <div class="cell">
+                <form id="formA" method="post" enctype="multipart/form-data" class="box">
+                    <h2 class="subtitle">Form A: Upload Waypoint</h2>
+                    <div class="file has-name is-boxed">
+                        <label class="file-label">
+                            <input id="pickerA" class="file-input" type="file" name="fileA" />
+                            <span class="file-cta">
+                                <span class="icon"><i class="fas fa-upload"></i></span>
+                                <span class="file-label">Choose waypoint file...</span>
+                            </span>
+                            <span class="file-name">No file selected</span>
+                        </label>
+                    </div>
+                    <div class="field mt-4">
+                        <button class="button is-primary" type="submit">Upload Waypoint</button>
+                    </div>
+                </form>
+            </div>
+
+
+            <div class="cell">
+                <form id="formB" method="post" enctype="multipart/form-data" class="box">
+                    <h2 class="subtitle">Form B: Upload Terminal</h2>
+                    <div class="file has-name is-boxed">
+                        <label class="file-label">
+                            <input id="pickerB" class="file-input" type="file" name="fileB" />
+                            <span class="file-cta">
+                                <span class="icon"><i class="fas fa-upload"></i></span>
+                                <span class="file-label">Choose terminal file...</span>
+                            </span>
+                            <span class="file-name">No file selected</span>
+                        </label>
+                    </div>
+                    <div class="field mt-4">
+                        <button class="button is-link" type="submit">Upload Terminal</button>
+                    </div>
+                </form>
             </div>
         </div>
-
-        <div class="grid">
-            <div class="cell">
-                <button class="button is-primary" onclick="rtabmap_set_mode_mapping()">RTABMAP MAPPING</button>
-            </div>
-            <div class="cell">
-                <button class="button is-primary" onclick="rtabmap_set_mode_localization()">RTABMAP
-                    LOCALIZATION</button>
-            </div>
-            <div class="cell">
-                <button class="button is-warning" onclick="rtabmap_trigger_new_map()">RTABMAP NEW MAP</button>
-            </div>
-            <div class="cell">
-                <button class="button is-danger" onclick="rtabmap_reset()">RESET RTABMAP</button>
-            </div>
-            <div class="cell">
-                <button class="button is-warning" onclick="offset_odometry(0,0,0)">RESET ODOM</button>
-            </div>
-            <div class="cell">
-                <button class="button is-warning" onclick="rtabmap_reset_map2odom(0,0,0)">RESET MAP2ODOM</button>
-            </div>
-        </div>
-
-        <div class="grid">
-            <div class="cell mx-auto">
-                <button class="button is-primary" onclick="route_record(true)">RECORD ROUTE</button>
-            </div>
-            <div class="cell mx-auto">
-                <button class="button is-info" onclick="route_record(false)">STOP ROUTE RECORD</button>
-            </div>
-        </div>
-
-        <div class="grid">
-            <div class="cell mx-auto">
-                <button class="button is-info" onclick="add_terminal_here(true)">Add Terminal Here</button>
-            </div>
-
-            <div class="cell mx-auto">
-                <button class="button is-primary" onclick="add_terminal_here(false)">Save Terminals</button>
-            </div>
-
-            <div class="cell mx-auto">
-                <button class="button is-danger" onclick="remove_terminal(true)">Clear All terminals</button>
-            </div>
-
-            <div class="cell mx-auto">
-                <button class="button is-warning" onclick="remove_terminal(false)">Pop terminal</button>
-            </div>
-        </div>
-
-
-        <div id="map"></div>
     </div>
 
-    <script type="text/javascript" src="slam.js">
+    <script type="text/javascript" src="upload.js">
     </script>
 </body>
 
