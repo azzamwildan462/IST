@@ -144,6 +144,7 @@ public:
     rclcpp::Subscription<ros2_interface::msg::PointArray>::SharedPtr sub_lane_tengah;
     rclcpp::Subscription<ros2_interface::msg::PointArray>::SharedPtr sub_lane_kanan;
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr sub_odometry;
+    rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr sub_icp_pose_estimate;
     rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_error_code_beckhoff;
     rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_error_code_pose_estimator;
     rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_error_code_obstacle_filter;
@@ -167,6 +168,7 @@ public:
     rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr sub_icp_score;
     rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr sub_detected_forklift_contour;
     rclcpp::Subscription<std_msgs::msg::Int8>::SharedPtr sub_detected_forklift;
+    rclcpp::Subscription<std_msgs::msg::UInt8>::SharedPtr sub_gyro_counter;
 
     rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr srv_set_record_route_mode;
     rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr srv_set_terminal; // Aktif -> add terminal, InActive -> save terminal
@@ -308,6 +310,13 @@ public:
     int8_t detected_forklift_number_filtered = -1;
     float detected_forklift_contour = 0;
 
+    float dx_icp = 0;
+    float dy_icp = 0;
+    float dth_icp = 0;
+    float icp_mag = 0;
+
+    uint8_t gyro_counter = 0;
+
     Master();
     ~Master();
 
@@ -322,6 +331,7 @@ public:
     void callback_sub_lane_kanan(const ros2_interface::msg::PointArray::SharedPtr msg);
     void callback_sub_obs_find(const std_msgs::msg::Float32::SharedPtr msg);
     void callback_sub_odometry(const nav_msgs::msg::Odometry::SharedPtr msg);
+    void callback_sub_icp_pose_estimate(const nav_msgs::msg::Odometry::SharedPtr msg);
     void callback_sub_error_code_beckhoff(const std_msgs::msg::Int16::SharedPtr msg);
     void callback_sub_error_code_pose_estimator(const std_msgs::msg::Int16::SharedPtr msg);
     void callback_sub_error_code_obstacle_filter(const std_msgs::msg::Int16::SharedPtr msg);
@@ -344,6 +354,7 @@ public:
     void callback_sub_icp_score(const std_msgs::msg::Float32::SharedPtr msg);
     void callback_sub_detected_forklift_contour(const std_msgs::msg::Float32::SharedPtr msg);
     void callback_sub_detected_forklift(const std_msgs::msg::Int8::SharedPtr msg);
+    void callback_sub_gyro_counter(const std_msgs::msg::UInt8::SharedPtr msg);
     void callback_srv_set_record_route_mode(const std_srvs::srv::SetBool::Request::SharedPtr request, std_srvs::srv::SetBool::Response::SharedPtr response);
     void callback_srv_set_terminal(const std_srvs::srv::SetBool::Request::SharedPtr request, std_srvs::srv::SetBool::Response::SharedPtr response);
     void callback_srv_rm_terminal(const std_srvs::srv::SetBool::Request::SharedPtr request, std_srvs::srv::SetBool::Response::SharedPtr response);

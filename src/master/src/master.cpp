@@ -151,6 +151,8 @@ Master::Master()
         "/lidar_obstacle_filter/icp_score", 1, std::bind(&Master::callback_sub_icp_score, this, std::placeholders::_1), sub_opts);
     sub_detected_forklift_contour = this->create_subscription<std_msgs::msg::Float32>(
         "/forklift_detector_vision/forklift_detected", 1, std::bind(&Master::callback_sub_detected_forklift_contour, this, std::placeholders::_1), sub_opts);
+    sub_gyro_counter = this->create_subscription<std_msgs::msg::UInt8>(
+        "/can/gyro_counter", 1, std::bind(&Master::callback_sub_gyro_counter, this, std::placeholders::_1), sub_opts);
 
     srv_set_record_route_mode = this->create_service<std_srvs::srv::SetBool>(
         "/master/set_record_route_mode", std::bind(&Master::callback_srv_set_record_route_mode, this, std::placeholders::_1, std::placeholders::_2));
@@ -161,6 +163,8 @@ Master::Master()
     srv_rm_terminal = this->create_service<std_srvs::srv::SetBool>(
         "/master/rm_terminal", std::bind(&Master::callback_srv_rm_terminal, this, std::placeholders::_1, std::placeholders::_2));
 
+    sub_icp_pose_estimate = this->create_subscription<nav_msgs::msg::Odometry>(
+        "/lidar_obstacle_filter/icp_estimate", 1, std::bind(&Master::callback_sub_icp_pose_estimate, this, std::placeholders::_1));
     if (use_ekf_odometry)
         sub_odometry = this->create_subscription<nav_msgs::msg::Odometry>(
             "/slam/odometry/filtered", 1, std::bind(&Master::callback_sub_odometry, this, std::placeholders::_1));
@@ -244,6 +248,10 @@ void Master::callback_sub_detected_forklift(const std_msgs::msg::Int8::SharedPtr
     }
 }
 
+void Master::callback_sub_gyro_counter(const std_msgs::msg::UInt8::SharedPtr msg)
+{
+    gyro_counter = msg->data;
+}
 void Master::callback_sub_detected_forklift_contour(const std_msgs::msg::Float32::SharedPtr msg)
 {
     detected_forklift_contour = msg->data;
@@ -637,6 +645,35 @@ void Master::callback_sub_lane_kanan(const ros2_interface::msg::PointArray::Shar
     lane_kanan = *msg;
 }
 
+void Master::callback_sub_icp_pose_estimate(const nav_msgs::msg::Odometry::SharedPtr msg)
+{
+    tf2::Quaternion q;
+    double roll, pitch, yaw;
+    tf2::fromMsg(msg->pose.pose.orientation, q);
+    tf2::Matrix3x3(q).getRPY(roll, pitch, yaw);
+
+    dx_icp = msg->twist.twist.linear.x;
+    dy_icp = msg->twist.twist.linear.y;
+    dth_icp = msg->twist.twist.angular.z;
+
+    while (dth_icp > M_PI)
+        dth_icp -= 2 * M_PI;
+    while (dth_icp < -M_PI)
+        dth_icp += 2 * M_PI;
+
+    icp_mag = sqrtf(dx_icp * dx_icp + dy_icp * dy_icp);
+
+    static const float new_pose_gain = 0.07;
+
+    fb_filtered_final_pose_xyo[0] = fb_final_pose_xyo[0] * (1 - new_pose_gain) + (fb_final_pose_xyo[0] + dx_icp) * new_pose_gain;
+    fb_filtered_final_pose_xyo[1] = fb_final_pose_xyo[1] * (1 - new_pose_gain) + (fb_final_pose_xyo[1] + dy_icp) * new_pose_gain;
+    fb_filtered_final_pose_xyo[2] = fb_final_pose_xyo[2] * (1 - new_pose_gain) + (fb_final_pose_xyo[2] + dth_icp) * new_pose_gain;
+
+    while (fb_filtered_final_pose_xyo[2] > M_PI)
+        fb_filtered_final_pose_xyo[2] -= M_PI * 2;
+    while (fb_filtered_final_pose_xyo[2] < -M_PI)
+        fb_filtered_final_pose_xyo[2] += M_PI * 2;
+}
 void Master::callback_sub_odometry(const nav_msgs::msg::Odometry::SharedPtr msg)
 {
     last_time_pose_estimator = rclcpp::Clock(RCL_SYSTEM_TIME).now();
@@ -653,28 +690,28 @@ void Master::callback_sub_odometry(const nav_msgs::msg::Odometry::SharedPtr msg)
     fb_final_pose_xyo[1] = msg->pose.pose.position.y;
     fb_final_pose_xyo[2] = yaw;
 
-    float distance = pythagoras(prev_msg_x, prev_msg_y, msg->pose.pose.position.x, msg->pose.pose.position.y);
+    // float distance = pythagoras(prev_msg_x, prev_msg_y, msg->pose.pose.position.x, msg->pose.pose.position.y);
 
-    float normalized_distance = (distance - complementary_terms[0]) / (complementary_terms[1] - complementary_terms[0]);
-    if (normalized_distance < 0)
-        normalized_distance = 0;
-    else if (normalized_distance > 1)
-        normalized_distance = 1;
+    // float normalized_distance = (distance - complementary_terms[0]) / (complementary_terms[1] - complementary_terms[0]);
+    // if (normalized_distance < 0)
+    //     normalized_distance = 0;
+    // else if (normalized_distance > 1)
+    //     normalized_distance = 1;
 
-    float new_pose_gain = normalized_distance * (complementary_terms[2] - complementary_terms[1]) + complementary_terms[1];
+    // float new_pose_gain = normalized_distance * (complementary_terms[2] - complementary_terms[1]) + complementary_terms[1];
 
-    fb_filtered_final_pose_xyo[0] = fb_filtered_final_pose_xyo[0] * (1 - new_pose_gain) + msg->pose.pose.position.x * new_pose_gain;
-    fb_filtered_final_pose_xyo[1] = fb_filtered_final_pose_xyo[1] * (1 - new_pose_gain) + msg->pose.pose.position.y * new_pose_gain;
-    fb_filtered_final_pose_xyo[2] = fb_filtered_final_pose_xyo[2] * (1 - new_pose_gain) + yaw * new_pose_gain;
+    // fb_filtered_final_pose_xyo[0] = fb_filtered_final_pose_xyo[0] * (1 - new_pose_gain) + msg->pose.pose.position.x * new_pose_gain;
+    // fb_filtered_final_pose_xyo[1] = fb_filtered_final_pose_xyo[1] * (1 - new_pose_gain) + msg->pose.pose.position.y * new_pose_gain;
+    // fb_filtered_final_pose_xyo[2] = fb_filtered_final_pose_xyo[2] * (1 - new_pose_gain) + yaw * new_pose_gain;
 
-    while (fb_filtered_final_pose_xyo[2] > M_PI)
-        fb_filtered_final_pose_xyo[2] -= M_PI * 2;
-    while (fb_filtered_final_pose_xyo[2] < -M_PI)
-        fb_filtered_final_pose_xyo[2] += M_PI * 2;
+    // while (fb_filtered_final_pose_xyo[2] > M_PI)
+    //     fb_filtered_final_pose_xyo[2] -= M_PI * 2;
+    // while (fb_filtered_final_pose_xyo[2] < -M_PI)
+    //     fb_filtered_final_pose_xyo[2] += M_PI * 2;
 
-    prev_msg_x = fb_filtered_final_pose_xyo[0];
-    prev_msg_y = fb_filtered_final_pose_xyo[1];
-    prev_msg_theta = fb_filtered_final_pose_xyo[2];
+    // prev_msg_x = fb_filtered_final_pose_xyo[0];
+    // prev_msg_y = fb_filtered_final_pose_xyo[1];
+    // prev_msg_theta = fb_filtered_final_pose_xyo[2];
 
     // if (transform_map2odom)
     // {
@@ -813,7 +850,7 @@ void Master::callback_tim_50hz()
 
         if (debug_motion)
         {
-            logger.info("icp %.2f %.2f %d", icp_score, threshold_icp_score, fb_beckhoff_digital_input);
+            logger.info("icp %.2f %.2f %.2f %.2f || %.2f %d", icp_score, dx_icp, dy_icp, dth_icp, threshold_icp_score, fb_beckhoff_digital_input);
         }
 
         if (icp_score < threshold_icp_score)

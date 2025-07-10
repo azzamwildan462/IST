@@ -52,6 +52,7 @@ public:
     rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr pub_error_code;
     rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr pub_eps_encoder;
     rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr pub_imu_can;
+    rclcpp::Publisher<std_msgs::msg::UInt8>::SharedPtr pub_gyro_counter;
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr sub_master_actuator;
     rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_master_global_fsm;
 
@@ -65,6 +66,7 @@ public:
     bool use_socket_can = true;
     bool can_to_car = false;
     int jhctech_can_id = -1; // Jika -1, masuk default, 1 untuk EPS, 2 untuk mobil
+    int counter_divider_can_send = 4;
 
     int socket_can = -1;
 
@@ -81,9 +83,12 @@ public:
     uint8_t epoch_encoder = 0;
     uint8_t prev_epoch_encoder = 0;
 
+    uint8_t counter_gyro_update = 0;
+
     sensor_msgs::msg::Imu imu_msg;
 
     std::thread thread_routine;
+    int counter_can_send = 0;
 
     CANbus_HAL()
         : Node("CANbus_HAL")
@@ -111,6 +116,9 @@ public:
         this->declare_parameter("can_to_car", false);
         this->get_parameter("can_to_car", can_to_car);
 
+        this->declare_parameter("counter_divider_can_send", 4);
+        this->get_parameter("counter_divider_can_send", counter_divider_can_send);
+
         //----Publiher
         if (can_to_car)
         {
@@ -125,6 +133,7 @@ public:
             pub_eps_encoder = this->create_publisher<std_msgs::msg::Float32>("/can/eps_encoder", 1);
             pub_fb_eps_mode = this->create_publisher<std_msgs::msg::UInt8>("/can/eps_mode", 1);
             pub_imu_can = this->create_publisher<sensor_msgs::msg::Imu>("/can/imu", 1);
+            pub_gyro_counter = this->create_publisher<std_msgs::msg::UInt8>("/can/gyro_counter", 1);
         }
 
         //----Timer
@@ -209,21 +218,26 @@ public:
         {
             if (!can_to_car)
             {
-                struct can_frame frame;
-                frame.can_id = COB_ID_EPS_ACTUATION;
-                frame.can_dlc = 3;
-
-                static const float ENC_RAD2CNTR = EPS_ENCODER_MAX_COUNTER / EPS_ENCODER_MAX_RAD;
-                int16_t eps_actuation_cntr = eps_actuation * ENC_RAD2CNTR;
-
-                memcpy(&frame.data[0], &eps_flag, 1);
-                memcpy(&frame.data[1], &eps_actuation_cntr, 2);
-
-                if (write(socket_can, &frame, sizeof(struct can_frame)) != sizeof(struct can_frame))
+                if (counter_can_send >= counter_divider_can_send)
                 {
-                    logger.warn("SOCKET CAN SEND FAILED\n");
+                    struct can_frame frame;
+                    frame.can_id = COB_ID_EPS_ACTUATION;
+                    frame.can_dlc = 3;
+
+                    static const float ENC_RAD2CNTR = EPS_ENCODER_MAX_COUNTER / EPS_ENCODER_MAX_RAD;
+                    int16_t eps_actuation_cntr = eps_actuation * ENC_RAD2CNTR;
+
+                    memcpy(&frame.data[0], &eps_flag, 1);
+                    memcpy(&frame.data[1], &eps_actuation_cntr, 2);
+
+                    if (write(socket_can, &frame, sizeof(struct can_frame)) != sizeof(struct can_frame))
+                    {
+                        logger.warn("SOCKET CAN SEND FAILED\n");
+                    }
+                    counter_can_send = 0;
                 }
             }
+            counter_can_send++;
 
             parse_can_frame(); // Ini blocking
         }
@@ -286,6 +300,10 @@ public:
             std_msgs::msg::UInt8 msg_fb_eps_mode;
             msg_fb_eps_mode.data = eps_mode_fb;
             pub_fb_eps_mode->publish(msg_fb_eps_mode);
+
+            std_msgs::msg::UInt8 msg_gyro_counter;
+            msg_gyro_counter.data = counter_gyro_update;
+            pub_gyro_counter->publish(msg_gyro_counter);
 
             pub_imu_can->publish(imu_msg);
         }
@@ -381,6 +399,10 @@ public:
                         q_msg.w = q_tf2.w();
 
                         imu_msg.orientation = q_msg;
+
+                        counter_gyro_update++;
+                        if (counter_gyro_update >= 255)
+                            counter_gyro_update = 0;
                     }
                     // Akselero
                     else if (can_data->data[7] == 0x01)
@@ -497,6 +519,9 @@ public:
         else if (frame.can_id == COB_ID_GYRO_RION)
         {
             int16_t data_buffer = 0;
+            counter_gyro_update++;
+            if (counter_gyro_update >= 255)
+                counter_gyro_update = 0;
 
             // Posisi
             if (frame.data[7] == 0x00)
@@ -518,6 +543,10 @@ public:
                 q_msg.w = q_tf2.w();
 
                 imu_msg.orientation = q_msg;
+
+                counter_gyro_update++;
+                if (counter_gyro_update >= 255)
+                    counter_gyro_update = 0;
             }
             // Akselero
             else if (frame.data[7] == 0x01)

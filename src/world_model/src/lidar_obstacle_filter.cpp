@@ -475,9 +475,9 @@ public:
         msg_odom.pose.covariance[21] = 1e6;
         msg_odom.pose.covariance[28] = 1e6;
         msg_odom.pose.covariance[35] = 1e-2;
-        msg_odom.twist.twist.linear.x = 0;
-        msg_odom.twist.twist.linear.y = 0;
-        msg_odom.twist.twist.angular.z = 0;
+        msg_odom.twist.twist.linear.x = dx_icp;
+        msg_odom.twist.twist.linear.y = dy_icp;
+        msg_odom.twist.twist.angular.z = dth_icp;
         msg_odom.twist.covariance[0] = 1e-2;
         msg_odom.twist.covariance[7] = 1e-2;
         msg_odom.twist.covariance[14] = 1e6;

@@ -275,6 +275,8 @@ void Master::wp2velocity_steering(float lookahead_distance, float *pvelocity, fl
     static const float threshold_error_arah_hadap_terminal = 1.37;
     static int16_t terminal_now = 0;
     static int16_t prev_terminal = 0;
+    static uint8_t prev_gyro_counter = 0;
+    static uint8_t counter_gyro_anomali = 0;
 
     static bool request_stop = false;
     static uint16_t counter_request_stop = 0;
@@ -366,6 +368,9 @@ void Master::wp2velocity_steering(float lookahead_distance, float *pvelocity, fl
                 terminal_now = i;
                 obs_scan_camera_thr_terminal = terminals.terminals[i].obs_threshold;
 
+                camera_scan_min_y_ = terminals.terminals[i].scan_min_y;
+                camera_scan_max_y_ = terminals.terminals[i].scan_max_y;
+
                 /* Deteksi forklift */
                 if (detected_forklift_contour > obs_scan_camera_thr_terminal)
                 {
@@ -453,9 +458,20 @@ void Master::wp2velocity_steering(float lookahead_distance, float *pvelocity, fl
         }
     }
 
+    /* Cek gyro */
+    if (gyro_counter == prev_gyro_counter)
+    {
+        counter_gyro_anomali++;
+        if (counter_gyro_anomali >= 200)
+        {
+            counter_gyro_anomali = 200;
+        }
+    }
+    prev_gyro_counter = gyro_counter;
+
     if (debug_motion)
     {
-        logger.info("(%.2f) (%d %.2f %.2f) Pose: %.2f %.2f %.2f || idx %d %d || term %d %.2f %.2f %d || %.2f %.2f || %.2f %.2f", icp_score, request_stop, detected_forklift_contour, obs_scan_camera_thr_terminal, pose_used_x, pose_used_y, fb_final_pose_xyo[2], index_sekarang, index_lookahead, terminal_now, lookahead_distance, obs_scan_r, lidar_obs_scan_thr, obs_scan_camera_thr_terminal, waypoints[index_sekarang].x, waypoints[index_sekarang].y, waypoints[index_lookahead].x, waypoints[index_lookahead].y);
+        logger.info("(%.2f %.2f %.2f %.2f) (%d %d) (%d %.2f %.2f) Pose: %.2f %.2f %.2f || idx %d %d || term %d %.2f %.2f %d || %.2f %.2f || %.2f %.2f", icp_score, dx_icp, dy_icp, dth_icp, gyro_counter, counter_gyro_anomali, request_stop, detected_forklift_contour, obs_scan_camera_thr_terminal, pose_used_x, pose_used_y, fb_final_pose_xyo[2], index_sekarang, index_lookahead, terminal_now, lookahead_distance, obs_scan_r, lidar_obs_scan_thr, obs_scan_camera_thr_terminal, waypoints[index_sekarang].x, waypoints[index_sekarang].y, waypoints[index_lookahead].x, waypoints[index_lookahead].y);
     }
 
     /* Jika sudah mencapai waypoint terakhir */
@@ -473,22 +489,6 @@ void Master::wp2velocity_steering(float lookahead_distance, float *pvelocity, fl
         }
     }
 
-    /* Safety tambahan */
-    if (index_lookahead == index_sekarang)
-    {
-        *pvelocity = -1;
-        *psteering = 0;
-        return;
-    }
-
-    /* Jika ada request stop */
-    if (request_stop)
-    {
-        *pvelocity = -1;
-        *psteering = 0;
-        return;
-    }
-
     static uint16_t counter_posisi_salah = 0;
 
     if (icp_score > threshold_icp_score)
@@ -500,7 +500,32 @@ void Master::wp2velocity_steering(float lookahead_distance, float *pvelocity, fl
         counter_posisi_salah = 0;
     }
 
+    /* Safety tambahan */
+    if (index_lookahead == index_sekarang)
+    {
+        *pvelocity = -1;
+        *psteering = 0;
+        return;
+    }
+
+    /* Jika ada request stop (ada anomali di lapangan seperti tiba tiba ada forklift) */
+    if (request_stop)
+    {
+        *pvelocity = -1;
+        *psteering = 0;
+        return;
+    }
+
+    /* Jika posisi salah */
     if (counter_posisi_salah > 100)
+    {
+        *pvelocity = -1;
+        *psteering = 0;
+        return;
+    }
+
+    /* Jika terjadi anomali gyroscope */
+    if (counter_gyro_anomali > 10)
     {
         *pvelocity = -1;
         *psteering = 0;
@@ -745,6 +770,9 @@ float Master::local_obstacle_influence(float obs_scan_r, float gain)
     // static const float x_max = 1;
     static const float y_max = 1.0;
 
+    float target_y_min_scan = fminf(y_min, camera_scan_min_y_);
+    float target_y_max_scan = fmaxf(y_max, camera_scan_max_y_);
+
     sensor_msgs::msg::LaserScan lidar_depan_points_local;
 
     mutex_lidar_depan_points.lock();
@@ -773,7 +801,7 @@ float Master::local_obstacle_influence(float obs_scan_r, float gain)
                 float point_y = range * sinf(angle);
 
                 // Ketika masuk scan box
-                if (point_x > x_min && point_x < obs_scan_r && point_y > y_min && point_y < y_max)
+                if (point_x > x_min && point_x < obs_scan_r && point_y > target_y_min_scan && point_y < target_y_max_scan)
                 {
                     obs_find_local += obs_scan_r_decimal * (obs_scan_r - range);
                 }
