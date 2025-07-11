@@ -46,3 +46,39 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 });
+
+function reset_state_robot() {
+    // Clear all terminals
+    const modeRequest_remove = new ROSLIB.ServiceRequest({
+        data: true
+    });
+
+    const modeService_remove = new ROSLIB.Service({
+        ros: ros,
+        name: '/master/rm_terminal',
+        serviceType: 'std_srvs/srv/SetBool'
+    });
+
+    modeService_remove.callService(modeRequest_remove, function (response) {
+        console.log('Set Terminal:', response);
+    });
+
+    // Tunggu 2 detik
+    setTimeout(() => {
+    }, 2000);
+
+    // Re-INIT state
+    const modeRequest = new ROSLIB.ServiceRequest({
+        data: false
+    });
+
+    const modeService = new ROSLIB.Service({
+        ros: ros,
+        name: '/master/set_record_route_mode',
+        serviceType: 'std_srvs/srv/SetBool'
+    });
+
+    modeService.callService(modeRequest, function (response) {
+        console.log('Record:', response);
+    });
+}
