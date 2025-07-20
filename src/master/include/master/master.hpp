@@ -101,6 +101,14 @@
 #define TERMINAL_TYPE_STOP4 0x10
 #define TERMINAL_TYPE_LURUS 0x20
 
+#define EMERGENCY_LIDAR_DEPAN_DETECTED 0b010
+#define EMERGENCY_CAMERA_OBS_DETECTED 0b100
+#define EMERGENCY_GYRO_ANOMALY_DETECTED 0b1000
+#define EMERGENCY_ICP_SCORE_TERLALU_BESAR 0b10000
+#define EMERGENCY_ICP_TRANSLATE_TERLALU_BESAR 0b100000
+#define EMERGENCY_STOP_KARENA_OBSTACLE 0b1000000
+#define STATUS_TOWING_CONNECTED 0b01
+
 // using namespace std::chrono_literals;
 
 typedef struct
@@ -136,6 +144,8 @@ public:
     rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr pub_pose_filtered;
     rclcpp::Publisher<std_msgs::msg::UInt8>::SharedPtr pub_slam_status;
     rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr pub_camera_obs_emergency;
+    rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr pub_master_status_emergency;
+    rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr pub_master_status_klik_terminal_terakhir;
 
     rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr sub_CAN_eps_encoder;
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr sub_beckhoff_sensor;
@@ -274,6 +284,7 @@ public:
     rclcpp::Time last_time_error_code_lane_detection;
     rclcpp::Time time_start_operation;
     rclcpp::Time time_start_follow_lane;
+    rclcpp::Time last_time_kamera_pcl;
 
     std::vector<waypoint_t> waypoints;
     ros2_interface::msg::TerminalArray terminals;
@@ -295,8 +306,6 @@ public:
     geometry_msgs::msg::TransformStamped tf_lidar_base;
     std::unique_ptr<tf2_ros::Buffer> tf_lidar_base_buffer;
     std::unique_ptr<tf2_ros::TransformListener> tf_lidar_base_listener;
-    pcl::PassThrough<pcl::PointXYZ> pass_x_, pass_y_;
-    pcl::VoxelGrid<pcl::PointXYZ> voxel_;
 
     float camera_scan_min_x_, camera_scan_max_x_, camera_scan_min_y_, camera_scan_max_y_;
     int camera_scan_obs_result = 0;
@@ -316,6 +325,9 @@ public:
     float icp_mag = 0;
 
     uint8_t gyro_counter = 0;
+
+    int16_t master_status_emergency = 0;
+    int16_t status_klik_terminal_terakhir = -1;
 
     Master();
     ~Master();

@@ -1523,42 +1523,74 @@ def generate_launch_description():
         arguments=["--ros-args", "--log-level", "warn"],
     )
 
-    return LaunchDescription(
-        [
-            # DeclareLaunchArgument('auto_start', default_value='true'),
-            # hokuyo1_lidar_driver,
-            # hokuyo1_lidar_configure,
-            # hokuyo1_lidar_activate,
-            # hokuyo2_lidar_driver,
-            # hokuyo2_lidar_configure,
-            # hokuyo2_lidar_activate,
-            # beckhoff,
-            # CANbus_HAL,
-
-            # tf_base_link_to_lidar2_link,
-            # tf_base_link_to_body_link,
-            # tf_base_link_to_lidar1_link,
-            # tf_base_link_to_imu_link,
-            # tf_base_link_to_camera_link,
-
-            # rs2_cam_main,
-            # rviz2,
-            # CANbus_HAL_socket_can0,
-            # CANbus_HAL_socket_can1,
-
-            rosapi_node,
-            rosbridge_server, 
-            web_video_server,
-            master,
-            ui_server,
-            upload_server,
-
-
-            # camera_obstacle_detector,
-            # lidar_obstacle_filter,
-            # forklift_detector
-        ]
+    test_map_server = Node(
+        package='nav2_map_server',
+        executable='map_server',
+        name='map_server',
+        output='screen',
+        parameters=[{
+            'use_sim_time': False,
+            'yaml_filename': "/home/wildan/Desktop/map_baru/map_baru_bagus.yaml",
+            }],
+        remappings=[
+            ('map', '/slam/map')
+        ],
     )
+
+    test_map_server_lifecycle = Node(
+        package='nav2_lifecycle_manager',
+        executable='lifecycle_manager',
+        name='lifecycle_manager_map',
+        output='screen',
+        parameters=[{
+            'use_sim_time': False,
+            'autostart': True,
+            'node_names': ['map_server'],
+        }],
+        remappings=[
+            ('map', '/slam/map')
+        ],
+    )
+
+    # return LaunchDescription(
+    #     [
+    #         # DeclareLaunchArgument('auto_start', default_value='true'),
+    #         # hokuyo1_lidar_driver,
+    #         # hokuyo1_lidar_configure,
+    #         # hokuyo1_lidar_activate,
+    #         # hokuyo2_lidar_driver,
+    #         # hokuyo2_lidar_configure,
+    #         # hokuyo2_lidar_activate,
+    #         # beckhoff,
+    #         # CANbus_HAL,
+
+    #         # tf_base_link_to_lidar2_link,
+    #         # tf_base_link_to_body_link,
+    #         # tf_base_link_to_lidar1_link,
+    #         # tf_base_link_to_imu_link,
+    #         # tf_base_link_to_camera_link,
+
+    #         # rs2_cam_main,
+    #         # rviz2,
+    #         # CANbus_HAL_socket_can0,
+    #         # CANbus_HAL_socket_can1,
+
+    #         rosapi_node,
+    #         rosbridge_server, 
+    #         web_video_server,
+    #         master,
+    #         ui_server,
+    #         upload_server,
+
+    #         # test_map_server,
+    #         # test_map_server_lifecycle
+
+
+    #         # camera_obstacle_detector,
+    #         # lidar_obstacle_filter,
+    #         # forklift_detector
+    #     ]
+    # )
 
     # ==============================================================================
 
@@ -1631,6 +1663,7 @@ def generate_launch_description():
             web_video_server,
             master,
             ui_server,
+            upload_server,
 
             # # =============================================================================
             

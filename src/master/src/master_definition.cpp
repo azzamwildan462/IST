@@ -220,6 +220,14 @@ void Master::process_transmitter()
 
         pub_terminals->publish(terminals);
     }
+
+    std_msgs::msg::Int16 msg_status_emergency;
+    msg_status_emergency.data = master_status_emergency;
+    pub_master_status_emergency->publish(msg_status_emergency);
+
+    std_msgs::msg::Int16 msg_terminal_terakhir;
+    msg_terminal_terakhir.data = status_klik_terminal_terakhir;
+    pub_master_status_klik_terminal_terakhir->publish(msg_terminal_terakhir);
 }
 
 void Master::process_load_terminals()

@@ -89,6 +89,8 @@ Master::Master()
     pub_pose_filtered = this->create_publisher<nav_msgs::msg::Odometry>("/master/pose_filtered", 1);
     pub_slam_status = this->create_publisher<std_msgs::msg::UInt8>("/master/slam_status", 1);
     pub_camera_obs_emergency = this->create_publisher<std_msgs::msg::Float32>("/master/camera_obs_emergency", 1);
+    pub_master_status_emergency = this->create_publisher<std_msgs::msg::Int16>("/master/status_emergency", 1);
+    pub_master_status_klik_terminal_terakhir = this->create_publisher<std_msgs::msg::Int16>("/master/terminal_terakhir", 1);
 
     auto sub_opts = rclcpp::SubscriptionOptions();
     sub_opts.callback_group = cloud_cb_group_;
@@ -145,8 +147,11 @@ Master::Master()
         "/slam/map", 1, std::bind(&Master::callback_sub_map, this, std::placeholders::_1));
     sub_localization_pose = this->create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>(
         "/slam/localization_pose", 1, std::bind(&Master::callback_sub_localization_pose, this, std::placeholders::_1));
-    // sub_camera_pcl = this->create_subscription<sensor_msgs::msg::PointCloud2>(
-    //     "/camera/rs2_cam_main/depth/color/points", 1, std::bind(&Master::callback_sub_camera_pcl, this, std::placeholders::_1), sub_opts);
+    if (enable_obs_detection_camera)
+    {
+        sub_camera_pcl = this->create_subscription<sensor_msgs::msg::PointCloud2>(
+            "/camera/rs2_cam_main/depth/color/points", 1, std::bind(&Master::callback_sub_camera_pcl, this, std::placeholders::_1), sub_opts);
+    }
     sub_icp_score = this->create_subscription<std_msgs::msg::Float32>(
         "/lidar_obstacle_filter/icp_score", 1, std::bind(&Master::callback_sub_icp_score, this, std::placeholders::_1), sub_opts);
     sub_detected_forklift_contour = this->create_subscription<std_msgs::msg::Float32>(
@@ -175,9 +180,6 @@ Master::Master()
     lidar_obstacle_param_client = std::make_shared<rclcpp::SyncParametersClient>(
         this, "lidar_obstacle_filter");
 
-    tf_lidar_base_buffer = std::make_unique<tf2_ros::Buffer>(this->get_clock());
-    tf_lidar_base_listener = std::make_unique<tf2_ros::TransformListener>(*tf_lidar_base_buffer);
-
     // while (!tf_is_initialized)
     // {
     //     sleep(1);
@@ -192,11 +194,6 @@ Master::Master()
     //         tf_is_initialized = false;
     //     }
     // }
-
-    pass_x_.setFilterFieldName("x");
-    pass_y_.setFilterFieldName("y");
-
-    voxel_.setLeafSize(0.03f, 0.03f, 0.03f); // optional downsample
 
     //----Timer
     tim_50hz = this->create_wall_timer(std::chrono::milliseconds(20), std::bind(&Master::callback_tim_50hz, this), timer_cb_group_);
@@ -263,45 +260,81 @@ void Master::callback_sub_icp_score(const std_msgs::msg::Float32::SharedPtr msg)
 
 void Master::callback_sub_camera_pcl(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
 {
-    if (!tf_is_initialized)
-    {
-        return;
-    }
+    last_time_kamera_pcl = rclcpp::Clock(RCL_SYSTEM_TIME).now();
 
-    static pcl::PointCloud<pcl::PointXYZ> points_lidar_;
-    static pcl::PointCloud<pcl::PointXYZ> points_lidar2base_;
-    static pcl::PointCloud<pcl::PointXYZ> points_lidar2base_filtered_;
-    static pcl::PointCloud<pcl::PointXYZ> temp_;
-    static pcl::PointCloud<pcl::PointXYZ> filtered_;
+    // if (!tf_is_initialized)
+    // {
+    //     return;
+    // }
 
-    pass_x_.setFilterLimits(camera_scan_min_x_, camera_scan_max_x_);
-    pass_y_.setFilterLimits(camera_scan_min_y_, camera_scan_max_y_);
+    // static pcl::PointCloud<pcl::PointXYZ> points_lidar_;
+    // static pcl::PointCloud<pcl::PointXYZ> points_lidar2base_;
+    // static pcl::PointCloud<pcl::PointXYZ> points_lidar2base_filtered_;
+    // static pcl::PointCloud<pcl::PointXYZ> temp_;
+    // static pcl::PointCloud<pcl::PointXYZ> filtered_;
 
-    pcl::fromROSMsg(*msg, points_lidar_);
+    // pass_x_.setFilterLimits(camera_scan_min_x_, camera_scan_max_x_);
+    // pass_y_.setFilterLimits(camera_scan_min_y_, camera_scan_max_y_);
 
-    if (points_lidar_.empty())
-    {
-        points_lidar2base_.clear();
-        filtered_.clear();
-    }
-    else
-    {
-        pcl_ros::transformPointCloud(points_lidar_, points_lidar2base_, tf_lidar_base);
+    // pcl::fromROSMsg(*msg, points_lidar_);
 
-        // voxel_.setInputCloud(points_lidar2base_.makeShared());
-        // voxel_.filter(points_lidar2base_);
+    // if (points_lidar_.empty())
+    // {
+    //     points_lidar2base_.clear();
+    //     filtered_.clear();
+    // }
+    // else
+    // {
+    //     pcl_ros::transformPointCloud(points_lidar_, points_lidar2base_, tf_lidar_base);
 
-        pass_x_.setInputCloud(points_lidar2base_.makeShared());
-        pass_x_.filter(temp_);
+    //     // voxel_.setInputCloud(points_lidar2base_.makeShared());
+    //     // voxel_.filter(points_lidar2base_);
 
-        pass_y_.setInputCloud(temp_.makeShared());
-        pass_y_.filter(filtered_);
-    }
+    //     pass_x_.setInputCloud(points_lidar2base_.makeShared());
+    //     pass_x_.filter(temp_);
 
-    camera_scan_obs_result = filtered_.size();
+    //     pass_y_.setInputCloud(temp_.makeShared());
+    //     pass_y_.filter(filtered_);
+    // }
+
+    // camera_scan_obs_result = filtered_.size();
+
+    // std_msgs::msg::Float32 out;
+    // out.data = static_cast<float>(filtered_.size());
+    // pub_camera_obs_emergency->publish(out);
+
+    // Convert to PCL
+    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
+    pcl::fromROSMsg(*msg, *cloud);
+
+    // PassThrough filter on Z
+    pcl::PointCloud<pcl::PointXYZ>::Ptr zFiltered(new pcl::PointCloud<pcl::PointXYZ>);
+    pcl::PassThrough<pcl::PointXYZ> pass_z;
+    pass_z.setInputCloud(cloud);
+    pass_z.setFilterFieldName("z");
+    pass_z.setFilterLimits(0.0, camera_scan_max_x_); // keep 0 ≤ z ≤ 3 m
+    pass_z.filter(*zFiltered);
+
+    // PassThrough filter on X
+    pcl::PointCloud<pcl::PointXYZ>::Ptr xFiltered(new pcl::PointCloud<pcl::PointXYZ>);
+    pcl::PassThrough<pcl::PointXYZ> pass_x;
+    pass_x.setInputCloud(zFiltered);
+    pass_x.setFilterFieldName("x");
+    pass_x.setFilterLimits(-camera_scan_max_y_, -camera_scan_min_y_);
+    pass_x.filter(*xFiltered);
+
+    // PassThrough filter on Y
+    pcl::PointCloud<pcl::PointXYZ>::Ptr yFiltered(new pcl::PointCloud<pcl::PointXYZ>);
+    pcl::PassThrough<pcl::PointXYZ> pass_y;
+    pass_y.setInputCloud(xFiltered);
+    pass_y.setFilterFieldName("y");
+    pass_y.setFilterLimits(-0.8, 0.8);
+    pass_y.filter(*yFiltered);
+
+    camera_scan_obs_result = yFiltered->size();
 
     std_msgs::msg::Float32 out;
-    out.data = static_cast<float>(filtered_.size());
+    out.data = static_cast<float>(yFiltered->size());
     pub_camera_obs_emergency->publish(out);
 }
 
@@ -817,6 +850,8 @@ void Master::callback_tim_50hz()
             global_fsm.value = FSM_GLOBAL_PREOP;
         }
 
+        master_status_emergency &= ~STATUS_TOWING_CONNECTED;
+
         /* Untuk manual maju mundur */
         if ((fb_beckhoff_digital_input & IN_MANUAL_MAJU) == IN_MANUAL_MAJU || (fb_beckhoff_digital_input & IN_MANUAL_MUNDUR) == IN_MANUAL_MUNDUR)
         {
@@ -863,16 +898,32 @@ void Master::callback_tim_50hz()
             rclcpp::Duration dt_pose_estimator = current_time - last_time_pose_estimator;
             rclcpp::Duration dt_beckhoff = current_time - last_time_beckhoff;
             rclcpp::Duration dt_CANbus = current_time - last_time_CANbus;
+            rclcpp::Duration dt_kamera = current_time - last_time_kamera_pcl;
 
             // Jika sudah berhasil menerima semua data yang diperlukan
             if (dt_pose_estimator.seconds() < 1 && dt_beckhoff.seconds() < 1 && dt_CANbus.seconds() < 1 && is_rtabmap_ready && is_pose_corrected && ((fb_beckhoff_digital_input & IN_EPS_nFAULT) == IN_EPS_nFAULT) && icp_score < threshold_icp_score)
             {
-                target_velocity_joy_x = 0;
-                target_velocity_joy_y = 0;
-                target_velocity_joy_wz = 0;
-                local_fsm.value = 0;
-                global_fsm.value = FSM_GLOBAL_OP_3;
-                time_start_operation = current_time;
+                if (enable_obs_detection_camera)
+                {
+                    if (dt_kamera.seconds() < 1)
+                    {
+                        target_velocity_joy_x = 0;
+                        target_velocity_joy_y = 0;
+                        target_velocity_joy_wz = 0;
+                        local_fsm.value = 0;
+                        global_fsm.value = FSM_GLOBAL_OP_3;
+                        time_start_operation = current_time;
+                    }
+                }
+                else
+                {
+                    target_velocity_joy_x = 0;
+                    target_velocity_joy_y = 0;
+                    target_velocity_joy_wz = 0;
+                    local_fsm.value = 0;
+                    global_fsm.value = FSM_GLOBAL_OP_3;
+                    time_start_operation = current_time;
+                }
             }
         }
         else if ((fb_beckhoff_digital_input & IN_START_GAS_MANUAL) == IN_START_GAS_MANUAL)
@@ -930,6 +981,16 @@ void Master::callback_tim_50hz()
             break;
         }
 
+        if (enable_obs_detection_camera)
+        {
+            rclcpp::Duration dt_kamera = current_time - last_time_kamera_pcl;
+            if (dt_kamera.seconds() > 0.8)
+            {
+                global_fsm.value = FSM_GLOBAL_PREOP;
+                break;
+            }
+        }
+
         if ((fb_beckhoff_digital_input & IN_SYSTEM_FULL_ENABLE) == 0)
         {
             global_fsm.value = FSM_GLOBAL_SAFEOP;
@@ -947,6 +1008,8 @@ void Master::callback_tim_50hz()
             global_fsm.value = FSM_GLOBAL_SAFEOP;
             break;
         }
+
+        master_status_emergency |= STATUS_TOWING_CONNECTED;
 
         process_local_fsm();
         break;

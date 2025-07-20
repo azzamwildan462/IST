@@ -5,20 +5,18 @@
             "includePath": [
                 "${workspaceFolder}/**",
                 "/opt/ros/humble/include/**",
-                "/home/her/ros2_humble/install/**",
-                "/home/her/ros2_humble/build/**",
                 "/opt/ros/humble/lib/**",
                 "/usr/include/opencv4/**",
                 "/usr/include/pcl-1.12/**",
                 "/usr/include/eigen3/**",
-                "${workspaceFolder}/src/**",
-                "${workspaceFolder}/build/**",
+                "${workspaceFolder}/src/**"
             ],
             "defines": [],
-            "compilerPath": null,
+            "compilerPath": "/usr/bin/g++",
             "cStandard": "c17",
-            "cppStandard": "c++14",
-            "intelliSenseMode": "linux-clang-x64"
+            "cppStandard": "c++17",
+            "intelliSenseMode": "linux-gcc-x64",
+            "compileCommands": "${workspaceFolder}/build/compile_commands.json"
         }
     ],
     "version": 4

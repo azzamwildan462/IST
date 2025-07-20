@@ -459,6 +459,8 @@ terminalsTopic.subscribe(function (message) {
         const x = points[i].target_pose_x;
         const y = points[i].target_pose_y;
         const radius = points[i].radius_area;
+        const arah = points[i].target_pose_theta
+        const id = points[i].id
 
         // Transform coordinates according to your logic
         const x_tf = x + (stage.width() * 0.5) / wtf_skala;
@@ -482,8 +484,29 @@ terminalsTopic.subscribe(function (message) {
             fill: null,          // Ensure circle is not filled
         });
 
+        const lineEndX = x_tf * wtf_skala + radius * wtf_skala * Math.cos(arah);
+        const lineEndY = y_tf * wtf_skala - radius * wtf_skala * Math.sin(arah);
+
+        // Draw the line inside the circle
+        const conv_line = new Konva.Line({
+            points: [x_tf * wtf_skala, y_tf * wtf_skala, lineEndX, lineEndY],
+            stroke: 'Cyan',
+            strokeWidth: 5,
+        });
+
+        const idText = new Konva.Text({
+            x: x_tf * wtf_skala + 5,
+            y: y_tf * wtf_skala + 5,
+            text: id.toString(),
+            fontSize: 24,
+            fontFamily: 'Calibri',
+            fill: 'magenta',
+        });
+
         // Add circle to the terminalsLayer
         terminalsLayer.add(terminalCircle);
+        terminalsLayer.add(conv_line);
+        terminalsLayer.add(idText);
     }
 
     terminalsLayer.draw();
@@ -580,6 +603,8 @@ mapTopic.subscribe(function (message) {
         mapLayer.draw();
     };
     imageObj.src = mapCanvas.toDataURL();
+
+    mapTopic.unsubscribe();
 });
 
 
