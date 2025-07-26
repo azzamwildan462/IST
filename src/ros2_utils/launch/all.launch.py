@@ -437,6 +437,16 @@ def generate_launch_description():
         name='lidar_obstacle_filter',
         output='screen',
         parameters=[{
+            # "scan_min_y": -1.0,
+            # "scan_max_y": 1.0,
+            # "scan_range": 3.5,
+            # "obstacle_error_tolerance": 0.4,
+            # "pgm_path": "/root/.ros/rtabmap.pgm",
+            # "resolution": 0.3,
+            # "origin_x": -214.674,
+            # "origin_y": -22.7611,
+
+            ## STABIL
             "scan_min_y": -1.0,
             "scan_max_y": 1.0,
             "scan_range": 3.5,
@@ -445,6 +455,16 @@ def generate_launch_description():
             "resolution": 0.3,
             "origin_x": -211.59,
             "origin_y": -22.645,
+
+            ## INSYAALLAH STABIL
+            # "scan_min_y": -1.0,
+            # "scan_max_y": 1.0,
+            # "scan_range": 3.5,
+            # "obstacle_error_tolerance": 0.4,
+            # "pgm_path": "/root/.ros/rtabmap.pgm",
+            # "resolution": 0.3,
+            # "origin_x": -218.581,
+            # "origin_y": -21.8307,
         }],
         respawn=True,
         # remappings=[('/hardware/imu', '/can/imu')],

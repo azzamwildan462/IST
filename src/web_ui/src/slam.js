@@ -879,6 +879,17 @@ sub_master_global_fsm.subscribe(function (message) {
     }
 });
 
+const icp_score = document.getElementById('icp-score');
+var sub_icp_score = new ROSLIB.Topic({
+    ros: ros,
+    name: "/lidar_obstacle_filter/icp_score",
+    messageType: "std_msgs/Float32",
+});
+
+sub_icp_score.subscribe(function (message) {
+    icp_score.innerHTML = "ICP Score: " + message.data.toFixed(2);
+});
+
 
 
 

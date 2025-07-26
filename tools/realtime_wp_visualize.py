@@ -6,7 +6,8 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 import os
 
-csv_file = "./smoothed_waypoints.csv"
+csv_file = "./wp_2_jalur.csv"
+# csv_file = "./wp_jalur_tunggal.csv"
 
 def read_csv(file_path):
     x_vals, y_vals = [], []
