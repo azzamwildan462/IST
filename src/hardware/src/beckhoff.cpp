@@ -698,13 +698,25 @@ public:
             {
                 if (counter_kedip_lampu_kuning > 40)
                 {
-                    digital_out->data &= ~DO_LAMPU_BELAKANG_HIJAU;
-                    digital_out->data &= ~DO_LAMPU_BELAKANG_MERAH;
-                    digital_out->data |= DO_LAMPU_BELAKANG_KUNING;
+                    if (master_local_fsm == 1)
+                    {
+                        digital_out->data &= ~DO_LAMPU_BELAKANG_HIJAU;
+                        digital_out->data &= ~DO_LAMPU_BELAKANG_MERAH;
+                        digital_out->data |= DO_LAMPU_BELAKANG_KUNING;
+                    }
+                    else
+                    {
+                        digital_out->data &= ~DO_LAMPU_BELAKANG_HIJAU;
+                        digital_out->data |= DO_LAMPU_BELAKANG_MERAH;
+                        digital_out->data &= ~DO_LAMPU_BELAKANG_KUNING;
+                    }
                     counter_kedip_lampu_kuning = 0;
                 }
                 else if (counter_kedip_lampu_kuning > 20)
                 {
+                    digital_out->data &= ~DO_LAMPU_BELAKANG_HIJAU;
+                    digital_out->data &= ~DO_LAMPU_BELAKANG_MERAH;
+                    digital_out->data &= ~DO_LAMPU_BELAKANG_KUNING;
                     digital_out->data &= ~DO_LAMPU_BELAKANG_HIJAU;
                     digital_out->data &= ~DO_LAMPU_BELAKANG_MERAH;
                     digital_out->data &= ~DO_LAMPU_BELAKANG_KUNING;
