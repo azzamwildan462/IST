@@ -115,6 +115,76 @@
                 </div>
             </div>
         </div>
+
+        <h2 class="title is-2">Catatan</h2>
+
+        Untuk upload silahkan pilih file yang ingin di-upload, lalu tekan tombol upload, lalu kembali ke halaman ini,
+        dan jangan lupa tekan tombol APPLY untuk mengaplikasikan
+
+        <br>
+        <br>
+        <br>
+
+        <h3 class="title is-5">Koordinat yang Digunakan</h3>
+        Ada dua sistem koordinat yang digunakan, yang pertama adalah sistem koordinat peta (digunakan untuk posisi
+        waypoint dan terminal). Yang kedua adalah sistem koordinat mobil (digunakan untuk obstacle dan tuning).
+        <br>
+
+        <div class="has-text-centered">
+            <p>Koordinat Peta:</p>
+            <figure class="image" style="margin: 0 auto; width: 512px; height: 512px;">
+                <img src="./koord_peta.png" />
+            </figure>
+        </div>
+
+        <br>
+
+        <div class="has-text-centered">
+            <p>Koordinat Mobil:</p>
+            <figure class="image" style="margin: 0 auto; width: 512px; height: 512px;">
+                <img src="./koord_mobil.png" />
+            </figure>
+        </div>
+
+        <br>
+        <br>
+        <br>
+
+        <h3 class="title is-5">Waypoint</h3>
+        Waypoint hanya perlu edit koordinat (x,y) saja. Sesuai koordinat peta.
+
+        <br>
+        <br>
+        <br>
+
+        <h3 class="title is-5">Terminal</h3>
+        Penjelasan terminal:
+        <ul>
+            <li>Type: 1 untuk stop, 2 atau 32 sama saja untuk jalan belok atau lurus</li>
+            <li>Id: Wajib beda, untuk membedakan terminal nama dan mempermudah mengubah terminal</li>
+            <li>X: Koordinat terminal sesuai koordinat peta</li>
+            <li>Y: Koordinat terminal sesuai koordinat peta</li>
+            <li>Theta: Arah jalan mobil sesuai koordinat peta</li>
+            <li>Max vx: Kecepatan robot saat didalam dan setelah melewati terminal</li>
+            <li>Max vy: (Abaikan)</li>
+            <li>Max vtheta: (Abaikan)</li>
+            <li>Radius area: radius area terminal</li>
+            <li>Lookahead distance: scan target untuk sistem kontrol movement mobil (lihat pada gambar)</li>
+            <li>Obs_scan_r: (lihat pada gambar)</li>
+            <li>Icp_score_max: Representasi nilai posisi salah atau ada perbedaan di peta nya. Semakin kecil nilainya
+                semakin posisi mobil benar dan sedikit perbedaan di peta</li>
+            <li>Scan_min_x: (lihat pada gambar) (Abaikan)</li>
+            <li>Scan_max_x: (lihat pada gambar) (Abaikan)</li>
+            <li>Scan_min_y: (lihat pada gambar)</li>
+            <li>Scan_max_y: (lihat pada gambar)</li>
+            <li>Obs_threshold: (Abaikan)</li>
+        </ul>
+
+        <br>
+        <br>
+        <br>
+
+
     </div>
 
     <script type="text/javascript" src="upload.js">
