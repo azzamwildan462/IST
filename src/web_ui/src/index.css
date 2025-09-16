@@ -59,3 +59,109 @@ text {
     text-anchor: middle;
     dominant-baseline: middle;
 }
+
+.comment-box {
+    background-color: #101010;
+    /* warna kotak (gelap) */
+    border-left: 4px solid #10ccb0;
+    /* garis samping hijau */
+    padding: 15px;
+    margin: 20px 0;
+    border-radius: 8px;
+    font-family: Arial, sans-serif;
+    color: #f1f1f1;
+    line-height: 1.6;
+}
+
+.comment-box h3 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    color: #10ccb0;
+}
+
+.green {
+    color: #4caf50;
+    font-weight: bold;
+}
+
+.red {
+    color: #f44336;
+    font-weight: bold;
+}
+
+.comment-form {
+    background-color: #101010;
+    border-left: 4px solid #10ccb0;
+    padding: 20px;
+    margin: 20px 0;
+    border-radius: 8px;
+    font-family: Arial, sans-serif;
+    color: #f1f1f1;
+}
+
+.comment-form h3 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: #10ccb0;
+}
+
+.comment-form label {
+    display: block;
+    margin: 10px 0 5px;
+    font-weight: bold;
+}
+
+.comment-form input,
+.comment-form textarea {
+    width: 100%;
+    padding: 10px;
+    border: none;
+    border-radius: 5px;
+    margin-bottom: 15px;
+    font-size: 14px;
+}
+
+.comment-form button {
+    background-color: #10ccb0;
+    color: black;
+    border: none;
+    padding: 10px 15px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.comment-form button:hover {
+    background-color: #0da790;
+}
+
+.result-choice {
+    margin-top: 15px;
+    font-size: 16px;
+}
+
+.result-choice label {
+    margin-right: 20px;
+    cursor: pointer;
+}
+
+.result-choice input {
+    margin-right: 5px;
+}
+
+#btn-next {
+    margin-top: 20px;
+    padding: 10px 15px;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    cursor: not-allowed;
+    background-color: #777;
+    color: #ccc;
+}
+
+#btn-next.active {
+    cursor: pointer;
+    background-color: #0da790;
+    color: black;
+}
