@@ -345,7 +345,7 @@ void Master::wp2velocity_steering(float lookahead_distance, float *pvelocity, fl
     static float max_velocity_terminal = profile_max_velocity;
     static float lookahead_distance_terminal = lookahead_distance;
     static float obs_scan_r_terminal = obs_scan_r;
-    static float obs_scan_camera_thr_terminal = 3000;
+    static float obs_scan_camera_thr_terminal = 50000;
     static float threshold_icp_score_terminal = threshold_icp_score;
 
     for (size_t i = 0; i < terminals.terminals.size(); i++)
@@ -374,28 +374,29 @@ void Master::wp2velocity_steering(float lookahead_distance, float *pvelocity, fl
                 camera_scan_min_y_ = terminals.terminals[i].scan_min_y;
                 camera_scan_max_y_ = terminals.terminals[i].scan_max_y;
                 camera_scan_max_x_ = terminals.terminals[i].scan_max_x;
+                camera_scan_min_x_ = terminals.terminals[i].scan_min_x;
 
                 /* Deteksi forklift */
-                if (detected_forklift_contour > obs_scan_camera_thr_terminal)
-                {
-                    counter_request_stop++;
-                    counter_request_start_again = 0;
+                // if (detected_forklift_contour > obs_scan_camera_thr_terminal)
+                // {
+                //     counter_request_stop++;
+                //     counter_request_start_again = 0;
 
-                    if (counter_request_stop > 1000)
-                    {
-                        counter_request_stop = 1000;
-                    }
-                }
-                else
-                {
-                    counter_request_start_again++;
-                    counter_request_stop = 0;
+                //     if (counter_request_stop > 1000)
+                //     {
+                //         counter_request_stop = 1000;
+                //     }
+                // }
+                // else
+                // {
+                //     counter_request_start_again++;
+                //     counter_request_stop = 0;
 
-                    if (counter_request_start_again > 1000)
-                    {
-                        counter_request_start_again = 1000;
-                    }
-                }
+                //     if (counter_request_start_again > 1000)
+                //     {
+                //         counter_request_start_again = 1000;
+                //     }
+                // }
                 break;
             }
         }
@@ -427,6 +428,7 @@ void Master::wp2velocity_steering(float lookahead_distance, float *pvelocity, fl
     lookahead_distance = lookahead_distance_terminal;
     obs_scan_r = obs_scan_r_terminal;
     lidar_obs_scan_thr = obs_scan_r;
+    all_obstacle_thr = obs_scan_camera_thr_terminal;
 
     /* Mencari waypoint sesuai lookahead_distance */
     index_lookahead = index_sekarang;
@@ -487,7 +489,9 @@ void Master::wp2velocity_steering(float lookahead_distance, float *pvelocity, fl
                                  EMERGENCY_CAMERA_OBS_DETECTED |
                                  EMERGENCY_GYRO_ANOMALY_DETECTED |
                                  EMERGENCY_ICP_SCORE_TERLALU_BESAR |
-                                 EMERGENCY_STOP_KARENA_OBSTACLE);
+                                 EMERGENCY_STOP_KARENA_OBSTACLE |
+                                 EMERGENCY_ALL_LIDAR_DETECTED |
+                                 EMERGENCY_GANDENGAN_LEPAS);
 
     /* Jika sudah mencapai waypoint terakhir */
     if (index_lookahead == waypoints.size() - 1)
@@ -553,6 +557,29 @@ void Master::wp2velocity_steering(float lookahead_distance, float *pvelocity, fl
         return;
     }
 
+    static uint16_t counter_gandengan_lepas = 0;
+
+    if (result_toribay_real_wtf_kanan + result_toribay_real_wtf_kiri < thresh_toribay_real_detected)
+    {
+        counter_gandengan_lepas++;
+        if (counter_gandengan_lepas >= 30000)
+        {
+            counter_gandengan_lepas = 0;
+        }
+    }
+    else
+    {
+        counter_gandengan_lepas = 0;
+    }
+
+    if (counter_gandengan_lepas > 150)
+    {
+        *pvelocity = -1;
+        *psteering = 0;
+        master_status_emergency |= EMERGENCY_GANDENGAN_LEPAS;
+        return;
+    }
+
     /* Menghitung target velocity */
     float dx = waypoints[index_lookahead].x - pose_used_x;
     float dy = waypoints[index_lookahead].y - pose_used_y;
@@ -581,6 +608,7 @@ void Master::wp2velocity_steering(float lookahead_distance, float *pvelocity, fl
     /* Menghitung obstacle */
     if (enable_obs_detection)
     {
+        static uint16_t counter_all_lidar_active = 0;
         if (obs_find_baru > 0.05)
         {
             master_status_emergency |= EMERGENCY_LIDAR_DEPAN_DETECTED;
@@ -591,6 +619,25 @@ void Master::wp2velocity_steering(float lookahead_distance, float *pvelocity, fl
 
             if (target_velocity > max_velocity_terminal)
                 target_velocity = max_velocity_terminal;
+        }
+
+        if (result_lidar_kanan + result_lidar_kiri + result_camera >= all_obstacle_thr)
+        {
+            counter_all_lidar_active++;
+            if (counter_all_lidar_active >= 5000)
+            {
+                counter_all_lidar_active = 5000;
+            }
+        }
+        else
+        {
+            counter_all_lidar_active = 0;
+        }
+
+        if (counter_all_lidar_active >= 15)
+        {
+            master_status_emergency |= EMERGENCY_ALL_LIDAR_DETECTED;
+            target_velocity = -profile_max_braking;
         }
     }
 

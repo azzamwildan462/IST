@@ -67,6 +67,7 @@ public:
     bool can_to_car = false;
     int jhctech_can_id = -1; // Jika -1, masuk default, 1 untuk EPS, 2 untuk mobil
     int counter_divider_can_send = 4;
+    int counter_divider_publish = 200;
 
     int socket_can = -1;
 
@@ -119,17 +120,35 @@ public:
         this->declare_parameter("counter_divider_can_send", 4);
         this->get_parameter("counter_divider_can_send", counter_divider_can_send);
 
+        this->declare_parameter("counter_divider_publish", 200);
+        this->get_parameter("counter_divider_publish", counter_divider_publish);
+
         //----Publiher
-        if (can_to_car)
+        if (use_socket_can)
+        {
+            if (can_to_car)
+            {
+                pub_battery = this->create_publisher<std_msgs::msg::Int16>("/can/battery", 1);
+                pub_encoder = this->create_publisher<std_msgs::msg::Int32>("/can/encoder", 1);
+                pub_fb_tps_accelerator = this->create_publisher<std_msgs::msg::UInt8>("/can/fb_tps_accelerator", 1);
+                pub_fb_transmission = this->create_publisher<std_msgs::msg::UInt8>("/can/fb_transmission", 1);
+                pub_error_code = this->create_publisher<std_msgs::msg::Int16>("/can/error_code", 1);
+            }
+            else
+            {
+                pub_eps_encoder = this->create_publisher<std_msgs::msg::Float32>("/can/eps_encoder", 1);
+                pub_fb_eps_mode = this->create_publisher<std_msgs::msg::UInt8>("/can/eps_mode", 1);
+                pub_imu_can = this->create_publisher<sensor_msgs::msg::Imu>("/can/imu", 1);
+                pub_gyro_counter = this->create_publisher<std_msgs::msg::UInt8>("/can/gyro_counter", 1);
+            }
+        }
+        else
         {
             pub_battery = this->create_publisher<std_msgs::msg::Int16>("/can/battery", 1);
             pub_encoder = this->create_publisher<std_msgs::msg::Int32>("/can/encoder", 1);
             pub_fb_tps_accelerator = this->create_publisher<std_msgs::msg::UInt8>("/can/fb_tps_accelerator", 1);
             pub_fb_transmission = this->create_publisher<std_msgs::msg::UInt8>("/can/fb_transmission", 1);
             pub_error_code = this->create_publisher<std_msgs::msg::Int16>("/can/error_code", 1);
-        }
-        else
-        {
             pub_eps_encoder = this->create_publisher<std_msgs::msg::Float32>("/can/eps_encoder", 1);
             pub_fb_eps_mode = this->create_publisher<std_msgs::msg::UInt8>("/can/eps_mode", 1);
             pub_imu_can = this->create_publisher<sensor_msgs::msg::Imu>("/can/imu", 1);
@@ -137,13 +156,8 @@ public:
         }
 
         //----Timer
-        if (use_socket_can)
-        {
-            // tim_50hz = this->create_wall_timer(std::chrono::milliseconds(1), std::bind(&CANbus_HAL::callback_routine, this));
-            thread_routine = std::thread(std::bind(&CANbus_HAL::callback_routine_multi_thread, this), this);
-        }
-        else
-            tim_50hz = this->create_wall_timer(std::chrono::milliseconds(10), std::bind(&CANbus_HAL::callback_routine, this));
+        thread_routine = std::thread(std::bind(&CANbus_HAL::callback_routine_multi_thread, this), this);
+        // tim_50hz = this->create_wall_timer(std::chrono::milliseconds(1), std::bind(&CANbus_HAL::callback_routine, this));
 
         //----Subscriber
         sub_master_actuator = this->create_subscription<std_msgs::msg::Float32MultiArray>(
@@ -202,6 +216,7 @@ public:
         while (rclcpp::ok())
         {
             callback_routine();
+            // std::this_thread::sleep_for(std::chrono::microseconds(1));
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
     }
@@ -243,34 +258,97 @@ public:
         }
         else
         {
-            uint8_t data_send_buffer[3] = {0};
-
-            static const float ENC_RAD2CNTR = EPS_ENCODER_MAX_COUNTER / EPS_ENCODER_MAX_RAD;
-            int16_t eps_actuation_cntr = eps_actuation * ENC_RAD2CNTR;
-
-            memcpy(data_send_buffer, &eps_flag, 1);
-            memcpy(data_send_buffer + 1, &eps_actuation_cntr, 2);
-
-            int eps_jhctech_can_id = jhctech_can_id;
-            if (jhctech_can_id == -1)
+            if (counter_can_send >= counter_divider_can_send)
             {
-                eps_jhctech_can_id = 1;
-            }
+                uint8_t data_send_buffer[3] = {0};
 
-            long ret = jhctech_SendDataFrame(socket_can, 't', eps_jhctech_can_id, COB_ID_EPS_ACTUATION, data_send_buffer, 3);
-            if (ret < 0)
-            {
-                logger.warn("CAN%d SEND FAILED", eps_jhctech_can_id);
+                static const float ENC_RAD2CNTR = EPS_ENCODER_MAX_COUNTER / EPS_ENCODER_MAX_RAD;
+                int16_t eps_actuation_cntr = eps_actuation * ENC_RAD2CNTR;
+
+                memcpy(data_send_buffer, &eps_flag, 1);
+                memcpy(data_send_buffer + 1, &eps_actuation_cntr, 2);
+
+                int eps_jhctech_can_id = jhctech_can_id;
+                if (jhctech_can_id == -1)
+                {
+                    eps_jhctech_can_id = 1;
+                }
+
+                long ret = jhctech_SendDataFrame(socket_can, 't', eps_jhctech_can_id, COB_ID_EPS_ACTUATION, data_send_buffer, 3);
+                if (ret < 0)
+                {
+                    logger.warn("CAN%d SEND FAILED", eps_jhctech_can_id);
+                }
+                counter_can_send = 0;
             }
+            counter_can_send++;
 
             parse_can_jhctech(); // Ini blocking
         }
 
-        if (can_to_car)
+        if (use_socket_can)
         {
-            std_msgs::msg::Int16 msg_battery;
-            msg_battery.data = battery;
-            pub_battery->publish(msg_battery);
+            if (can_to_car)
+            {
+                static uint16_t counter_divider_pub_battery = 0;
+                if (counter_divider_pub_battery++ >= counter_divider_publish)
+                {
+                    counter_divider_pub_battery = 0;
+                    std_msgs::msg::Int16 msg_battery;
+                    msg_battery.data = battery;
+                    pub_battery->publish(msg_battery);
+
+                    std_msgs::msg::Int16 msg_error_code;
+                    msg_error_code.data = error_code;
+                    pub_error_code->publish(msg_error_code);
+                }
+
+                if (prev_epoch_encoder != epoch_encoder)
+                {
+                    std_msgs::msg::Int32 msg_encoder;
+                    msg_encoder.data = encoder;
+                    pub_encoder->publish(msg_encoder);
+                }
+
+                std_msgs::msg::UInt8 msg_fb_tps_accelerator;
+                msg_fb_tps_accelerator.data = fb_tps_accelerator;
+                pub_fb_tps_accelerator->publish(msg_fb_tps_accelerator);
+
+                std_msgs::msg::UInt8 msg_fb_transmission;
+                msg_fb_transmission.data = fb_transmission;
+                pub_fb_transmission->publish(msg_fb_transmission);
+            }
+            else
+            {
+                std_msgs::msg::Float32 msg_eps_encoder;
+                msg_eps_encoder.data = eps_encoder_fb;
+                pub_eps_encoder->publish(msg_eps_encoder);
+
+                std_msgs::msg::UInt8 msg_fb_eps_mode;
+                msg_fb_eps_mode.data = eps_mode_fb;
+                pub_fb_eps_mode->publish(msg_fb_eps_mode);
+
+                std_msgs::msg::UInt8 msg_gyro_counter;
+                msg_gyro_counter.data = counter_gyro_update;
+                pub_gyro_counter->publish(msg_gyro_counter);
+
+                pub_imu_can->publish(imu_msg);
+            }
+        }
+        else
+        {
+            static uint16_t counter_divider_pub_battery = 0;
+            if (counter_divider_pub_battery++ >= counter_divider_publish)
+            {
+                counter_divider_pub_battery = 0;
+                std_msgs::msg::Int16 msg_battery;
+                msg_battery.data = battery;
+                pub_battery->publish(msg_battery);
+
+                std_msgs::msg::Int16 msg_error_code;
+                msg_error_code.data = error_code;
+                pub_error_code->publish(msg_error_code);
+            }
 
             if (prev_epoch_encoder != epoch_encoder)
             {
@@ -287,12 +365,6 @@ public:
             msg_fb_transmission.data = fb_transmission;
             pub_fb_transmission->publish(msg_fb_transmission);
 
-            std_msgs::msg::Int16 msg_error_code;
-            msg_error_code.data = error_code;
-            pub_error_code->publish(msg_error_code);
-        }
-        else
-        {
             std_msgs::msg::Float32 msg_eps_encoder;
             msg_eps_encoder.data = eps_encoder_fb;
             pub_eps_encoder->publish(msg_eps_encoder);

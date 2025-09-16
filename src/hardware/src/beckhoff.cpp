@@ -57,6 +57,16 @@
 #define IN_SELECTOR_SIRINE 0b10000000000000
 #define IN_SELECTOR_DISABLE_SIRINE 0b100000000000000
 
+#define EMERGENCY_LIDAR_DEPAN_DETECTED 0b010
+#define EMERGENCY_CAMERA_OBS_DETECTED 0b100
+#define EMERGENCY_GYRO_ANOMALY_DETECTED 0b1000
+#define EMERGENCY_ICP_SCORE_TERLALU_BESAR 0b10000
+#define EMERGENCY_ICP_TRANSLATE_TERLALU_BESAR 0b100000
+#define EMERGENCY_STOP_KARENA_OBSTACLE 0b1000000
+#define EMERGENCY_ALL_LIDAR_DETECTED 0b10000000
+#define EMERGENCY_GANDENGAN_LEPAS 0b100000000
+#define STATUS_TOWING_CONNECTED 0b01
+
 PACKED_BEGIN
 typedef struct
 {
@@ -350,6 +360,7 @@ public:
     rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr sub_master_camera_obs;
     rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr sub_master_lidar_obs;
     rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_car_battery;
+    rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_master_status_emergency;
 
     // Configs
     // =======================================================
@@ -422,6 +433,10 @@ public:
     rclcpp::Time current_time;
     bool status_mobil_connected = false;
 
+    int16_t master_status_emergency = 0; // Status emergency dari master
+
+    std::thread thread_routine;
+
     Beckhoff()
         : Node("beckhoff")
     {
@@ -456,6 +471,7 @@ public:
         }
 
         //----Timer
+        // thread_routine = std::thread(std::bind(&Beckhoff::callback_routine_multi_thread, this), this);
         tim_routine = this->create_wall_timer(std::chrono::milliseconds(10), std::bind(&Beckhoff::callback_tim_routine, this));
         tim_control_brake = this->create_wall_timer(std::chrono::milliseconds(100), std::bind(&Beckhoff::callback_tim_control_brake, this)); // SEMENTARA KARENA PERLU DIBENAHI SECARA MEKANIK REM NYA
 
@@ -482,11 +498,28 @@ public:
             "/master/obs_find", 1, std::bind(&Beckhoff::callback_sub_master_lidar_obs, this, std::placeholders::_1));
         sub_car_battery = this->create_subscription<std_msgs::msg::Int16>(
             "/can/battery", 1, std::bind(&Beckhoff::callback_sub_car_battery, this, std::placeholders::_1));
+        sub_master_status_emergency = this->create_subscription<std_msgs::msg::Int16>(
+            "/master/status_emergency", 1, std::bind(&Beckhoff::callback_sub_master_status_emergency, this, std::placeholders::_1));
+    }
+
+    void callback_routine_multi_thread()
+    {
+        while (rclcpp::ok())
+        {
+            callback_tim_routine();
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
+    }
+
+    void callback_sub_master_status_emergency(const std_msgs::msg::Int16::SharedPtr msg)
+    {
+        master_status_emergency = msg->data;
     }
 
     void callback_sub_car_battery(const std_msgs::msg::Int16::SharedPtr msg)
     {
-        last_time_update_can_mobil = rclcpp::Clock(RCL_SYSTEM_TIME).now();
+        if (msg->data > 5)
+            last_time_update_can_mobil = rclcpp::Clock(RCL_SYSTEM_TIME).now();
     }
 
     void callback_sub_master_lidar_obs(const std_msgs::msg::Float32::SharedPtr msg)
@@ -584,6 +617,13 @@ public:
         ec_send_processdata();
         int wkc = ec_receive_processdata(EC_TIMEOUTRET);
 
+        // static uint16_t counter_pembagi = 1;
+        // if (counter_pembagi++ <= 10)
+        // {
+        //     return;
+        // }
+        // counter_pembagi = 1;
+
         if (wkc >= expectedWKC)
         {
             counter_beckhoff_disconnect = 0;
@@ -676,9 +716,12 @@ public:
             static uint16_t counter_kedip_lampu_hijau = 0;
             if (!status_mobil_connected)
             {
+                // digital_out->data &= ~DO_LAMPU_BELAKANG_HIJAU;
+                // digital_out->data &= ~DO_LAMPU_BELAKANG_KUNING;
+                // digital_out->data |= DO_LAMPU_BELAKANG_MERAH;
                 digital_out->data &= ~DO_LAMPU_BELAKANG_HIJAU;
                 digital_out->data &= ~DO_LAMPU_BELAKANG_KUNING;
-                digital_out->data |= DO_LAMPU_BELAKANG_MERAH;
+                digital_out->data &= ~DO_LAMPU_BELAKANG_MERAH;
             }
             else if (master_global_fsm == 0 || master_global_fsm == 1)
             {
@@ -763,7 +806,7 @@ public:
                 }
             }
 
-            if (master_global_fsm == 3)
+            if (master_global_fsm == 3 && master_local_fsm == 1)
             {
                 if ((digital_in1->data & IN_SELECTOR_DISABLE_SIRINE) == IN_SELECTOR_DISABLE_SIRINE)
                     digital_out->data |= DO_SIRINE;
@@ -781,14 +824,52 @@ public:
             }
 
             static uint16_t counter = 0;
-            if ((master_camera_obs > 100000) || master_lidar_obs > 0.05)
+            static uint16_t target_delay = 20;
+            uint8_t obs_all_aktif = ((master_status_emergency & EMERGENCY_ALL_LIDAR_DETECTED) == EMERGENCY_ALL_LIDAR_DETECTED);
+            uint8_t obs_depan_aktif = ((master_status_emergency & EMERGENCY_LIDAR_DEPAN_DETECTED) == EMERGENCY_LIDAR_DEPAN_DETECTED);
+            uint8_t icp_terlalu_besar = ((master_status_emergency & EMERGENCY_ICP_SCORE_TERLALU_BESAR) == EMERGENCY_ICP_SCORE_TERLALU_BESAR);
+            uint8_t gandengan_lepas = ((master_status_emergency & EMERGENCY_GANDENGAN_LEPAS) == EMERGENCY_GANDENGAN_LEPAS);
+            if ((obs_all_aktif + obs_depan_aktif + icp_terlalu_besar + gandengan_lepas) > 0 && status_mobil_connected)
             {
-                if (counter > 20)
+                if (obs_all_aktif && obs_depan_aktif && icp_terlalu_besar)
+                {
+                    target_delay = 10;
+                }
+                else if (obs_all_aktif && icp_terlalu_besar)
+                {
+                    target_delay = 20;
+                }
+                else if (obs_all_aktif && obs_depan_aktif)
+                {
+                    target_delay = 20;
+                }
+                else if (icp_terlalu_besar && obs_depan_aktif)
+                {
+                    target_delay = 20;
+                }
+                else if (obs_all_aktif)
+                {
+                    target_delay = 40;
+                }
+                else if (obs_depan_aktif)
+                {
+                    target_delay = 60;
+                }
+                else if (icp_terlalu_besar)
+                {
+                    target_delay = 80;
+                }
+                else if (gandengan_lepas)
+                {
+                    target_delay = 100;
+                }
+
+                if (counter > target_delay)
                 {
                     digital_out->data |= DO_BUZZER_BELAKANG;
                     counter = 0;
                 }
-                else if (counter > 10)
+                else if (counter > (target_delay >> 0x01))
                 {
                     digital_out->data &= ~DO_BUZZER_BELAKANG;
                 }
@@ -799,8 +880,10 @@ public:
                 digital_out->data &= ~DO_BUZZER_BELAKANG;
             }
 
-            // Always enable
-            digital_out->data |= DO_LAMPU_BAWAAN;
+            if (status_mobil_connected)
+                digital_out->data |= DO_LAMPU_BAWAAN;
+            else
+                digital_out->data &= ~DO_LAMPU_BAWAAN;
 
             // ===================================================================================
 
@@ -899,6 +982,10 @@ public:
     int8_t init_brake_jiayu_fsm()
     {
         // uint16_t sword = if_brake_input->status_word;
+
+        // if (!(brake_slave_id != 255 && fsm_brake_driver == 3 && fsm_brake_calibration == 4))
+        // {
+        // }
         (void)ec_SDOread(brake_slave_id, ADDRESS_STATUS_WORD, 0x00, FALSE, &status_word_size, &status_word, EC_TIMEOUTRXM);
         uint16_t sword = status_word;
         static uint16_t last_sword = sword;
@@ -1195,11 +1282,11 @@ public:
                 }
 
                 // =============== CONFIGURE WATCHDOG ================
-                // for (uint8_t slave = 1; slave <= ec_slavecount; slave++)
-                // {
-                //     logger.info("Setting watchdog for slave %d", slave);
-                //     set_watchdog(slave, 100);
-                // }
+                for (uint8_t slave = 1; slave <= ec_slavecount; slave++)
+                {
+                    logger.info("Setting watchdog for slave %d", slave);
+                    set_watchdog(slave, 700);
+                }
                 // ===================================================
 
                 ec_config_map(&IOmap);

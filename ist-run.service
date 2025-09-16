@@ -1,0 +1,13 @@
+[Unit]
+Description=IST RUN SERVICE
+StartLimitIntervalSec=0
+
+[Service]
+Environment=HOME=/root
+Type=simple
+Restart=always
+RestartSec=3
+ExecStart=/usr/bin/bash -c "source /opt/ros/humble/setup.bash && cd /home/ist/IST && ./run.sh"
+
+[Install]
+WantedBy=multi-user.target

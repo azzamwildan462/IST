@@ -12,36 +12,47 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "../include/base_realsense_node.h"
-#include <chrono>
 
-using namespace realsense2_camera;
+
+#include "base_realsense_node.h"
+
+
+
 using namespace std::chrono_literals;
+using namespace realsense2_camera;
+
+
 
 #if defined (ACCELERATE_GPU_WITH_GLSL)
+    void BaseRealSenseNode::initOpenGLProcessing
+    (
+        bool use_gpu_processing
+    )
+    {
+        // Once we have a window, initialize GL module
+        // Pass our window to enable sharing of textures between processed frames and the window
+        // The "use_gpu_processing" is going to control if we will use CPU or GPU for data processing
+        rs2::gl::init_processing(_app, use_gpu_processing);
+        if (use_gpu_processing) {
+            rs2::gl::init_rendering();
+        }
 
-void BaseRealSenseNode::initOpenGLProcessing(bool use_gpu_processing)
-{
-    // Once we have a window, initialize GL module
-    // Pass our window to enable sharing of textures between processed frames and the window
-    // The "use_gpu_processing" is going to control if we will use CPU or GPU for data processing
-    rs2::gl::init_processing(_app, use_gpu_processing);
-    if (use_gpu_processing)
-        rs2::gl::init_rendering();
+        _timer = _node.create_wall_timer(1000ms, std::bind(&BaseRealSenseNode::glfwPollEventCallback, this));
+    }
 
-    _timer = _node.create_wall_timer(1000ms, std::bind(&BaseRealSenseNode::glfwPollEventCallback, this));
-}
 
-void BaseRealSenseNode::glfwPollEventCallback()
-{
-    // Must poll the GLFW events perodically, else window will hang or crash
-    glfwPollEvents();
-}
 
-void BaseRealSenseNode::shutdownOpenGLProcessing()
-{
-    rs2::gl::shutdown_rendering();
-    rs2::gl::shutdown_processing();
-}
+    void BaseRealSenseNode::glfwPollEventCallback()
+    {
+        // Must poll the GLFW events perodically, else window will hang or crash
+        glfwPollEvents();
+    }
 
-#endif
+
+
+    void BaseRealSenseNode::shutdownOpenGLProcessing()
+    {
+        rs2::gl::shutdown_rendering();
+        rs2::gl::shutdown_processing();
+    }
+#endif // !defined (ACCELERATE_GPU_WITH_GLSL)

@@ -1,0 +1,13 @@
+[Unit]
+Description=OPEN WEB SERVICE
+After=multi-user.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=3
+ExecStart=/usr/bin/bash -c "cd /home/wildan/proyek/robotika/IST/src/web_ui/src && /usr/bin/python3 open_web.py"
+
+[Install]
+WantedBy=default.target

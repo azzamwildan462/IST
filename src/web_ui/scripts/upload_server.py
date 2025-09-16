@@ -15,6 +15,9 @@ class UploadServerNode(Node):
         self.upload_dir = self.get_parameter("config_dir").get_parameter_value().string_value
         os.makedirs(self.upload_dir, exist_ok=True)
 
+        self.declare_parameter("launch_dir", "")
+        self.launch_dir = self.get_parameter("launch_dir").get_parameter_value().string_value
+
         # Build Flask app
         app = Flask(__name__)
 
@@ -35,6 +38,15 @@ class UploadServerNode(Node):
             dest = os.path.join(self.upload_dir, 'terminal.csv')
             f.save(dest)
             return f'✅ terminal.csv saved to {dest}', 200
+
+        @app.route('/uploadC', methods=['POST'])
+        def upload_c():
+            f = request.files.get('fileC')
+            if not f:
+                abort(400, 'Missing form field "fileC"')
+            dest = os.path.join(self.launch_dir, 'all.launch.py')
+            f.save(dest)
+            return f'✅ all.launch.py saved to {dest}', 200
 
         # Start Flask in a daemon thread so it doesn't block rclpy.spin()
         thread = threading.Thread(

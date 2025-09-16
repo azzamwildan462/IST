@@ -13,6 +13,7 @@ void Master::process_local_fsm()
     local_fsm.reentry(999, 1);
 
     static float stop_time_s = timeout_terminal_1;
+    static int16_t counter_next_terminal = 0;
 
     switch (local_fsm.value)
     {
@@ -28,6 +29,7 @@ void Master::process_local_fsm()
         break;
 
     case FSM_LOCAL_FOLLOW_LANE:
+        counter_next_terminal = 0;
 
         if (metode_following == 0)
         {
@@ -44,17 +46,6 @@ void Master::process_local_fsm()
 
         if ((current_time - time_start_follow_lane).seconds() > 10)
         {
-            // if (aruco_nearest_marker_id == ARUCO_TERMINAL_1)
-            // {
-            //     local_fsm.resetUptimeTimeout();
-            //     local_fsm.value = FSM_LOCAL_MENUNGGU_STATION_1;
-            // }
-            // else if (aruco_nearest_marker_id == ARUCO_TERMINAL_2)
-            // {
-            //     local_fsm.resetUptimeTimeout();
-            //     local_fsm.value = FSM_LOCAL_MENUNGGU_STATION_2;
-            // }
-
             for (size_t i = 0; i < terminals.terminals.size(); i++)
             {
                 float error_arah_hadap = terminals.terminals[i].target_pose_theta - fb_final_pose_xyo[2];
@@ -68,13 +59,15 @@ void Master::process_local_fsm()
                     float jarak_robot_terminal = pythagoras(fb_final_pose_xyo[0], fb_final_pose_xyo[1], terminals.terminals[i].target_pose_x, terminals.terminals[i].target_pose_y);
                     if (jarak_robot_terminal < terminals.terminals[i].radius_area)
                     {
-                        if (terminals.terminals[i].type == TERMINAL_TYPE_STOP1)
+                        status_klik_terminal_terakhir = terminals.terminals[i].id;
+                        if (terminals.terminals[i].type == TERMINAL_TYPE_STOP1 || status_klik_terminal_terakhir == 0)
                         {
                             local_fsm.resetUptimeTimeout();
                             local_fsm.value = FSM_LOCAL_MENUNGGU_STATION_1;
                             stop_time_s = terminals.terminals[i].stop_time_s;
+                            counter_lap++;
                         }
-                        else if (terminals.terminals[i].type == TERMINAL_TYPE_STOP2)
+                        else if (terminals.terminals[i].type == TERMINAL_TYPE_STOP2 || status_klik_terminal_terakhir == 7)
                         {
                             local_fsm.resetUptimeTimeout();
                             local_fsm.value = FSM_LOCAL_MENUNGGU_STATION_2;
@@ -109,10 +102,31 @@ void Master::process_local_fsm()
         // IN_NEXT_TERMINAL
         if ((fb_beckhoff_digital_input & IN_NEXT_TERMINAL) == IN_NEXT_TERMINAL)
         {
-            local_fsm.value = FSM_LOCAL_PRE_FOLLOW_LANE;
+            counter_next_terminal++;
+            if (counter_next_terminal >= 5000)
+            {
+                counter_next_terminal = 5000;
+            }
+        }
+        else
+        {
+            counter_next_terminal--;
+            if (counter_next_terminal <= 1)
+            {
+                counter_next_terminal = 1;
+            }
+            if (counter_next_terminal > 10000)
+            {
+                counter_next_terminal = 1;
+            }
         }
 
-        // local_fsm.timeout(FSM_LOCAL_PRE_FOLLOW_LANE, stop_time_s);
+        if (counter_next_terminal >= 50 && result_toribay_kiri < toribay_ready_threshold && battery_soc > 30)
+        {
+            local_fsm.value = FSM_LOCAL_PRE_FOLLOW_LANE;
+            counter_next_terminal = 0;
+        }
+
         break;
 
     case FSM_LOCAL_MENUNGGU_STATION_2:
@@ -131,10 +145,31 @@ void Master::process_local_fsm()
 
         if ((fb_beckhoff_digital_input & IN_NEXT_TERMINAL) == IN_NEXT_TERMINAL)
         {
-            local_fsm.value = FSM_LOCAL_PRE_FOLLOW_LANE;
+            counter_next_terminal++;
+            if (counter_next_terminal >= 5000)
+            {
+                counter_next_terminal = 5000;
+            }
+        }
+        else
+        {
+            counter_next_terminal--;
+            if (counter_next_terminal <= 1)
+            {
+                counter_next_terminal = 1;
+            }
+            if (counter_next_terminal > 10000)
+            {
+                counter_next_terminal = 1;
+            }
         }
 
-        // local_fsm.timeout(FSM_LOCAL_PRE_FOLLOW_LANE, stop_time_s);
+        if (counter_next_terminal >= 50 && result_toribay_kanan < toribay_ready_threshold_kanan && battery_soc > 30)
+        {
+            local_fsm.value = FSM_LOCAL_PRE_FOLLOW_LANE;
+            counter_next_terminal = 0;
+        }
+
         break;
 
     case FSM_LOCAL_MENUNGGU_STOP:
@@ -153,10 +188,31 @@ void Master::process_local_fsm()
 
         if ((fb_beckhoff_digital_input & IN_NEXT_TERMINAL) == IN_NEXT_TERMINAL)
         {
-            local_fsm.value = FSM_LOCAL_PRE_FOLLOW_LANE;
+            counter_next_terminal++;
+            if (counter_next_terminal >= 5000)
+            {
+                counter_next_terminal = 5000;
+            }
+        }
+        else
+        {
+            counter_next_terminal--;
+            if (counter_next_terminal <= 1)
+            {
+                counter_next_terminal = 1;
+            }
+            if (counter_next_terminal > 10000)
+            {
+                counter_next_terminal = 1;
+            }
         }
 
-        // local_fsm.timeout(FSM_LOCAL_PRE_FOLLOW_LANE, stop_time_s);
+        if (counter_next_terminal >= 50 && battery_soc > 30)
+        {
+            local_fsm.value = FSM_LOCAL_PRE_FOLLOW_LANE;
+            counter_next_terminal = 0;
+        }
+
         break;
     }
 }
@@ -187,17 +243,6 @@ void Master::process_transmitter()
     msg_transmission_master.data = transmission_joy_master;
     pub_transmission_master->publish(msg_transmission_master);
 
-    tf2::Quaternion q;
-    q.setRPY(0, 0, fb_filtered_final_pose_xyo[2]);
-    nav_msgs::msg::Odometry msg_pose_filtered;
-    msg_pose_filtered.pose.pose.position.x = fb_filtered_final_pose_xyo[0];
-    msg_pose_filtered.pose.pose.position.y = fb_filtered_final_pose_xyo[1];
-    msg_pose_filtered.pose.pose.orientation.x = q.x();
-    msg_pose_filtered.pose.pose.orientation.y = q.y();
-    msg_pose_filtered.pose.pose.orientation.z = q.z();
-    msg_pose_filtered.pose.pose.orientation.w = q.w();
-    pub_pose_filtered->publish(msg_pose_filtered);
-
     std_msgs::msg::UInt8 msg_slam_status;
     msg_slam_status.data = slam_status;
     pub_slam_status->publish(msg_slam_status);
@@ -221,13 +266,52 @@ void Master::process_transmitter()
         pub_terminals->publish(terminals);
     }
 
-    std_msgs::msg::Int16 msg_status_emergency;
-    msg_status_emergency.data = master_status_emergency;
-    pub_master_status_emergency->publish(msg_status_emergency);
+    static uint16_t divider_transmit2ui = 0;
+    if (divider_transmit2ui++ >= 50)
+    {
+        divider_transmit2ui = 0;
 
-    std_msgs::msg::Int16 msg_terminal_terakhir;
-    msg_terminal_terakhir.data = status_klik_terminal_terakhir;
-    pub_master_status_klik_terminal_terakhir->publish(msg_terminal_terakhir);
+        tf2::Quaternion q;
+        q.setRPY(0, 0, fb_final_pose_xyo[2]);
+        nav_msgs::msg::Odometry msg_pose_filtered;
+        msg_pose_filtered.pose.pose.position.x = fb_final_pose_xyo[0];
+        msg_pose_filtered.pose.pose.position.y = fb_final_pose_xyo[1];
+        msg_pose_filtered.pose.pose.orientation.x = q.x();
+        msg_pose_filtered.pose.pose.orientation.y = q.y();
+        msg_pose_filtered.pose.pose.orientation.z = q.z();
+        msg_pose_filtered.pose.pose.orientation.w = q.w();
+        pub_pose_filtered->publish(msg_pose_filtered);
+
+        std_msgs::msg::Int16 msg_status_emergency;
+        msg_status_emergency.data = master_status_emergency;
+        pub_master_status_emergency->publish(msg_status_emergency);
+
+        std_msgs::msg::Int16 msg_terminal_terakhir;
+        msg_terminal_terakhir.data = status_klik_terminal_terakhir;
+        pub_master_status_klik_terminal_terakhir->publish(msg_terminal_terakhir);
+
+        std_msgs::msg::Int16 msg_battery_soc;
+        msg_battery_soc.data = battery_soc;
+        pub_master_battery_soc->publish(msg_battery_soc);
+
+        std_msgs::msg::Int32 msg_counter_lap;
+        msg_counter_lap.data = counter_lap;
+        pub_master_counter_lap->publish(msg_counter_lap);
+    }
+
+    static uint16_t divider_scan_box_pub_counter = 0;
+    if (divider_scan_box_pub_counter++ >= 5)
+    {
+        divider_scan_box_pub_counter = 0;
+
+        std_msgs::msg::Float32MultiArray msg_scan_box;
+        msg_scan_box.data.push_back(camera_scan_min_x_);
+        msg_scan_box.data.push_back(camera_scan_min_y_);
+        msg_scan_box.data.push_back(camera_scan_max_x_);
+        msg_scan_box.data.push_back(camera_scan_max_y_);
+        msg_scan_box.data.push_back(lidar_obs_scan_thr);
+        pub_scan_box->publish(msg_scan_box);
+    }
 }
 
 void Master::process_load_terminals()
@@ -273,6 +357,8 @@ void Master::process_load_terminals()
                 terminal.scan_min_y = std::stof(tokens[14]);
                 terminal.scan_max_y = std::stof(tokens[15]);
                 terminal.obs_threshold = std::stof(tokens[16]);
+
+                logger.info("term: %d || %.2f", terminal.id, terminal.obs_threshold);
 
                 if (transform_map2odom)
                 {

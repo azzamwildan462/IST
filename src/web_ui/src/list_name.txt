@@ -1,0 +1,18 @@
+0 Berangkat: Area jibcrane IST 
+26 Berangkat: Tikungan samping lab 
+24 Berangkat: Jalur 1 lurus depan YOKAI 1
+1 Berangkat: Tikungan samping yokai 1
+3 Berangkat: Jalur 1 lurus samping yokai 1 
+5/6 Berangkat: Jalur 1 Tikungan Bawah tangga 
+11 Berangkat: Jalur 1 lurus setelah bawah tangga 
+15 Berangkat: Jalur 1 tikungan beacukai 
+19 Berangkat: Jalur 1 lurus setelah beacukai 
+23/46 Berangkat: Degasing 
+7 Pulang: Degasing 
+25/47 Pulang: Degasing 
+35 Pulang: Jalur 2 lurus setelah beacukai
+37 Pulang: Jalur 2 Tikungan beacukai 
+38 Pulang: Jalur 2 lurus sebelum beacukai 
+40 Pulang: Jalur 2 tikungan bawah tangga 
+41 Pulang: Jalur 2 lurus samping yokai 1 
+43/48 Pulang: Jalur 2 Tikungan jembatan penyebrangan

@@ -12,21 +12,45 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+
+
 #include "ros_param_backend.h"
+
+
 
 namespace realsense2_camera
 {
-    void ParametersBackend::add_on_set_parameters_callback(ros2_param_callback_type callback)
-    {
-        _ros_callback = _node.add_on_set_parameters_callback(callback);
-    }
 
-    ParametersBackend::~ParametersBackend()
-    {
-        if (_ros_callback)
-        {
-            _node.remove_on_set_parameters_callback((rclcpp::node_interfaces::OnSetParametersCallbackHandle*)(_ros_callback.get()));
-            _ros_callback.reset();
-        }
+
+
+ParametersBackend::ParametersBackend
+(
+    rclcpp::Node& node
+) : _node(node), _logger(node.get_logger())
+{
+    // NOTHING
+}
+
+
+
+ParametersBackend::~ParametersBackend()
+{
+    if (_ros_callback) {
+        _node.remove_on_set_parameters_callback((rclcpp::node_interfaces::OnSetParametersCallbackHandle*)(_ros_callback.get()));
+        _ros_callback.reset();
     }
 }
+
+
+
+void ParametersBackend::add_on_set_parameters_callback
+(
+    ros2_param_callback_type callback
+)
+{
+    _ros_callback = _node.add_on_set_parameters_callback(callback);
+}
+
+
+
+} // !namespace realsense2_camera

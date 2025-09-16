@@ -262,28 +262,11 @@ robotTopic.subscribe(function (message) {
 }
 );
 
-const robotTopic2 = new ROSLIB.Topic({
-    ros: ros,
-    // name: '/lidar_obstacle_filter/icp_estimate',
-    name: '/master/pose_filtered',
-    messageType: 'nav_msgs/Odometry'
-});
-
-robotTopic2.subscribe(function (message) {
-    const x = message.pose.pose.position.x;
-    const y = message.pose.pose.position.y;
-    const q = message.pose.pose.orientation;
-    const theta = Math.atan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y * q.y + q.z * q.z));
-    const radius = 0.35;
-
-    addRobot("1.1.1.1", x, y, theta, radius, 'green');
-}
-);
-
 // const robotTopic2 = new ROSLIB.Topic({
 //     ros: ros,
-//     name: '/slam/localization_pose',
-//     messageType: 'geometry_msgs/PoseWithCovarianceStamped'
+//     // name: '/lidar_obstacle_filter/icp_estimate',
+//     name: '/master/pose_filtered',
+//     messageType: 'nav_msgs/Odometry'
 // });
 
 // robotTopic2.subscribe(function (message) {
@@ -293,11 +276,28 @@ robotTopic2.subscribe(function (message) {
 //     const theta = Math.atan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y * q.y + q.z * q.z));
 //     const radius = 0.35;
 
-//     // console.log("x: " + x + " y: " + y + " theta: " + theta);
-
-//     addRobot("1.1.1.1", x, y, theta, radius, 'Yellow');
+//     addRobot("1.1.1.1", x, y, theta, radius, 'green');
 // }
 // );
+
+const robotTopic2 = new ROSLIB.Topic({
+    ros: ros,
+    name: '/slam/localization_pose',
+    messageType: 'geometry_msgs/PoseWithCovarianceStamped'
+});
+
+robotTopic2.subscribe(function (message) {
+    const x = message.pose.pose.position.x;
+    const y = message.pose.pose.position.y;
+    const q = message.pose.pose.orientation;
+    const theta = Math.atan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y * q.y + q.z * q.z));
+    const radius = 0.35;
+
+    // console.log("x: " + x + " y: " + y + " theta: " + theta);
+
+    addRobot("1.1.1.1", x, y, theta, radius, 'green');
+}
+);
 
 let rtabmap_current_ref_id = 0;
 
@@ -314,7 +314,7 @@ slam_info.subscribe(function (message) {
 
 const lidar_tf_x = 1.378;
 const lidar_tf_y = 0.0;
-const lidar_tf_theta = 0;
+const lidar_tf_theta = 0; // radians
 
 const lidarTopic = new ROSLIB.Topic({
     ros: ros,
@@ -323,47 +323,61 @@ const lidarTopic = new ROSLIB.Topic({
 });
 
 lidarTopic.subscribe(function (message) {
-    // Tunggu ketika rtabmap ready
-    if (robots.length == 0 || rtabmap_current_ref_id == 0) {
-        return;
-    }
+    // Wait until rtabmap/robot ready
+    if (robots.length === 0 || rtabmap_current_ref_id === 0) return;
 
     const ranges = message.ranges;
     const angleIncrement = message.angle_increment;
-    const angleMin = message.angle_min + (robots[0].theta);
+    const angleMin = message.angle_min; // <-- don't add robot theta here
 
-    const rotated_x = lidar_tf_x * Math.cos(robots[0].theta) - lidar_tf_y * Math.sin(robots[0].theta);
-    const rotated_y = lidar_tf_x * Math.sin(robots[0].theta) + lidar_tf_y * Math.cos(robots[0].theta);
+    const xr = robots[0].x;
+    const yr = robots[0].y;
+    const theta_r = robots[0].theta;
+    const cos_r = Math.cos(theta_r);
+    const sin_r = Math.sin(theta_r);
+
+    const theta_L = lidar_tf_theta;
+    const w = stage.width();
+    const h = stage.height();
+    const scale = wtf_skala;
+
+    const cx = w * 0.5 / scale; // world meters corresponding to screen center
+    const cy = h * 0.5 / scale;
 
     const laserPoints = [];
     for (let i = 0; i < ranges.length; i++) {
-        const angle = angleMin + i * angleIncrement;
-        let x = ranges[i] * Math.cos(angle) + robots[0].x + rotated_x;
-        let y = -ranges[i] * Math.sin(angle) + robots[0].y + rotated_y;
+        const r = ranges[i];
+        if (!Number.isFinite(r)) continue; // skip NaN/Inf
 
-        x = x + stage.width() * 0.5 / wtf_skala;
-        y = stage.height() * 0.5 / wtf_skala - y;
+        // 1) laser frame angle, include lidar yaw
+        const a = angleMin + i * angleIncrement + theta_L;
 
-        x = x * wtf_skala;
-        y = y * wtf_skala;
+        // 2) to base frame (rotate by lidar yaw already via +theta_L, then translate)
+        const x_b = r * Math.cos(a) + lidar_tf_x;
+        const y_b = -r * Math.sin(a) + lidar_tf_y;
 
-        laserPoints.push(x, y);
+        // 3) base -> world (rotate by robot yaw, then translate by robot position)
+        const x_w = xr + (x_b * cos_r - y_b * sin_r);
+        const y_w = yr + (x_b * sin_r + y_b * cos_r);
+
+        // 4) world -> screen (center-at-screen, invert y, then scale)
+        const x_screen = (x_w + cx) * scale;
+        const y_screen = (cy - y_w) * scale;
+
+        laserPoints.push(x_screen, y_screen);
     }
 
-    // Clear the shape layer
+    // Draw
     lidarLayer.destroyChildren();
-
-    // Draw the laser scan
     const laserLine = new Konva.Line({
         points: laserPoints,
         stroke: 'red',
-        strokeWidth: 1,
+        strokeWidth: 1
     });
     lidarLayer.add(laserLine);
-
     lidarLayer.draw();
-}
-);
+});
+
 
 const filteredLidarTopic = new ROSLIB.Topic({
     ros: ros,
@@ -890,6 +904,16 @@ sub_icp_score.subscribe(function (message) {
     icp_score.innerHTML = "ICP Score: " + message.data.toFixed(2);
 });
 
+const obs_score = document.getElementById('obs-score');
+var sub_obs_score = new ROSLIB.Topic({
+    ros: ros,
+    name: "/all_obstacle_filter/result_all_obstacle",
+    messageType: "std_msgs/Float32MultiArray",
+});
+
+sub_obs_score.subscribe(function (message) {
+    obs_score.innerHTML = "Obs Score (Kiri, kanan, kamera, tbkiri, tbkanan): " + message.data[0].toFixed(2) + " " + message.data[1].toFixed(2) + " " + message.data[2].toFixed(2) + " " + message.data[3].toFixed(2) + " " + message.data[4].toFixed(2) + " " + message.data[5].toFixed(2) + " " + message.data[6].toFixed(2);
+});
 
 
 

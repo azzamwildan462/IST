@@ -12,34 +12,43 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+
+
 #pragma once
+
+
 
 #include <rclcpp/rclcpp.hpp>
 
+
+
 namespace realsense2_camera
 {
-    class ParametersBackend
-    {
-        public:
-            ParametersBackend(rclcpp::Node& node) : 
-                _node(node),
-                _logger(node.get_logger())
-                {}
-            ~ParametersBackend();
 
 
-            #if defined( RCLCPP_HAS_OnSetParametersCallbackType )
-                using ros2_param_callback_type = rclcpp::node_interfaces::NodeParametersInterface::OnSetParametersCallbackType;
-            #else
-                using ros2_param_callback_type = rclcpp::node_interfaces::NodeParametersInterface::OnParametersSetCallbackType;
-            #endif
 
-            void add_on_set_parameters_callback(ros2_param_callback_type callback);
+class ParametersBackend
+{
+public:
+    ParametersBackend(rclcpp::Node& node);
+    ~ParametersBackend();
+
+public:
+    #if defined(RCLCPP_HAS_OnSetParametersCallbackType)
+        using ros2_param_callback_type = rclcpp::node_interfaces::NodeParametersInterface::OnSetParametersCallbackType;
+    #else
+        using ros2_param_callback_type = rclcpp::node_interfaces::NodeParametersInterface::OnParametersSetCallbackType;
+    #endif
+
+public:
+    void add_on_set_parameters_callback(ros2_param_callback_type callback);
+
+private:
+    rclcpp::Node& _node;
+    rclcpp::Logger _logger;
+    std::shared_ptr<void> _ros_callback;
+}; // !class ParametersBackend
 
 
-        private:
-            rclcpp::Node& _node;
-            rclcpp::Logger _logger;
-            std::shared_ptr<void> _ros_callback;
-    };
-}
+
+} // !namespace realsense2_camera

@@ -34,6 +34,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Point the forms at Flask endpoints
     document.getElementById('formA').action = `http://${HOST}:${PORT}/uploadA`;
     document.getElementById('formB').action = `http://${HOST}:${PORT}/uploadB`;
+    document.getElementById('formC').action = `http://${HOST}:${PORT}/uploadC`;
 
     document.querySelectorAll('.file-input').forEach((input) => {
         const nameSpan = input.closest('.file').querySelector('.file-name');

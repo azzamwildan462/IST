@@ -28,6 +28,8 @@
 #include <pcl/common/transforms.h>
 #include <Eigen/Geometry> // for Affine3f, AngleAxisf
 
+#include <yaml-cpp/yaml.h>
+
 class LidarObstacleFilter : public rclcpp::Node
 {
 public:
@@ -62,6 +64,7 @@ public:
     bool tf_is_initialized = false;
 
     std::string pgm_path_;
+    std::string yaml_path_;
     double resolution_, origin_x_, origin_y_;
     double scan_min_y_, scan_max_y_, obstacle_tolerance_;
     double scan_range_;
@@ -69,6 +72,8 @@ public:
     float final_pose_x, final_pose_y, final_pose_theta;
     float odom_x, odom_y, odom_theta;
     float obs_find = 0;
+
+    float icp_max_range = 10.0;
 
     pcl::PointXYZ point_batas_kiri_bawah;  // Kirinya mobil
     pcl::PointXYZ point_batas_kanan_bawah; // Kanannya mobil
@@ -94,6 +99,7 @@ public:
 
         // Declare parameters
         declare_parameter<std::string>("pgm_path", "map.pgm");
+        declare_parameter<std::string>("yaml_path", "");
         declare_parameter<double>("resolution", 0.05);
         declare_parameter<double>("origin_x", 0.0);
         declare_parameter<double>("origin_y", 0.0);
@@ -101,8 +107,10 @@ public:
         declare_parameter<double>("scan_max_y", 0.5);
         declare_parameter<double>("scan_range", 5.0);
         declare_parameter<double>("obstacle_error_tolerance", 0.4);
+        declare_parameter<double>("icp_max_range", 10.0);
 
         get_parameter("pgm_path", pgm_path_);
+        get_parameter("yaml_path", yaml_path_);
         get_parameter("resolution", resolution_);
         get_parameter("origin_x", origin_x_);
         get_parameter("origin_y", origin_y_);
@@ -110,6 +118,30 @@ public:
         get_parameter("scan_max_y", scan_max_y_);
         get_parameter("scan_range", scan_range_);
         get_parameter("obstacle_error_tolerance", obstacle_tolerance_);
+        get_parameter("icp_max_range", icp_max_range);
+
+        if (yaml_path_ != "")
+        {
+            try
+            {
+                YAML::Node config = YAML::LoadFile(yaml_path_);
+                if (config["resolution"])
+                    resolution_ = config["resolution"].as<double>();
+                if (config["origin"])
+                {
+                    auto origin = config["origin"].as<std::vector<double>>();
+                    if (origin.size() >= 2)
+                    {
+                        origin_x_ = origin[0];
+                        origin_y_ = origin[1];
+                    }
+                }
+            }
+            catch (const std::exception &e)
+            {
+                RCLCPP_ERROR(this->get_logger(), "Failed to load YAML file: %s", e.what());
+            }
+        }
 
         tf_camera_map_buffer = std::make_unique<tf2_ros::Buffer>(this->get_clock());
         tf_camera_map_listener = std::make_unique<tf2_ros::TransformListener>(*tf_camera_map_buffer);
@@ -158,7 +190,7 @@ public:
         //     std::bind(&LidarObstacleFilter::callback_sub_camera_pcl, this, std::placeholders::_1), sub_camera_opts);
 
         load_map_pointcloud();
-        logger.info("LidarObstacleFilter node initialized");
+        logger.info("LidarObstacleFilter node initialized %.2f %.2f %.2f", resolution_, origin_x_, origin_y_);
     }
 
     // Update internal ROI values
@@ -272,6 +304,14 @@ public:
 
     void callback_scan(const sensor_msgs::msg::LaserScan::SharedPtr msg)
     {
+        static uint16_t counter_pembagi = 1;
+        if (counter_pembagi++ <= 4)
+        {
+            (void)msg;
+            return;
+        }
+        counter_pembagi = 1;
+
         sensor_msgs::msg::PointCloud2 cloud_msg;
         try
         {

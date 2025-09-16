@@ -21,6 +21,7 @@ set(var_dependencies
     pcl_conversions
     pcl_ros
     tf2_eigen
+    rtabmap_msgs
     )
     
 foreach(var_dependency ${var_dependencies})

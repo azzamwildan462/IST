@@ -2,7 +2,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 # Load waypoints
-filename = "wp_2_jalur.csv"
+# filename = "wp_2_jalurbenar_1.csv"
+filename = "wp_bagus.csv"
 df = pd.read_csv(filename)
 undo_stack = []
 

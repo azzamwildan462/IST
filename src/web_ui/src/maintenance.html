@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Web UI</title>
+    <link rel="stylesheet" href="./bulma.min.css">
+    <link rel="stylesheet" href="./index.css">
+    <script src="./eventemitter2.min.js"></script>
+    <script src="./roslib.min.js"></script>
+    <script src="./three.min.js"></script>
+    <script src="./ros3d.min.js"></script>
+    <script src="./anime.min.js"></script>
+    <script src="./konva.min.js"></script>
+
+    <style>
+        .hidden {
+            display: none;
+        }
+
+        .gyro-circle0 {
+            fill: none;
+            stroke-width: 10;
+            transform-origin: center;
+            transform: rotate(135deg);
+            /* Rotate to start at top left */
+        }
+
+        .gyro-circle1 {
+            fill: none;
+            stroke-width: 10;
+            transform-origin: center;
+            transform: rotate(135deg);
+            /* Rotate to start at top left */
+        }
+    </style>
+</head>
+
+<body>
+    <nav class="navbar" role="navigation" aria-label="main navigation">
+        <div class="navbar-brand">
+            <a class="navbar-item" href="https://bulma.io">
+                <svg width="640" height="160" viewBox="0 0 640 160" fill="none" xmlns="http://www.w3.org/2000/svg"
+                    class="navbar-svgs">
+                    <path stroke="#3498db" stroke-width="10" fill="none"
+                        d="M10,150 L100,150 L120,40 L140,150 L130,95 L110,95 L109,100 L135,100" fill="red"
+                        class="bd-svg-black" />
+                    <!-- A -->
+                    <path stroke="#3498db" stroke-width="10" fill="none" d="M140,150 L160,40 L180,150 L200,40 L400,40"
+                        fill="red" class="bd-svg-black" /> <!-- W -->
+                </svg>
+            </a>
+
+            <a role="button" class="navbar-burger" aria-label="menu" aria-expanded="false"
+                data-target="navbarBasicExample">
+                <span aria-hidden="true"></span>
+                <span aria-hidden="true"></span>
+                <span aria-hidden="true"></span>
+                <span aria-hidden="true"></span>
+            </a>
+        </div>
+
+        <div id="navbarBasicExample" class="navbar-menu">
+            <div class="navbar-start">
+                <a class="navbar-item" href="./index.html">
+                    Home
+                </a>
+                <a class="navbar-item" href="./maintenance.html">
+                    Maintenance
+                </a>
+                <a class="navbar-item" href="./ROS_if.html">
+                    ROS Interface
+                </a>
+                <a class="navbar-item" href="./ROS_if_imv.html">
+                    ROS Image Viewer
+                </a>
+                <a class="navbar-item" href="./slam.html">
+                    SLAM
+                </a>
+                <a class="navbar-item" href="./upload.html">
+                    Konfigurasi
+                </a>
+            </div>
+        </div>
+    </nav>
+    <br>
+
+    <!-- Lidar bawah, ditata obstacle didepannya ada atau tidak
+    Kamera, buat gambar kotak per 1 meter kayak di mobil
+    Lidar kiri, ditutupin nanti masuk apa enggak
+    Lidar kanan, ditutupin nanti masuk apa enggak
+    Gyro, towing diputar hadap kiri dan kanan sampai target derajat
+
+    Transmisi dirubah F-N-R
+    Steer diputer ke kiri dan ke kanan sampek target derajat
+    Throttle gas di injak sampai target kecepatan
+    Brake di injak sampai nyentuh 2 LS -->
+
+
+
+    <div class="container is-fluid">
+        <div id="maintenance">
+            <div class="box maintenance-step" data-step="1"
+                style="max-width: 600px; margin: 0 auto; position: relative; text-align: center;">
+                <h2 class="subtitle">Lidar Bawah</h2>
+
+                <p>
+                    Pastikan Balok pada ketinggian 20 cm terlihat oleh LIDAR Bawah. Pastikan balok dengan ketinggian 15
+                    cm tidak terlihat oleh LIDAR Bawah.
+                </p>
+
+                <!-- Connection status -->
+                <p id="lidar-status" class="has-text-grey is-size-7">Connecting to LIDAR...</p>
+
+                <!-- Viewer area -->
+                <div class="has-text-centered">
+                    <div id="lidarView"
+                        style="display:inline-block; width:560px; height:320px; border:1px solid #eee; border-radius:8px;">
+                    </div>
+                </div>
+
+                <div style="display: flex; justify-content: flex-end; margin-top: 1rem;">
+                    <button class="button is-primary next-btn">Next</button>
+                </div>
+            </div>
+
+            <div class="box maintenance-step hidden" data-step="2"
+                style="max-width: 600px; margin: 0 auto; position: relative; text-align: center;">
+                <h2 class="subtitle">Kamera</h2>
+
+                <div style="position:relative; display:inline-block;">
+                    <!-- web_video_server stream -->
+                    <img id="cam" src="" alt="camera view" style="display:block; width:640px; height:360px;">
+                    <!-- overlay canvas (same size as displayed image) -->
+                    <canvas id="overlay" width="640" height="360" style="position:absolute; left:0; top:0;"></canvas>
+                </div>
+
+                <div style="display: flex; justify-content: flex-end; margin-top: 1rem;">
+                    <button class="button is-primary next-btn">Next</button>
+                </div>
+            </div>
+
+            <div class="box maintenance-step hidden" data-step="3"
+                style="max-width: 600px; margin: 0 auto; position: relative; text-align: center;">
+                <h2 class="subtitle">Lidar Samping</h2>
+
+                <p>
+                    Pastikan Berbunyi jika ditutupi oleh tangan.
+                </p>
+
+                <div style="display: flex; justify-content: flex-end; margin-top: 1rem;">
+                    <button class="button is-primary next-btn">Next</button>
+                </div>
+            </div>
+
+
+            <div class="box maintenance-step hidden" data-step="4"
+                style="max-width: 600px; margin: 0 auto; position: relative; text-align: center;">
+                <h2 class="subtitle">Steering</h2>
+
+                <p>
+                    Pastikan Data kemudi berubah jika kemudi diputar ke kiri atau ke kanan.
+                </p>
+
+                <svg>
+                    <circle class="steering-circle0" cx="50" cy="50" r="40" stroke="#e0e0e0"></circle>
+                    <circle class="steering-circle1" cx="50" cy="50" r="40" stroke="#4caf50"></circle>
+                    <text x="52" y="52" id="steering-text">0 deg</text>
+                </svg>
+
+                <div style="display: flex; justify-content: flex-end; margin-top: 1rem;">
+                    <button class="button is-primary next-btn">Next</button>
+                </div>
+            </div>
+
+            <div class="box maintenance-step hidden" data-step="5"
+                style="max-width: 600px; margin: 0 auto; position: relative; text-align: center;">
+                <h2 class="subtitle">Gas</h2>
+
+                <p>
+                    Pastikan Target kecepatan berubah ketika pedal gas diinjak.
+                </p>
+
+                <div style="display: flex; justify-content: flex-end; margin-top: 1rem;">
+                    <button class="button is-primary next-btn">Next</button>
+                </div>
+            </div>
+
+            <!-- <div class="box maintenance-step hidden" data-step="6"
+                style="max-width: 600px; margin: 0 auto; position: relative; text-align: center;">
+                <h2 class="subtitle">Rem</h2>
+
+                <p>
+                    Pastikan Rem aktif dengan klik tombol
+                </p>
+
+                <div style="display: flex; justify-content: flex-end; margin-top: 1rem;">
+                    <button class="button is-primary next-btn">Next</button>
+                </div>
+            </div> -->
+
+            <div class="box maintenance-step hidden" data-step="6"
+                style="max-width: 600px; margin: 0 auto; position: relative; text-align: center;">
+                <h2 class="subtitle">Gyroscope</h2>
+
+                <p>
+                    Putar towing ke kiri 30 derajat, lalu ke kanan 30 derajat.
+                </p>
+
+                <svg>
+                    <circle class="gyro-circle0" cx="50" cy="50" r="40" stroke="#e0e0e0"></circle>
+                    <circle class="gyro-circle1" cx="50" cy="50" r="40" stroke="#4caf50"></circle>
+                    <text x="52" y="52" id="gyro-text">0 deg</text>
+                </svg>
+
+                <div style="display: flex; justify-content: flex-end; margin-top: 1rem;">
+                    <button class="button is-primary next-btn">Next</button>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+    <script>
+        document.querySelectorAll(".next-btn").forEach(btn => {
+            // btn.disabled = true;
+            btn.addEventListener("click", function () {
+                let currentBox = this.closest(".maintenance-step");
+                let currentStep = parseInt(currentBox.dataset.step);
+                let nextBox = document.querySelector(`.maintenance-step[data-step="${currentStep + 1}"]`);
+
+                // ✅ sembunyikan box sekarang
+                currentBox.classList.add("hidden");
+
+                // ✅ tampilkan box berikutnya
+                if (nextBox) {
+                    nextBox.classList.remove("hidden");
+                    nextBox.scrollIntoView({ behavior: "smooth" });
+                }
+
+                this.disabled = true; // disable button setelah dipakai
+            });
+
+        });
+    </script>
+
+    <script type="text/javascript" src="maintenance.js">
+    </script>
+</body>
+
+</html>

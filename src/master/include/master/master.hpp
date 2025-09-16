@@ -19,6 +19,7 @@
 #include "std_msgs/msg/bool.hpp"
 #include "std_msgs/msg/float32.hpp"
 #include "std_msgs/msg/float32_multi_array.hpp"
+#include "std_msgs/msg/int32.hpp"
 #include "std_msgs/msg/int16.hpp"
 #include "std_msgs/msg/int8.hpp"
 #include "std_msgs/msg/u_int16.hpp"
@@ -107,6 +108,8 @@
 #define EMERGENCY_ICP_SCORE_TERLALU_BESAR 0b10000
 #define EMERGENCY_ICP_TRANSLATE_TERLALU_BESAR 0b100000
 #define EMERGENCY_STOP_KARENA_OBSTACLE 0b1000000
+#define EMERGENCY_ALL_LIDAR_DETECTED 0b10000000
+#define EMERGENCY_GANDENGAN_LEPAS 0b100000000
 #define STATUS_TOWING_CONNECTED 0b01
 
 // using namespace std::chrono_literals;
@@ -146,6 +149,9 @@ public:
     rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr pub_camera_obs_emergency;
     rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr pub_master_status_emergency;
     rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr pub_master_status_klik_terminal_terakhir;
+    rclcpp::Publisher<std_msgs::msg::Float32MultiArray>::SharedPtr pub_scan_box;
+    rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr pub_master_battery_soc;
+    rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr pub_master_counter_lap;
 
     rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr sub_CAN_eps_encoder;
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr sub_beckhoff_sensor;
@@ -161,6 +167,7 @@ public:
     rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_error_code_can;
     rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_error_code_lane_detection;
     rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_error_code_aruco_detection;
+    rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_can_battery;
     rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr sub_joy;
     rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr sub_encoder_meter;
     rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr sub_key_pressed;
@@ -179,6 +186,7 @@ public:
     rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr sub_detected_forklift_contour;
     rclcpp::Subscription<std_msgs::msg::Int8>::SharedPtr sub_detected_forklift;
     rclcpp::Subscription<std_msgs::msg::UInt8>::SharedPtr sub_gyro_counter;
+    rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr sub_all_obstacle_filter;
 
     rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr srv_set_record_route_mode;
     rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr srv_set_terminal; // Aktif -> add terminal, InActive -> save terminal
@@ -211,10 +219,12 @@ public:
     float timeout_terminal_1 = 10;
     float timeout_terminal_2 = 10;
     bool transform_map2odom = false;
-    float toribay_ready_threshold = 0.5;
+    float toribay_ready_threshold = 100.5;
+    float toribay_ready_threshold_kanan = 100.5;
     bool use_filtered_pose = false;
     float threshold_icp_score = 100.0;
     bool debug_motion = false;
+    float thresh_toribay_real_detected = 10.0;
 
     std::vector<double> complementary_terms = {0.30, 0.03, 0.01, 0.9};
 
@@ -302,12 +312,13 @@ public:
     tf2::Transform manual_map2odom_tf;
     bool is_toribay_ready = false;
     float lidar_obs_scan_thr = 1.5;
+    float all_obstacle_thr = 50000;
 
     geometry_msgs::msg::TransformStamped tf_lidar_base;
     std::unique_ptr<tf2_ros::Buffer> tf_lidar_base_buffer;
     std::unique_ptr<tf2_ros::TransformListener> tf_lidar_base_listener;
 
-    float camera_scan_min_x_, camera_scan_max_x_, camera_scan_min_y_, camera_scan_max_y_;
+    float camera_scan_min_x_, camera_scan_max_x_, camera_scan_min_y_, camera_scan_max_y_; // INI UNTUK ALL OBSTACLE FILTER JUGA
     int camera_scan_obs_result = 0;
 
     uint8_t slam_status = 0;
@@ -328,6 +339,17 @@ public:
 
     int16_t master_status_emergency = 0;
     int16_t status_klik_terminal_terakhir = -1;
+
+    float result_lidar_kanan = 0.0;
+    float result_lidar_kiri = 0.0;
+    float result_camera = 0.0;
+    float result_toribay_kanan = 0.0;
+    float result_toribay_kiri = 0.0;
+    float result_toribay_real_wtf_kiri = 0.0;
+    float result_toribay_real_wtf_kanan = 0.0;
+
+    int16_t battery_soc = 0; // State of Charge dari Battery
+    int32_t counter_lap = 0;
 
     Master();
     ~Master();
@@ -355,6 +377,7 @@ public:
     void callback_sub_ui_control_btn(const std_msgs::msg::UInt16::SharedPtr msg);
     void callback_sub_ui_control_velocity_and_steering(const std_msgs::msg::Float32MultiArray::SharedPtr msg);
     void callback_sub_aruco_nearest_marker_id(const std_msgs::msg::Int16::SharedPtr msg);
+    void callback_sub_can_battery(const std_msgs::msg::Int16::SharedPtr msg);
     void callback_sub_CAN_eps_mode_fb(const std_msgs::msg::UInt8::SharedPtr msg);
     void callback_sub_beckhoff_digital_input(const std_msgs::msg::UInt8MultiArray::SharedPtr msg);
     void callback_sub_lidar_depan_scan(const sensor_msgs::msg::LaserScan::SharedPtr msg);
@@ -367,6 +390,7 @@ public:
     void callback_sub_detected_forklift_contour(const std_msgs::msg::Float32::SharedPtr msg);
     void callback_sub_detected_forklift(const std_msgs::msg::Int8::SharedPtr msg);
     void callback_sub_gyro_counter(const std_msgs::msg::UInt8::SharedPtr msg);
+    void callback_sub_all_obstacle_filter(const std_msgs::msg::Float32MultiArray::SharedPtr msg);
     void callback_srv_set_record_route_mode(const std_srvs::srv::SetBool::Request::SharedPtr request, std_srvs::srv::SetBool::Response::SharedPtr response);
     void callback_srv_set_terminal(const std_srvs::srv::SetBool::Request::SharedPtr request, std_srvs::srv::SetBool::Response::SharedPtr response);
     void callback_srv_rm_terminal(const std_srvs::srv::SetBool::Request::SharedPtr request, std_srvs::srv::SetBool::Response::SharedPtr response);

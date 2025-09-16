@@ -12,19 +12,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+
+
 #pragma once
+
+
 
 #include <librealsense2/rs.hpp> // Include RealSense Cross Platform API
 
+
+
 #if defined (ACCELERATE_GPU_WITH_GLSL)
+
+
 
 #define GL_SILENCE_DEPRECATION
 #define GLFW_INCLUDE_GLU
+
+#include <iostream>
 #include <GLFW/glfw3.h>
 #include <GL/gl.h>
-#include <iostream>
-
 #include <librealsense2-gl/rs_processing_gl.hpp> // Include GPU-Processing API
+
 
 
 #ifndef PI
@@ -33,12 +42,16 @@
 #endif
 
 
+
 class GLwindow
 {
 public:
-
-    GLwindow(int width, int height, const char* title)
-        : _width(width), _height(height)
+    GLwindow
+    (
+        int width, 
+        int height, 
+        const char* title
+    ) : _width(width), _height(height)
     {
         glfwInit();
         glfwWindowHint(GLFW_VISIBLE, 0);
@@ -48,7 +61,6 @@ public:
         glfwMakeContextCurrent(win);
 
         glfwSetWindowUserPointer(win, this);
-
     }
 
     ~GLwindow()
@@ -57,13 +69,21 @@ public:
         glfwTerminate();
     }
 
+public:
     void close()
     {
         glfwSetWindowShouldClose(win, 1);
     }
 
-    float width() const { return float(_width); }
-    float height() const { return float(_height); }
+    float width() const 
+    { 
+        return float(_width); 
+    }
+
+    float height() const 
+    { 
+        return float(_height); 
+    }
 
     operator bool()
     {
@@ -74,11 +94,16 @@ public:
         return res;
     }
 
-    operator GLFWwindow* () { return win; }
+    operator GLFWwindow* () 
+    {
+        return win; 
+    }
 
 private:
     GLFWwindow* win;
     int _width, _height;
-};
+}; // !class GLwindow
 
-#endif
+
+
+#endif // !defined (ACCELERATE_GPU_WITH_GLSL)
