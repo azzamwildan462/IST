@@ -101,16 +101,7 @@
         <div id="maintenance">
             <div class="box maintenance-step" data-step="1"
                 style="max-width: 600px; margin: 0 auto; position: relative; text-align: center;">
-                <h2 class="subtitle">Lidar Bawah</h2>
-
-                <p>
-                    Pastikan Balok pada ketinggian 20 cm terlihat oleh LIDAR Bawah. Pastikan balok dengan ketinggian 15
-                    cm tidak terlihat oleh LIDAR Bawah.
-                </p>
-
-                <!-- Connection status -->
-                <p id="lidar-status" class="has-text-grey is-size-7">Connecting to LIDAR...</p>
-
+                <h2 class="subtitle">LIDAR Bawah</h2>
                 <!-- Viewer area -->
                 <div class="has-text-centered">
                     <div id="lidarView"
@@ -118,8 +109,38 @@
                     </div>
                 </div>
 
+                <!-- Connection status -->
+                <p id="lidar-status" class="has-text-grey is-size-7">Connecting to LIDAR...</p>
+
+                <div class="comment-box">
+                    <p>✅ Pastikan titik LIDAR mengenai balok pada zona <span class="green">hijau</span></p>
+                    <p>❌ Pastikan titik LIDAR tidak mengenai balok pada zona <span class="red">merah</span></p>
+                    <p>👉 Kalibrasi dapat dilakukan dengan menyesuaikan <b>ketinggian</b> LIDAR atau <b>pitch</b> LIDAR.
+                    </p>
+
+                    <br>
+
+                    <div class="result-choice">
+                        <label>
+                            <input type="radio" name="hasil1" value="pass"> Berhasil
+                        </label>
+                        <label>
+                            <input type="radio" name="hasil1" value="fail"> Gagal
+                        </label>
+                    </div>
+                </div>
+
+
+                <div class="comment-form" style="display: none;">
+                    <form>
+                        <label for="komentar">Komentar</label>
+                        <textarea class="komentar" name="komentar1" rows="4"
+                            placeholder="Tuliskan komentar..."></textarea>
+                    </form>
+                </div>
+
                 <div style="display: flex; justify-content: flex-end; margin-top: 1rem;">
-                    <button class="button is-primary next-btn">Next</button>
+                    <button id="btn-next" class="btn-next" disabled>Lanjut</button>
                 </div>
             </div>
 
@@ -134,8 +155,34 @@
                     <canvas id="overlay" width="640" height="360" style="position:absolute; left:0; top:0;"></canvas>
                 </div>
 
+                <div class="comment-box">
+                    <p>✅ Pastikan box overlay pada frame kamera <b>tepat menutupi kalibrator</b>.</p>
+                    <p>❌ Jika tidak maka posisi kamera <b>salah</b>.</p>
+                    <p>👉 Kalibrasi dapat dilakukan dengan menyesuaikan <b>ketinggian, pitch, atau yaw</b> kamera.</p>
+                    </p>
+
+                    <br>
+
+                    <div class="result-choice">
+                        <label>
+                            <input type="radio" name="hasil2" value="pass"> Berhasil
+                        </label>
+                        <label>
+                            <input type="radio" name="hasil2" value="fail"> Gagal
+                        </label>
+                    </div>
+                </div>
+
+                <div class="comment-form" style="display: none;">
+                    <form>
+                        <label for="komentar">Komentar</label>
+                        <textarea class="komentar" name="komentar2" rows="4"
+                            placeholder="Tuliskan komentar..."></textarea>
+                    </form>
+                </div>
+
                 <div style="display: flex; justify-content: flex-end; margin-top: 1rem;">
-                    <button class="button is-primary next-btn">Next</button>
+                    <button id="btn-next" class="btn-next" disabled>Lanjut</button>
                 </div>
             </div>
 
@@ -143,12 +190,33 @@
                 style="max-width: 600px; margin: 0 auto; position: relative; text-align: center;">
                 <h2 class="subtitle">Lidar Samping</h2>
 
-                <p>
-                    Pastikan Berbunyi jika ditutupi oleh tangan.
-                </p>
+                <div class="comment-box">
+                    <p>✅ Pastikan alarm <b>berbunyi</b> ketika terhalang object.</p>
+                    <p>❌ Jika tidak maka ada masalah pada sistem.</p>
+                    <p>👉 Periksa koneksi dan restart towing</p>
+
+                    <br>
+
+                    <div class="result-choice">
+                        <label>
+                            <input type="radio" name="hasil3" value="pass"> Berhasil
+                        </label>
+                        <label>
+                            <input type="radio" name="hasil3" value="fail"> Gagal
+                        </label>
+                    </div>
+                </div>
+
+                <div class="comment-form" style="display: none;">
+                    <form>
+                        <label for="komentar">Komentar</label>
+                        <textarea class="komentar" name="komentar3" rows="4"
+                            placeholder="Tuliskan komentar..."></textarea>
+                    </form>
+                </div>
 
                 <div style="display: flex; justify-content: flex-end; margin-top: 1rem;">
-                    <button class="button is-primary next-btn">Next</button>
+                    <button id="btn-next" class="btn-next" disabled>Lanjut</button>
                 </div>
             </div>
 
@@ -157,18 +225,39 @@
                 style="max-width: 600px; margin: 0 auto; position: relative; text-align: center;">
                 <h2 class="subtitle">Steering</h2>
 
-                <p>
-                    Pastikan Data kemudi berubah jika kemudi diputar ke kiri atau ke kanan.
-                </p>
-
                 <svg>
                     <circle class="steering-circle0" cx="50" cy="50" r="40" stroke="#e0e0e0"></circle>
                     <circle class="steering-circle1" cx="50" cy="50" r="40" stroke="#4caf50"></circle>
                     <text x="52" y="52" id="steering-text">0 deg</text>
                 </svg>
 
+                <div class="comment-box">
+                    <p>✅ Pastikan data kemudi <b>berubah</b> jika kemudi diputar ke kiri atau ke kanan.</p>
+                    <p>❌ Jika tidak maka ada masalah pada sistem.</p>
+                    <p>👉 Periksa koneksi dan restart towing</p>
+
+                    <br>
+
+                    <div class="result-choice">
+                        <label>
+                            <input type="radio" name="hasil4" value="pass"> Berhasil
+                        </label>
+                        <label>
+                            <input type="radio" name="hasil4" value="fail"> Gagal
+                        </label>
+                    </div>
+                </div>
+
+                <div class="comment-form" style="display: none;">
+                    <form>
+                        <label for="komentar">Komentar</label>
+                        <textarea class="komentar" name="komentar4" rows="4"
+                            placeholder="Tuliskan komentar..."></textarea>
+                    </form>
+                </div>
+
                 <div style="display: flex; justify-content: flex-end; margin-top: 1rem;">
-                    <button class="button is-primary next-btn">Next</button>
+                    <button id="btn-next" class="btn-next" disabled>Lanjut</button>
                 </div>
             </div>
 
@@ -176,12 +265,41 @@
                 style="max-width: 600px; margin: 0 auto; position: relative; text-align: center;">
                 <h2 class="subtitle">Gas</h2>
 
-                <p>
-                    Pastikan Target kecepatan berubah ketika pedal gas diinjak.
-                </p>
+                <svg>
+                    <circle class="velocity-circle0" cx="50" cy="50" r="40" stroke="#e0e0e0"></circle>
+                    <circle class="velocity-circle1" cx="50" cy="50" r="40" stroke="#4caf50"></circle>
+                    <circle class="velocity-circle2" cx="50" cy="50" r="30" stroke="#cf1f10"></circle>
+                    <text x="52" y="52" id="velocity-text">0%</text>
+                </svg>
+                <p id="velocity-kmph" class="has-text-centered" style="padding-top: 10px;">0 km/h</p>
+
+                <div class="comment-box">
+                    <p>✅ Pastikan target kecepatan <b>berubah</b> ketika pedal gas diinjak.</p>
+                    <p>❌ Jika tidak maka ada masalah pada sistem.</p>
+                    <p>👉 Periksa koneksi dan restart towing</p>
+
+                    <br>
+
+                    <div class="result-choice">
+                        <label>
+                            <input type="radio" name="hasil5" value="pass"> Berhasil
+                        </label>
+                        <label>
+                            <input type="radio" name="hasil5" value="fail"> Gagal
+                        </label>
+                    </div>
+                </div>
+
+                <div class="comment-form" style="display: none;">
+                    <form>
+                        <label for="komentar">Komentar</label>
+                        <textarea class="komentar" name="komentar5" rows="4"
+                            placeholder="Tuliskan komentar..."></textarea>
+                    </form>
+                </div>
 
                 <div style="display: flex; justify-content: flex-end; margin-top: 1rem;">
-                    <button class="button is-primary next-btn">Next</button>
+                    <button id="btn-next" class="btn-next" disabled>Lanjut</button>
                 </div>
             </div>
 
@@ -202,46 +320,126 @@
                 style="max-width: 600px; margin: 0 auto; position: relative; text-align: center;">
                 <h2 class="subtitle">Gyroscope</h2>
 
-                <p>
-                    Putar towing ke kiri 30 derajat, lalu ke kanan 30 derajat.
-                </p>
-
                 <svg>
                     <circle class="gyro-circle0" cx="50" cy="50" r="40" stroke="#e0e0e0"></circle>
                     <circle class="gyro-circle1" cx="50" cy="50" r="40" stroke="#4caf50"></circle>
                     <text x="52" y="52" id="gyro-text">0 deg</text>
                 </svg>
 
+                <div class="comment-box">
+                    <p>✅ Putar towing ke kiri 30 derajat, lalu ke kanan 30 derajat.</p>
+                    <p>❌ Jika tidak maka ada masalah pada sistem.</p>
+                    <p>👉 Periksa koneksi dan restart towing</p>
+
+                    <br>
+
+                    <div class="result-choice">
+                        <label>
+                            <input type="radio" name="hasil6" value="pass"> Berhasil
+                        </label>
+                        <label>
+                            <input type="radio" name="hasil6" value="fail"> Gagal
+                        </label>
+                    </div>
+                </div>
+
+                <div class="comment-form" style="display: none;">
+                    <form>
+                        <label for="komentar">Komentar</label>
+                        <textarea class="komentar" name="komentar6" rows="4"
+                            placeholder="Tuliskan komentar..."></textarea>
+                    </form>
+                </div>
+
                 <div style="display: flex; justify-content: flex-end; margin-top: 1rem;">
-                    <button class="button is-primary next-btn">Next</button>
+                    <button id="btn-next" class="btn-next" disabled>Lanjut</button>
                 </div>
             </div>
 
-        </div>
+            <div class="box maintenance-step hidden" id="ringkasan-box"
+                style="max-width: 600px; margin: 0 auto; position: relative; text-align: center;">
+                <h2 class="subtitle">Hasil Kalibrasi</h2>
+                <div id="ringkasan" style="text-align: left; max-height: 400px; overflow-y: auto;"></div>
+            </div>
 
+        </div>
     </div>
 
     <script>
-        document.querySelectorAll(".next-btn").forEach(btn => {
-            // btn.disabled = true;
-            btn.addEventListener("click", function () {
+        document.querySelectorAll(".maintenance-step").forEach((form, index) => {
+            const radioButtons = form.querySelectorAll('input[type="radio"]');
+            const commentForm = form.querySelector('.comment-form');
+            const nextButton = form.querySelector('.btn-next');
+
+            radioButtons.forEach(radio => {
+                radio.addEventListener('change', function () {
+                    if (this.value === 'pass') {
+                        commentForm.style.display = 'none';
+                        nextButton.disabled = false;
+                        nextButton.classList.add("active");
+                        localStorage.setItem(`hasil_${index}`, "✅ Berhasil");
+                        localStorage.setItem(`komentar_${index}`, "");
+                        // console.log(localStorage.getItem(`hasil_${index}`));
+                        // console.log(localStorage.getItem(`komentar_${index}`));
+                    } else {
+                        commentForm.style.display = 'block';
+                        nextButton.disabled = true;
+                        nextButton.classList.remove("active");
+                        localStorage.setItem(`hasil_${index}`, "❌ Gagal");
+                        // console.log(localStorage.getItem(`hasil_${index}`));
+                    }
+                });
+            });
+
+            commentForm.addEventListener('input', function () {
+                const commentText = this.querySelector('.komentar').value.trim();
+                if (commentText.length > 0) {
+                    nextButton.disabled = false;
+                    nextButton.classList.add("active");
+                    localStorage.setItem(`komentar_${index}`, commentText);
+                    // console.log(localStorage.getItem(`komentar_${index}`));
+                } else {
+                    nextButton.disabled = true;
+                    nextButton.classList.remove("active");
+                }
+            });
+
+            nextButton.addEventListener('click', function () {
                 let currentBox = this.closest(".maintenance-step");
                 let currentStep = parseInt(currentBox.dataset.step);
                 let nextBox = document.querySelector(`.maintenance-step[data-step="${currentStep + 1}"]`);
 
-                // ✅ sembunyikan box sekarang
                 currentBox.classList.add("hidden");
 
-                // ✅ tampilkan box berikutnya
                 if (nextBox) {
                     nextBox.classList.remove("hidden");
                     nextBox.scrollIntoView({ behavior: "smooth" });
+                } else {
+                    console.log("Selesai semua langkah.");
+                    tampilkanRingkasan();
+                    document.getElementById("ringkasan-box").classList.remove("hidden");
+                    document.getElementById("ringkasan-box").scrollIntoView({ behavior: "smooth" });
                 }
 
-                this.disabled = true; // disable button setelah dipakai
+                this.disabled = true;
             });
-
         });
+
+        function tampilkanRingkasan() {
+            let hasilHTML = "<ul>";
+            for (let i = 0; i < 6; i++) { // max 6 step
+                const hasil = localStorage.getItem(`hasil_${i}`);
+                // console.log(hasil);
+                if (!hasil) continue;
+                const komentar = localStorage.getItem(`komentar_${i}`);
+                hasilHTML += `<li>
+            <strong>Step ${i + 1}:</strong> ${hasil}
+            ${komentar ? `<br>💬 Komentar: ${komentar}` : ""}
+        </li>`;
+            }
+            hasilHTML += "</ul>";
+            document.getElementById("ringkasan").innerHTML = hasilHTML;
+        }
     </script>
 
     <script type="text/javascript" src="maintenance.js">
