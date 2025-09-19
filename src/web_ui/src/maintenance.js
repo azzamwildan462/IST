@@ -25,6 +25,18 @@ ros.on("close", function () {
     console.log("Connection to WebSocket server closed.");
 });
 
+// SHARED VARIABLES
+// ================================================================
+let shared_steering_feedback = 0;
+let shared_target_steering = 1.0472;
+
+let shared_velocity_feedback = 0;
+let shared_target_velocity = 2;
+
+let shared_gyro_feedback = 0;
+let shared_gyro_target = 0.5236;
+let shared_gyro_offset = 0.1;
+
 // ================================================================
 
 // LIDAR BAWAH
@@ -43,7 +55,8 @@ const viewer = new ROS3D.Viewer({
     background: "#ffffff",
     cameraPose: { x: -2.0, y: 0, z: 0.3 },
     displayGrids: true,
-    displayAxes: false
+    displayAxes: false,
+    preserveDrawingBuffer: true
 });
 
 // ====== Add a grid to the viewer ======
@@ -67,8 +80,6 @@ hidden.position.set(0, 0, 0);
 hidden.scale.set(0.0001, 0.0001, 0.0001);
 hidden.position.set(1000, 1000, 1000);
 viewer.addObject(hidden);
-// ================================================
-
 // ============================================================================================
 // PARAMETER
 const boxWidth = 0.30;
@@ -109,7 +120,7 @@ function addCalibratedBox(x, y) {
     var geo2 = new THREE.BoxGeometry(boxWidth, boxWidth, allowedBoxHeigt);
     var mat2 = new THREE.MeshBasicMaterial({
         color: 0x00ff00,
-        opacity: 0.7,
+        opacity: 0.5,
         transparent: true,
         polygonOffset: true,
         polygonOffsetFactor: 2,
@@ -146,7 +157,22 @@ sphere.position.set(offsetAxisX, 0, 0);
 viewer.scene.add(sphere);
 
 // ============================================================================================
+window.lidarViewer = viewer;
 
+// helper: ubah camera pose saat runtime dan paksa render
+function setLidarCameraPose(x, y, z, lookAtX = 0, lookAtY = 0, lookAtZ = 0) {
+    if (!window.lidarViewer || !window.lidarViewer.camera) return;
+    const cam = window.lidarViewer.camera;
+    cam.position.set(x, y, z);
+    cam.lookAt(new THREE.Vector3(lookAtX, lookAtY, lookAtZ));
+    if (window.lidarViewer.controls) {
+        window.lidarViewer.controls.target.set(lookAtX, lookAtY, lookAtZ);
+        window.lidarViewer.controls.update();
+    }
+    cam.updateProjectionMatrix();
+    try { window.lidarViewer.renderer.render(window.lidarViewer.scene, cam); } catch (e) { console.warn('force render failed', e); }
+}
+window.setLidarCameraPose = setLidarCameraPose;
 // ============================================================================================
 
 // TF client (use a frame that exists; often map/odom/base_link/laser)
@@ -304,24 +330,120 @@ if (img.complete) { syncCanvasToImage(); drawStaticBox(); }
 
 // STEERING 
 // ==============================================================
-function set_steering(selector1, id_text, value1, raw_actuation) {
-    value1 = value1 * -1;
+var sub_master2ui = new ROSLIB.Topic({
+    ros: ros,
+    name: "/master/to_ui",
+    messageType: "std_msgs/Float32MultiArray",
+});
 
+sub_master2ui.subscribe(function (message) {
+    let velocity_actuation = message.data[0];
+    let steering_actuation = message.data[1];
+    let velocity_feedback = message.data[2];
+    let steering_feedback = message.data[3];
+
+    let steering_target_value = shared_target_steering * 135 / 6.28;
+    let steering_current_value = steering_feedback * 135 / 6.28;
+    let steering_current_deg = steering_feedback * 180 / 3.14;
+
+    let velocity_actuation_display = shared_target_velocity * 10 * 3.6;
+    let velocity_feedback_display = velocity_feedback * 10 * 3.6;
+
+    shared_steering_feedback = steering_feedback;
+    shared_velocity_feedback = velocity_feedback;
+
+    if (idx_global.innerText == "4") {
+        set_steering(".steering-circle1", ".steering-circle2", "steering-text", steering_target_value, steering_current_value, steering_current_deg);
+    } else if (idx_global.innerText == "5") {
+        set_velocity(".velocity-circle1", ".velocity-circle2", "velocity-text", velocity_actuation_display, velocity_feedback_display);
+    }
+});
+
+let var_global = document.getElementById("var-global");
+let idx_global = document.getElementById("idx-global");
+
+setInterval(() => {
+    if (idx_global.innerText == "4") {
+        if (shared_steering_feedback >= shared_target_steering) {
+            var_global.setAttribute("class", "steering1");
+            shared_target_steering = -Math.abs(shared_target_steering);
+        }
+        else if (var_global.getAttribute("class") === "steering1" && shared_steering_feedback <= shared_target_steering) {
+            var_global.setAttribute("class", "steering2");
+            shared_target_steering = 0;
+        }
+    } else if (idx_global.innerText == "5") {
+        if (shared_velocity_feedback >= shared_target_velocity) {
+            var_global.setAttribute("class", "velocity1");
+            shared_target_velocity = 0;
+        }
+    } else if (idx_global.innerText == "6") {
+        if (Math.abs(shared_gyro_target - shared_gyro_feedback) < 5 * 3.14 / 180 && shared_gyro_target > 0) {
+            var_global.setAttribute("class", "gyro1");
+            shared_gyro_target = -shared_gyro_target;
+        } else if (Math.abs(shared_gyro_target - shared_gyro_feedback) < 5 * 3.14 / 180 && shared_gyro_target < 0) {
+            var_global.setAttribute("class", "gyro2");
+            shared_gyro_target = 0;
+            shared_gyro_offset = 0;
+        }
+    }
+}, 100);
+
+function set_velocity(selector1, selector2, id_text, value1, value2) {
     if (value1 > 100) value1 = 100;
+    if (value2 > 100) value2 = 100;
 
     const new_value1 = value1 / 100 * 75;
+    const new_value2 = value2 / 100 * 75;
 
     const progressText = document.getElementById(id_text);
+    const velocity_kmph = document.getElementById("velocity-kmph");
     var circle = document.querySelector(selector1);
+    var circle2 = document.querySelector(selector2);
     var length = circle.getTotalLength(); // Get the total length of the circle's path
+    var length2 = circle2.getTotalLength();
 
     circle.style.strokeDasharray = length; // Set the stroke dasharray to the total length of the circle
     circle.style.strokeDashoffset = length - (length * (new_value1 / 100)); // Initially hide the stroke
 
-    circle.style.transform = "rotate(-90deg)"; // Adjust the rotation as needed
-    circle.style.transformOrigin = "50% 50%"; // Ensure rotation is centered
+    circle2.style.strokeDasharray = length2; // Set the stroke dasharray to the total length of the circle
+    circle2.style.strokeDashoffset = length2 - (length2 * (new_value2 / 100)); // Initially hide the stroke
 
-    progressText.textContent = `${raw_actuation.toFixed(2)}`;
+    value1_display = value2 * 0.1;
+    progressText.textContent = `${value1_display.toFixed(2)}`;
+    velocity_kmph.textContent = `${value1_display.toFixed(2)}` + " km/h";
+}
+
+function set_steering(selector1, slector2, id_text, value1, value2, raw_actuation) {
+    value1 = value1 * -1;
+    value2 = value2 * -1;
+
+    if (value1 > 100) value1 = 100;
+    if (value2 > 100) value2 = 100;
+
+    const new_value1 = value1 / 100 * 75;
+    const new_value2 = value2 / 100 * 75;
+
+    const progressText = document.getElementById(id_text);
+    var circle1 = document.querySelector(selector1);
+    var length1 = circle1.getTotalLength(); // Get the total length of the circle's path
+
+    circle1.style.strokeDasharray = length1; // Set the stroke dasharray to the total length of the circle
+    circle1.style.strokeDashoffset = length1 - (length1 * (new_value1 / 100)); // Initially hide the stroke
+
+    circle1.style.transform = "rotate(-90deg)"; // Adjust the rotation as needed
+    circle1.style.transformOrigin = "50% 50%"; // Ensure rotation is centered
+
+    var circle2 = document.querySelector(slector2);
+    var length2 = circle2.getTotalLength(); // Get the total length of the circle's path
+
+    circle2.style.strokeDasharray = length2; // Set the stroke dasharray to the total length of the circle
+    circle2.style.strokeDashoffset = length2 - (length2 * (new_value2 / 100)); // Initially hide the stroke
+
+    circle2.style.transform = "rotate(-90deg)"; // Adjust the rotation as needed
+    circle2.style.transformOrigin = "50% 50%"; // Ensure rotation is centered
+
+    progressText.textContent = `${raw_actuation.toFixed(1)}` + "°";
 }
 
 // GYRO
@@ -342,28 +464,62 @@ gyroSub.subscribe((msg) => {
     let gyro_value = (yaw) * 135 / 6.28;
     let yaw_deg = yaw * 180 / 3.14;
 
-    set_gyro(".gyro-circle1", "gyro-text", gyro_value, yaw_deg);
+    shared_gyro_feedback = yaw;
+
+    if (idx_global.innerText == "6") {
+        set_gyro(".gyro-circle00", ".gyro-circle1", ".gyro-circle2", "gyro-text", shared_gyro_target * 135 / 6.28, gyro_value, yaw_deg, shared_gyro_offset * 135 / 6.28);
+    }
 }
 );
 
-function set_gyro(selector1, id_text, value1, raw_actuation) {
+function set_gyro(selector0, selector1, selector2, id_text, value1, value2, raw_actuation, offset) {
     value1 = value1 * -1;
+    value2 = value2 * -1;
 
     if (value1 > 100) value1 = 100;
+    if (value2 > 100) value2 = 100;
 
-    const new_value1 = value1 / 100 * 75;
+    let new_value0 = value1 / 100 * 75;
+    let new_value1 = value1 / 100 * 75;
+    const new_value2 = value2 / 100 * 75;
+
+    if (value1 > 0) {
+        new_value0 = new_value0 - offset;
+        new_value1 = new_value1 + offset;
+    } else {
+        new_value0 = new_value0 + offset;
+        new_value1 = new_value1 - offset;
+    }
 
     const progressText = document.getElementById(id_text);
-    var circle = document.querySelector(selector1);
-    var length = circle.getTotalLength(); // Get the total length of the circle's path
 
-    circle.style.strokeDasharray = length; // Set the stroke dasharray to the total length of the circle
-    circle.style.strokeDashoffset = length - (length * (new_value1 / 100)); // Initially hide the stroke
+    var circle0 = document.querySelector(selector0);
+    var circle1 = document.querySelector(selector1);
+    var circle2 = document.querySelector(selector2);
 
-    circle.style.transform = "rotate(-90deg)"; // Adjust the rotation as needed
-    circle.style.transformOrigin = "50% 50%"; // Ensure rotation is centered
+    var length0 = circle0.getTotalLength(); // Get the total length of the circle0's path
+    var length1 = circle1.getTotalLength(); // Get the total length of the circle1's path
+    var length2 = circle2.getTotalLength(); // Get the total length of the circle2's path
 
-    progressText.textContent = `${raw_actuation.toFixed(2)}`;
+    circle0.style.strokeDasharray = length0; // Set the stroke dasharray to the total length of the circle0
+    circle0.style.strokeDashoffset = length0 - (length0 * (new_value0 / 100)); // Initially hide the stroke
+
+    circle0.style.transform = "rotate(-90deg)";
+    circle0.style.transformOrigin = "50% 50%"; // Ensure rotation is centered
+
+    circle1.style.strokeDasharray = length1; // Set the stroke dasharray to the total length of the circle1
+    circle1.style.strokeDashoffset = length1 - (length1 * (new_value1 / 100)); // Initially hide the stroke
+
+    circle1.style.transform = "rotate(-90deg)"; // Adjust the rotation as needed
+    circle1.style.transformOrigin = "50% 50%"; // Ensure rotation is centered
+
+    circle2.style.strokeDasharray = length2; // Set the stroke dasharray to the total length of the circle2
+    circle2.style.strokeDashoffset = length2 - (length2 * (new_value2 / 100)); // Initially hide the stroke
+
+    circle2.style.transform = "rotate(-90deg)"; // Adjust the rotation as needed
+    circle2.style.transformOrigin = "50% 50%"; // Ensure rotation is centered
+
+    progressText.textContent = `${raw_actuation.toFixed(1)}` + "°";
 }
 
 class CallibratedBox {
@@ -401,3 +557,53 @@ class CallibratedBox {
         this.viewer.scene.add(wire2);
     }
 }
+
+let steering_test_fb = 0.5;
+let velocity_test_fb = 0.0;
+let gyro_test_fb = 0.0;
+
+setInterval(() => {
+    const steering_test_act = 1;
+    shared_steering_feedback = steering_test_fb;
+
+
+    let steering_target_value = shared_target_steering * 135 / 6.28;
+    let steering_current_value = steering_test_fb * 135 / 6.28;
+    let steering_current_deg = steering_test_fb * 180 / 3.14;
+
+    let velocity_test_act = 0.0;
+    shared_velocity_feedback = velocity_test_fb;
+
+    let velocity_actuation_display = shared_target_velocity * 10 * 3.6;
+    let velocity_feedback_display = velocity_test_fb * 10 * 3.6;
+
+    let gyro_current_value = gyro_test_fb * 135 / 6.28;
+    let gyro_yaw_deg = gyro_test_fb * 180 / 3.14;
+    shared_gyro_feedback = gyro_test_fb;
+
+    let target_steering_value0 = 0.5 * 135 / 6.28;
+    let target_steering_value1 = 0.9 * 135 / 6.28;
+
+    let offset_steering = 0.5 * 135 / 6.28;
+
+    // set_target_steering(".steering-circle-target", target_steering_value0, offset_steering);
+
+    if (idx_global.innerText == "4") {
+        set_steering(".steering-circle1", ".steering-circle2", "steering-text", steering_target_value, steering_current_value, steering_current_deg);
+        if (shared_target_steering > 0) {
+            steering_test_fb += 0.1;
+        }
+        else {
+            steering_test_fb -= 0.1;
+        }
+    } else if (idx_global.innerText == "5") {
+        set_velocity(".velocity-circle1", ".velocity-circle2", "velocity-text", velocity_actuation_display, velocity_feedback_display);
+        velocity_test_fb += 0.1;
+    } else if (idx_global.innerText == "6") {
+        gyro_test_fb += 0.05;
+        set_gyro(".gyro-circle00", ".gyro-circle1", ".gyro-circle2", "gyro-text", shared_gyro_target * 135 / 6.28, gyro_current_value, gyro_yaw_deg, shared_gyro_offset * 135 / 6.28);
+        if (gyro_test_fb > 3.14) {
+            gyro_test_fb -= 6.28;
+        }
+    }
+}, 100);

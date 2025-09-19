@@ -11,7 +11,7 @@
     <script src="./ros3d.min.js"></script>
     <script src="./anime.min.js"></script>
     <script src="./konva.min.js"></script>
-
+    <script src="./html2pdf.bundle.min.js"></script>
     <style>
         .hidden {
             display: none;
@@ -25,12 +25,80 @@
             /* Rotate to start at top left */
         }
 
+        .gyro-circle00 {
+            fill: none;
+            stroke-width: 10;
+            transform-origin: center;
+            transform: rotate(135deg);
+            /* Rotate to start at top left */
+        }
+
         .gyro-circle1 {
             fill: none;
             stroke-width: 10;
             transform-origin: center;
             transform: rotate(135deg);
             /* Rotate to start at top left */
+        }
+
+        .gyro-circle2 {
+            fill: none;
+            stroke-width: 10;
+            transform-origin: center;
+            transform: rotate(135deg);
+            /* Rotate to start at top left */
+        }
+
+        .accordion {
+            border-radius: 6px;
+            border: 1px solid #eee;
+            padding: 0.5rem;
+            text-align: left;
+            margin-bottom: 0.5rem;
+        }
+
+        .accordion-header {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .accordion-title {
+            font-weight: 600;
+        }
+
+        .accordion-status {
+            font-weight: 500;
+            color: #666;
+            margin-left: auto;
+            margin-right: 0.5rem;
+            text-align: right;
+        }
+
+        .chevron svg {
+            width: 14px;
+            height: 14px;
+            display: block;
+            stroke-width: 2;
+            transform-box: fill-box;
+            transform-origin: 50% 50%;
+            transition: transform 180ms cubic-bezier(.4, 0, .2, 1);
+        }
+
+        /* rotasi SVG saat accordion open */
+        .accordion.open .chevron svg {
+            transform: rotate(90deg);
+        }
+
+        .accordion-content {
+            margin-top: 0.5rem;
+            display: none;
+        }
+
+        .accordion.open .accordion-content {
+            display: block;
         }
     </style>
 </head>
@@ -95,7 +163,8 @@
     Throttle gas di injak sampai target kecepatan
     Brake di injak sampai nyentuh 2 LS -->
 
-
+    <div id="var-global"></div>
+    <div id="idx-global"></div>
 
     <div class="container is-fluid">
         <div id="maintenance">
@@ -105,38 +174,43 @@
                 <!-- Viewer area -->
                 <div class="has-text-centered">
                     <div id="lidarView"
-                        style="display:inline-block; width:560px; height:320px; border:1px solid #eee; border-radius:8px;">
+                        style="display:inline-block; width:560px; height:320px; border:1px solid #eee; border-radius:1px;">
+                    </div>
+                    <div style="margin-top:8px;">
+                        <button id="btn-capture-lidar" class="button is-small hidden">Ambil SS LIDAR</button>
                     </div>
                 </div>
 
                 <!-- Connection status -->
                 <p id="lidar-status" class="has-text-grey is-size-7">Connecting to LIDAR...</p>
 
-                <div class="comment-box">
-                    <p>✅ Pastikan titik LIDAR mengenai balok pada zona <span class="green">hijau</span></p>
-                    <p>❌ Pastikan titik LIDAR tidak mengenai balok pada zona <span class="red">merah</span></p>
-                    <p>👉 Kalibrasi dapat dilakukan dengan menyesuaikan <b>ketinggian</b> LIDAR atau <b>pitch</b> LIDAR.
-                    </p>
-
+                <div class="comment-box" style="text-align: justify;">
+                    <p><b>Petunjuk:</b></p>
+                    <ul>
+                        <li>Lakukan kalibrasi dengan mengubah ketinggian dan pitch LIDAR.</li>
+                    </ul>
+                    <br>
+                    <p><b>Catatan:</b></p>
+                    <li><span class="green">Zona hijau</span> : Area di mana balok harus terdeteksi oleh LIDAR.</li>
+                    <li><span class="red">Zona merah</span> : Area di mana balok tidak boleh terdeteksi oleh LIDAR.</li>
                     <br>
 
-                    <div class="result-choice">
+                    <div class="result-choice" style="margin: auto 0;">
                         <label>
-                            <input type="radio" name="hasil1" value="pass"> Berhasil
+                            <input type="radio" name="hasil1" value="sukses"> Berhasil
                         </label>
                         <label>
-                            <input type="radio" name="hasil1" value="fail"> Gagal
+                            <input type="radio" name="hasil1" value="gagal"> Gagal
                         </label>
                     </div>
-                </div>
 
-
-                <div class="comment-form" style="display: none;">
-                    <form>
-                        <label for="komentar">Komentar</label>
-                        <textarea class="komentar" name="komentar1" rows="4"
-                            placeholder="Tuliskan komentar..."></textarea>
-                    </form>
+                    <div class="comment-form" style="display: none;">
+                        <form>
+                            <label for="komentar">Komentar:</label>
+                            <textarea class="komentar" name="komentar1" rows="4"
+                                placeholder="Tuliskan komentar..."></textarea>
+                        </form>
+                    </div>
                 </div>
 
                 <div style="display: flex; justify-content: flex-end; margin-top: 1rem;">
@@ -155,30 +229,32 @@
                     <canvas id="overlay" width="640" height="360" style="position:absolute; left:0; top:0;"></canvas>
                 </div>
 
-                <div class="comment-box">
-                    <p>✅ Pastikan box overlay pada frame kamera <b>tepat menutupi kalibrator</b>.</p>
-                    <p>❌ Jika tidak maka posisi kamera <b>salah</b>.</p>
-                    <p>👉 Kalibrasi dapat dilakukan dengan menyesuaikan <b>ketinggian, pitch, atau yaw</b> kamera.</p>
-                    </p>
-
+                <div class="comment-box" style="text-align: justify;">
+                    <p><b>Petunjuk:</b></p>
+                    <ul>
+                        <li>Lakukan kalibrasi dengan mengubah posisi dan orientasi kamera.</li>
+                    </ul>
+                    <br>
+                    <p><b>Catatan:</b></p>
+                    <p>Hasil kalibrasi yang sesuai adalah garis overlay tepat bersinggungan dengan papan kalibrasi.</p>
                     <br>
 
-                    <div class="result-choice">
+                    <div class="result-choice" style="margin: auto 0;">
                         <label>
-                            <input type="radio" name="hasil2" value="pass"> Berhasil
+                            <input type="radio" name="hasil2" value="sukses"> Berhasil
                         </label>
                         <label>
-                            <input type="radio" name="hasil2" value="fail"> Gagal
+                            <input type="radio" name="hasil2" value="gagal"> Gagal
                         </label>
                     </div>
-                </div>
 
-                <div class="comment-form" style="display: none;">
-                    <form>
-                        <label for="komentar">Komentar</label>
-                        <textarea class="komentar" name="komentar2" rows="4"
-                            placeholder="Tuliskan komentar..."></textarea>
-                    </form>
+                    <div class="comment-form" style="display: none;">
+                        <form>
+                            <label for="komentar">Komentar:</label>
+                            <textarea class="komentar" name="komentar2" rows="4"
+                                placeholder="Tuliskan komentar..."></textarea>
+                        </form>
+                    </div>
                 </div>
 
                 <div style="display: flex; justify-content: flex-end; margin-top: 1rem;">
@@ -188,31 +264,35 @@
 
             <div class="box maintenance-step hidden" data-step="3"
                 style="max-width: 600px; margin: 0 auto; position: relative; text-align: center;">
-                <h2 class="subtitle">Lidar Samping</h2>
+                <h2 class="subtitle">LIDAR Samping</h2>
 
-                <div class="comment-box">
-                    <p>✅ Pastikan alarm <b>berbunyi</b> ketika terhalang object.</p>
-                    <p>❌ Jika tidak maka ada masalah pada sistem.</p>
-                    <p>👉 Periksa koneksi dan restart towing</p>
-
+                <div class="comment-box" style="text-align: justify;">
+                    <p><b>Petunjuk:</b></p>
+                    <ul>
+                        <li>Lakukan pengujian dengan memberikan halangan atau objek dengan jarak 50 cm di kanan atau
+                            kiri kendaraan.</li>
+                    </ul>
+                    <br>
+                    <p><b>Catatan:</b></p>
+                    <p>Hasil pengujian yang sesuai adalah alarm berbunyi ketika LIDAR mendeteksi objek.</p>
                     <br>
 
-                    <div class="result-choice">
+                    <div class="result-choice" style="margin: auto 0;">
                         <label>
-                            <input type="radio" name="hasil3" value="pass"> Berhasil
+                            <input type="radio" name="hasil3" value="sukses"> Berhasil
                         </label>
                         <label>
-                            <input type="radio" name="hasil3" value="fail"> Gagal
+                            <input type="radio" name="hasil3" value="gagal"> Gagal
                         </label>
                     </div>
-                </div>
 
-                <div class="comment-form" style="display: none;">
-                    <form>
-                        <label for="komentar">Komentar</label>
-                        <textarea class="komentar" name="komentar3" rows="4"
-                            placeholder="Tuliskan komentar..."></textarea>
-                    </form>
+                    <div class="comment-form" style="display: none;">
+                        <form>
+                            <label for="komentar">Komentar:</label>
+                            <textarea class="komentar" name="komentar3" rows="4"
+                                placeholder="Tuliskan komentar..."></textarea>
+                        </form>
+                    </div>
                 </div>
 
                 <div style="display: flex; justify-content: flex-end; margin-top: 1rem;">
@@ -228,32 +308,39 @@
                 <svg>
                     <circle class="steering-circle0" cx="50" cy="50" r="40" stroke="#e0e0e0"></circle>
                     <circle class="steering-circle1" cx="50" cy="50" r="40" stroke="#4caf50"></circle>
-                    <text x="52" y="52" id="steering-text">0 deg</text>
+                    <circle class="steering-circle2" cx="50" cy="50" r="30" stroke="#cf1f10"></circle>
+
+                    <text x="52" y="52" id="steering-text">0°</text>
                 </svg>
 
-                <div class="comment-box">
-                    <p>✅ Pastikan data kemudi <b>berubah</b> jika kemudi diputar ke kiri atau ke kanan.</p>
-                    <p>❌ Jika tidak maka ada masalah pada sistem.</p>
-                    <p>👉 Periksa koneksi dan restart towing</p>
-
+                <div class="comment-box" style="text-align: justify;">
+                    <p><b>Petunjuk:</b></p>
+                    <ul>
+                        <li>Lakukan pengujian dengan memutar kemudi sepenuhnya ke kanan lalu ke kiri untuk memastikan
+                            respons sistem.</li>
+                    </ul>
+                    <br>
+                    <p><b>Catatan:</b></p>
+                    <p>Hasil pengujian yang sesuai adalah data kemudi dapat berubah dari rentang minimal (n deg) hingga
+                        maksimal (m deg).</p>
                     <br>
 
-                    <div class="result-choice">
+                    <div class="result-choice" style="margin: auto 0;">
+                        <!-- <label>
+                            <input type="radio" name="hasil4" value="sukses"> Berhasil
+                        </label> -->
                         <label>
-                            <input type="radio" name="hasil4" value="pass"> Berhasil
-                        </label>
-                        <label>
-                            <input type="radio" name="hasil4" value="fail"> Gagal
+                            <input type="radio" name="hasil4" value="gagal"> Gagal
                         </label>
                     </div>
-                </div>
 
-                <div class="comment-form" style="display: none;">
-                    <form>
-                        <label for="komentar">Komentar</label>
-                        <textarea class="komentar" name="komentar4" rows="4"
-                            placeholder="Tuliskan komentar..."></textarea>
-                    </form>
+                    <div class="comment-form" style="display: none;">
+                        <form>
+                            <label for="komentar">Komentar:</label>
+                            <textarea class="komentar" name="komentar4" rows="4"
+                                placeholder="Tuliskan komentar..."></textarea>
+                        </form>
+                    </div>
                 </div>
 
                 <div style="display: flex; justify-content: flex-end; margin-top: 1rem;">
@@ -269,33 +356,40 @@
                     <circle class="velocity-circle0" cx="50" cy="50" r="40" stroke="#e0e0e0"></circle>
                     <circle class="velocity-circle1" cx="50" cy="50" r="40" stroke="#4caf50"></circle>
                     <circle class="velocity-circle2" cx="50" cy="50" r="30" stroke="#cf1f10"></circle>
-                    <text x="52" y="52" id="velocity-text">0%</text>
+                    <text x="52" y="52" id="velocity-text">0</text>
                 </svg>
                 <p id="velocity-kmph" class="has-text-centered" style="padding-top: 10px;">0 km/h</p>
 
-                <div class="comment-box">
-                    <p>✅ Pastikan target kecepatan <b>berubah</b> ketika pedal gas diinjak.</p>
-                    <p>❌ Jika tidak maka ada masalah pada sistem.</p>
-                    <p>👉 Periksa koneksi dan restart towing</p>
-
+                <div class="comment-box" style="text-align: justify;">
+                    <p><b>Petunjuk:</b></p>
+                    <ul>
+                        <li>Lakukan pengujian dengan menginjak pedal gas sehingga dapat merubah nilai target kecepatan
+                            dan feedback kecepatan.</li>
+                    </ul>
+                    <br>
+                    <p><b>Catatan:</b></p>
+                    <li>Hasil pengujian yang sesuai adalah target kecepatan dapat berubah dan diikuti dengan perubahan
+                        feedback kecepatan.</li>
+                    <li><span class="green">Bar hijau</span> : Target kecepatan</li>
+                    <li><span class="red">Bar merah</span> : Feedback kecepatan</li>
                     <br>
 
-                    <div class="result-choice">
+                    <div class="result-choice" style="margin: auto 0;">
+                        <!-- <label>
+                            <input type="radio" name="hasil5" value="sukses"> Berhasil
+                        </label> -->
                         <label>
-                            <input type="radio" name="hasil5" value="pass"> Berhasil
-                        </label>
-                        <label>
-                            <input type="radio" name="hasil5" value="fail"> Gagal
+                            <input type="radio" name="hasil5" value="gagal"> Gagal
                         </label>
                     </div>
-                </div>
 
-                <div class="comment-form" style="display: none;">
-                    <form>
-                        <label for="komentar">Komentar</label>
-                        <textarea class="komentar" name="komentar5" rows="4"
-                            placeholder="Tuliskan komentar..."></textarea>
-                    </form>
+                    <div class="comment-form" style="display: none;">
+                        <form>
+                            <label for="komentar">Komentar:</label>
+                            <textarea class="komentar" name="komentar5" rows="4"
+                                placeholder="Tuliskan komentar..."></textarea>
+                        </form>
+                    </div>
                 </div>
 
                 <div style="display: flex; justify-content: flex-end; margin-top: 1rem;">
@@ -323,32 +417,37 @@
                 <svg>
                     <circle class="gyro-circle0" cx="50" cy="50" r="40" stroke="#e0e0e0"></circle>
                     <circle class="gyro-circle1" cx="50" cy="50" r="40" stroke="#4caf50"></circle>
-                    <text x="52" y="52" id="gyro-text">0 deg</text>
+                    <circle class="gyro-circle00" cx="50" cy="50" r="40" stroke="#e0e0e0"></circle>
+                    <circle class="gyro-circle2" cx="50" cy="50" r="30" stroke="#cf1f10"></circle>
+                    <text x="52" y="52" id="gyro-text">0°</text>
                 </svg>
 
-                <div class="comment-box">
-                    <p>✅ Putar towing ke kiri 30 derajat, lalu ke kanan 30 derajat.</p>
-                    <p>❌ Jika tidak maka ada masalah pada sistem.</p>
-                    <p>👉 Periksa koneksi dan restart towing</p>
-
+                <div class="comment-box" style="text-align: justify;">
+                    <p><b>Petunjuk:</b></p>
+                    <ul>
+                        <li>Lakukan pengujian dengan menggerakkan kendaraan ke 30 derajat ke kanan dan ke kiri.</li>
+                    </ul>
+                    <br>
+                    <p><b>Catatan:</b></p>
+                    <p>Hasil pengujian yang sesuai adalah gyro dapat mendeteksi perubahan sudut dengan akurat.</p>
                     <br>
 
-                    <div class="result-choice">
+                    <div class="result-choice" style="margin: auto 0;">
+                        <!-- <label>
+                            <input type="radio" name="hasil6" value="sukses"> Berhasil
+                        </label> -->
                         <label>
-                            <input type="radio" name="hasil6" value="pass"> Berhasil
-                        </label>
-                        <label>
-                            <input type="radio" name="hasil6" value="fail"> Gagal
+                            <input type="radio" name="hasil6" value="gagal"> Gagal
                         </label>
                     </div>
-                </div>
 
-                <div class="comment-form" style="display: none;">
-                    <form>
-                        <label for="komentar">Komentar</label>
-                        <textarea class="komentar" name="komentar6" rows="4"
-                            placeholder="Tuliskan komentar..."></textarea>
-                    </form>
+                    <div class="comment-form" style="display: none;">
+                        <form>
+                            <label for="komentar">Komentar:</label>
+                            <textarea class="komentar" name="komentar6" rows="4"
+                                placeholder="Tuliskan komentar..."></textarea>
+                        </form>
+                    </div>
                 </div>
 
                 <div style="display: flex; justify-content: flex-end; margin-top: 1rem;">
@@ -356,94 +455,412 @@
                 </div>
             </div>
 
-            <div class="box maintenance-step hidden" id="ringkasan-box"
+            <div class="box maintenance-step hidden" id="ringkasan-box" data-step="7"
                 style="max-width: 600px; margin: 0 auto; position: relative; text-align: center;">
                 <h2 class="subtitle">Hasil Kalibrasi</h2>
-                <div id="ringkasan" style="text-align: left; max-height: 400px; overflow-y: auto;"></div>
+                <img id="ringkasan-image" src="" alt="Hasil Kalibrasi"
+                    style="max-width: 25%; height: auto; display: none; margin: 0 auto;">
+
+                <div class="accordion" id="hasil-lidar-bawah">
+                    <div class="accordion-header" onclick="this.parentElement.classList.toggle('open')">
+                        <span class="accordion-title">LIDAR Bawah</span>
+                        <span class="accordion-status" id="status-1"></span>
+                        <span class="chevron">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </span>
+                    </div>
+                    <div class="accordion-content">
+                        <ul>
+                            <li style="margin-top: 1rem;"><img class="screenshot-img" src="" alt="Screenshot left"
+                                    style="max-width: 100%; height:auto; margin: 0 auto;"></li>
+                            <p id="hasil-lidar1" style="text-align: center;" class="has-text-grey is-size-7">Hasil LIDAR
+                                bawah tampak depan</p>
+
+                            <li style="margin-top: 1rem;"><img class="screenshot-img" src="" alt="Screenshot side"
+                                    style="max-width: 100%; height:auto; margin: 0 auto;"></li>
+                            <p id="hasil-lidar2" style="text-align: center;" class="has-text-grey is-size-7">Hasil LIDAR
+                                bawah tampak samping</p>
+
+                            <li style="margin-top: 1rem;"><img class="screenshot-img" src="" alt="Screenshot top"
+                                    style="max-width: 100%; height:auto; margin: 0 auto;"></li>
+                            <p id="hasil-lidar3" style="text-align: center;" class="has-text-grey is-size-7">Hasil LIDAR
+                                bawah tampak atas</p>
+                            <p class="komentar-display" id="komentar-3" style="margin-top: 1rem; font-style: italic;">
+                            </p>
+                        </ul>
+                    </div>
+                </div>
+                <div class="accordion" id="hasil-kamera">
+                    <div class="accordion-header" onclick="this.parentElement.classList.toggle('open')">
+                        <span class="accordion-title">Kamera</span>
+                        <span class="accordion-status" id="status-2"></span>
+                        <span class="chevron">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </span>
+                    </div>
+                    <div class="accordion-content">
+                        <ul>
+                            <li style="margin-top: 1rem;"><img class="kamera-img" src="" alt="Kamera"
+                                    style="max-width: 100%; height:auto; margin: 0 auto;"></li>
+                            <p id="hasil-kamera" style="text-align: center;" class="has-text-grey is-size-7">Hasil
+                                Kamera</p>
+                            <p class="komentar-display" id="komentar-2" style="margin-top: 1rem; font-style: italic;">
+                        </ul>
+                    </div>
+                </div>
+                <div class="accordion" id="hasil-lidar-samping">
+                    <div class="accordion-header" onclick="this.parentElement.classList.toggle('open')">
+                        <span class="accordion-title">LIDAR Samping</span>
+                        <span class="accordion-status" id="status-3"></span>
+                        <span class="chevron">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </span>
+                    </div>
+                    <div class="accordion-content">
+                        <ul>
+                            <p class="komentar-display" id="komentar-3" style="margin-top: 1rem; font-style: italic;">
+                            </p>
+                        </ul>
+                    </div>
+                </div>
+                <div class="accordion" id="hasil-steering">
+                    <div class="accordion-header" onclick="this.parentElement.classList.toggle('open')">
+                        <span class="accordion-title">Steering</span>
+                        <span class="accordion-status" id="status-4"></span>
+                        <span class="chevron">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </span>
+                    </div>
+                    <div class="accordion-content">
+                        <ul>
+                            <p class="komentar-display" id="komentar-4" style="margin-top: 1rem; font-style: italic;">
+                            </p>
+                        </ul>
+                    </div>
+                </div>
+                <div class="accordion" id="hasil-gas">
+                    <div class="accordion-header" onclick="this.parentElement.classList.toggle('open')">
+                        <span class="accordion-title">Gas</span>
+                        <span class="accordion-status" id="status-5"></span>
+                        <span class="chevron">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </span>
+                    </div>
+                    <div class="accordion-content">
+                        <ul>
+                            <p class="komentar-display" id="komentar-5" style="margin-top: 1rem; font-style: italic;">
+                            </p>
+                        </ul>
+                    </div>
+                </div>
+                <div class="accordion" id="hasil-gyroscope">
+                    <div class="accordion-header" onclick="this.parentElement.classList.toggle('open')">
+                        <span class="accordion-title">Gyroscope</span>
+                        <span class="accordion-status" id="status-6"></span>
+                        <span class="chevron">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="    round">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </span>
+                    </div>
+                    <div class="accordion-content">
+                        <ul>
+                            <p class="komentar-display" id="komentar-6" style="margin-top: 1rem; font-style: italic;">
+                            </p>
+                        </ul>
+                    </div>
+                </div>
+
+                <div style="display: flex; justify-content: center; margin-top: 1rem;">
+                    <button id="btn-save" class="button is-primary">Save to PDF</button>
+                </div>
+
             </div>
-
         </div>
-    </div>
 
-    <script>
-        document.querySelectorAll(".maintenance-step").forEach((form, index) => {
-            const radioButtons = form.querySelectorAll('input[type="radio"]');
-            const commentForm = form.querySelector('.comment-form');
-            const nextButton = form.querySelector('.btn-next');
+        <script>
+            document.addEventListener("DOMContentLoaded", () => {
+                localStorage.clear();
+                const steps = document.querySelectorAll(".maintenance-step");
+                const buttonSave = document.getElementById('btn-save');
+                const takeLidar = document.getElementById('btn-capture-lidar');
+                const var_global = document.getElementById("var-global");
+                const idx_global = document.getElementById("idx-global");
 
-            radioButtons.forEach(radio => {
-                radio.addEventListener('change', function () {
-                    if (this.value === 'pass') {
-                        commentForm.style.display = 'none';
-                        nextButton.disabled = false;
-                        nextButton.classList.add("active");
-                        localStorage.setItem(`hasil_${index}`, "✅ Berhasil");
-                        localStorage.setItem(`komentar_${index}`, "");
-                        // console.log(localStorage.getItem(`hasil_${index}`));
-                        // console.log(localStorage.getItem(`komentar_${index}`));
-                    } else {
-                        commentForm.style.display = 'block';
-                        nextButton.disabled = true;
-                        nextButton.classList.remove("active");
-                        localStorage.setItem(`hasil_${index}`, "❌ Gagal");
-                        // console.log(localStorage.getItem(`hasil_${index}`));
-                    }
+                // ====== Save ke PDF ======
+                if (buttonSave) {
+                    buttonSave.addEventListener('click', async () => {
+                        const element = document.getElementById('ringkasan-box');
+                        const lidarView = document.getElementById('lidarView');
+                        let lidarImg;
+
+                        if (lidarView && lidarView.toDataURL) {
+                            const dataURL = lidarView.toDataURL("image/png");
+                            lidarImg = document.createElement("img");
+                            lidarImg.src = dataURL;
+                            lidarImg.style.width = "100%";
+                            lidarImg.classList.add("page-break");
+                            element.appendChild(lidarImg);
+                        }
+
+                        const opt = {
+                            margin: 0.5,
+                            filename: 'hasil_kalibrasi.pdf',
+                            image: { type: 'jpeg', quality: 0.95 },
+                            html2canvas: { scale: 1.5, useCORS: true },
+                            jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' },
+                            pagebreak: { mode: ['css', 'legacy'] }
+                        };
+
+                        await html2pdf().set(opt).from(element).save();
+
+                        if (lidarImg) element.removeChild(lidarImg);
+                    });
+                }
+
+                // ====== Ambil Screenshot Lidar ======
+                if (takeLidar) {
+                    takeLidar.addEventListener('click', async () => {
+                        const container = document.getElementById('lidarView');
+                        if (!container) return alert('LIDAR view tidak ditemukan');
+
+                        const poses = [
+                            { x: -2.0, y: 0.0, z: 0.3, name: 'left' },
+                            { x: 0.0, y: -2.0, z: 0.3, name: 'side' },
+                            { x: 0.0, y: 0.0, z: 4.0, name: 'top' }
+                        ];
+
+                        const screenshots = [];
+
+                        for (let i = 0; i < poses.length; i++) {
+                            const pose = poses[i];
+                            try { window.setLidarCameraPose(pose.x, pose.y, pose.z); } catch (e) { }
+                            try {
+                                const rv = window.lidarViewer;
+                                if (rv && rv.renderer && rv.renderer.domElement) {
+                                    try { rv.renderer.render(rv.scene, rv.camera); } catch (e) { }
+                                    const canvas = rv.renderer.domElement;
+                                    if (!canvas.width || !canvas.height) {
+                                        return alert('Canvas belum siap. Tunggu sebentar lalu coba lagi.');
+                                    }
+                                    await new Promise(resolve => {
+                                        canvas.toBlob
+                                            ? canvas.toBlob(blob => {
+                                                screenshots.push({ name: pose.name, blob });
+                                                resolve();
+                                            }, 'image/png')
+                                            : (() => {
+                                                screenshots.push({ name: pose.name, dataURL: canvas.toDataURL('image/png') });
+                                                resolve();
+                                            })();
+                                    });
+                                    showScreenshots(screenshots);
+                                    await new Promise(r => setTimeout(r, 100));
+                                }
+                            } catch (e) { console.warn('Gagal capture Lidar:', e); }
+                        }
+                    });
+                }
+
+                // setInterval(() => {
+                //     console.log('Cek var_global:', var_global.getAttribute("class"));
+                // }, 500);
+
+                // ====== Per Step Handling ======
+                steps.forEach((stepBox, index) => {
+                    const radios = stepBox.querySelectorAll('input[type="radio"]');
+                    const commentForm = stepBox.querySelector('.comment-form');
+                    const nextButton = stepBox.querySelector('.btn-next');
+
+                    // ====== Pantau perubahan var_global untuk step 4–6 ======
+                    const observer = new MutationObserver((mutationsList) => {
+                        for (let mutation of mutationsList) {
+                            if (mutation.type === "attributes" && mutation.attributeName === "class") {
+                                const stepNow = idx_global.innerText;
+                                const classNow = var_global.getAttribute("class");
+
+                                console.log("Mutation:", stepNow, "| class =", classNow);
+
+                                if (stepNow === "4") {
+                                    const activeStep = document.querySelector('.maintenance-step:not(.hidden)');
+                                    if (!activeStep) return;
+
+                                    const nextButton = activeStep.querySelector('.btn-next');
+
+                                    if (classNow === "steering2") {
+                                        // console.log("steering2 tercapai → Next aktif");
+                                        enableNext(nextButton);
+                                        localStorage.setItem(`hasil_${parseInt(stepNow) - 1}`, "sukses");
+                                    } else {
+                                        // console.log("belum steering2 → Next dimatikan");
+                                    }
+                                } else if (stepNow === "5") {
+                                    const activeStep = document.querySelector('.maintenance-step:not(.hidden)');
+                                    if (!activeStep) return;
+
+                                    const nextButton = activeStep.querySelector('.btn-next');
+
+                                    if (classNow === "velocity1") {
+                                        // console.log("velocity1 tercapai → Next aktif");
+                                        enableNext(nextButton);
+                                        localStorage.setItem(`hasil_${parseInt(stepNow) - 1}`, "sukses");
+                                    } else {
+                                        // console.log("belum velocity1 → Next dimatikan");
+                                    }
+                                } else if (stepNow === "6") {
+                                    const activeStep = document.querySelector('.maintenance-step:not(.hidden)');
+                                    if (!activeStep) return;
+                                    const nextButton = activeStep.querySelector('.btn-next');
+                                    if (classNow === "gyro2") {
+                                        // console.log("valid3 tercapai → Next aktif");
+                                        enableNext(nextButton);
+                                        localStorage.setItem(`hasil_${parseInt(stepNow) - 1}`, "sukses");
+                                    } else {
+                                        // console.log("belum valid3 → Next dimatikan");
+                                    }
+                                }
+                            }
+                        }
+                    });
+
+                    observer.observe(var_global, {
+                        attributes: true,
+                        childList: false,
+                        characterData: false,
+                    });
+
+                    radios.forEach(radio => {
+                        radio.addEventListener('change', function () {
+                            const step = stepBox.dataset.step;
+
+                            if (step == "1") {
+                                console.log("step 1 selesai, ambil screenshot LIDAR otomatis");
+                                takeLidar.click();
+                            }
+
+                            if (this.value === 'sukses') {
+                                if (step === "4" || step === "5" || step === "6") {
+                                    commentForm.style.display = 'none';
+                                    disableNext(nextButton);
+                                    localStorage.setItem(`hasil_${index}`, "sukses_ignored");
+                                } else {
+                                    // step biasa
+                                    commentForm.style.display = 'none';
+                                    enableNext(nextButton);
+                                    localStorage.setItem(`hasil_${index}`, "sukses");
+                                    localStorage.setItem(`komentar_${index}`, "");
+                                }
+                            } else if (this.value === 'gagal') {
+                                commentForm.style.display = 'block';
+                                disableNext(nextButton);
+                                localStorage.setItem(`hasil_${index}`, "gagal");
+                                const oldComment = commentForm.querySelector('.komentar').value.trim();
+                                localStorage.setItem(`komentar_${index}`, oldComment);
+                            }
+                        });
+                    });
+
+
+                    commentForm.addEventListener('input', function () {
+                        const commentText = this.querySelector('.komentar').value.trim();
+                        if (commentText.length > 0) {
+                            enableNext(nextButton);
+                            localStorage.setItem(`komentar_${index}`, commentText);
+                        } else {
+                            disableNext(nextButton);
+                        }
+                    });
+
+
+                    nextButton.addEventListener('click', () => {
+                        const nextStep = parseInt(stepBox.dataset.step) + 1;
+                        const nextBox = document.querySelector(`.maintenance-step[data-step="${nextStep}"]`);
+                        stepBox.classList.add("hidden");
+
+                        if (nextBox) {
+                            nextBox.classList.remove("hidden");
+                            nextBox.scrollIntoView({ behavior: "smooth" });
+
+                            idx_global.innerText = nextStep;
+
+                            if (nextStep === 7) {
+                                updateAccordionStatus();
+                            }
+                        } else {
+                            updateAccordionStatus();
+                            document.getElementById("ringkasan-box").classList.remove("hidden");
+                            document.getElementById("ringkasan-box").scrollIntoView({ behavior: "smooth" });
+                        }
+                        disableNext(nextButton);
+                    });
                 });
-            });
 
-            commentForm.addEventListener('input', function () {
-                const commentText = this.querySelector('.komentar').value.trim();
-                if (commentText.length > 0) {
-                    nextButton.disabled = false;
-                    nextButton.classList.add("active");
-                    localStorage.setItem(`komentar_${index}`, commentText);
-                    // console.log(localStorage.getItem(`komentar_${index}`));
-                } else {
-                    nextButton.disabled = true;
-                    nextButton.classList.remove("active");
+                // ====== Helpers ======
+                function enableNext(btn) {
+                    btn.disabled = false;
+                    btn.classList.add("active");
+                }
+                function disableNext(btn) {
+                    btn.disabled = true;
+                    btn.classList.remove("active");
+                }
+                function showScreenshots(screenshots) {
+                    const imgElements = document.querySelectorAll('#hasil-lidar-bawah .screenshot-img');
+                    screenshots.forEach((ss, i) => {
+                        if (imgElements[i]) {
+                            imgElements[i].src = ss.blob ? URL.createObjectURL(ss.blob) : ss.dataURL;
+                        }
+                    });
+                }
+                function updateAccordionStatus() {
+                    const statusElements = document.querySelectorAll('.accordion-status');
+                    statusElements.forEach((el, index) => {
+                        const komentar = localStorage.getItem(`komentar_${index}`);
+                        const komentarEl = document.getElementById(`komentar-${index + 1}`);
+                        if (komentar && komentar.length > 0) {
+                            komentarEl.textContent = "Komentar: " + komentar;
+                        }
+
+                        const hasil = localStorage.getItem(`hasil_${index}`);
+                        if (hasil === 'sukses') {
+                            if (komentar && komentar.length > 0) {
+                                el.textContent = '✅ Berhasil (dengan komentar)';
+                                el.style.color = 'orange';
+                            } else {
+                                el.textContent = '✅ Berhasil';
+                                el.style.color = 'green';
+                            }
+                        } else if (hasil === 'gagal') {
+                            el.textContent = '❌ Gagal';
+                            el.style.color = 'red';
+                        } else {
+                            el.textContent = '';
+                            el.style.color = '';
+                        }
+                    });
                 }
             });
+        </script>
 
-            nextButton.addEventListener('click', function () {
-                let currentBox = this.closest(".maintenance-step");
-                let currentStep = parseInt(currentBox.dataset.step);
-                let nextBox = document.querySelector(`.maintenance-step[data-step="${currentStep + 1}"]`);
 
-                currentBox.classList.add("hidden");
-
-                if (nextBox) {
-                    nextBox.classList.remove("hidden");
-                    nextBox.scrollIntoView({ behavior: "smooth" });
-                } else {
-                    console.log("Selesai semua langkah.");
-                    tampilkanRingkasan();
-                    document.getElementById("ringkasan-box").classList.remove("hidden");
-                    document.getElementById("ringkasan-box").scrollIntoView({ behavior: "smooth" });
-                }
-
-                this.disabled = true;
-            });
-        });
-
-        function tampilkanRingkasan() {
-            let hasilHTML = "<ul>";
-            for (let i = 0; i < 6; i++) { // max 6 step
-                const hasil = localStorage.getItem(`hasil_${i}`);
-                // console.log(hasil);
-                if (!hasil) continue;
-                const komentar = localStorage.getItem(`komentar_${i}`);
-                hasilHTML += `<li>
-            <strong>Step ${i + 1}:</strong> ${hasil}
-            ${komentar ? `<br>💬 Komentar: ${komentar}` : ""}
-        </li>`;
-            }
-            hasilHTML += "</ul>";
-            document.getElementById("ringkasan").innerHTML = hasilHTML;
-        }
-    </script>
-
-    <script type="text/javascript" src="maintenance.js">
-    </script>
+        <script type="text/javascript" src="maintenance.js">
+        </script>
 </body>
 
 </html>
