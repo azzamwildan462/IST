@@ -10,7 +10,7 @@ anime({
 
 // Connect to the ROS bridge WebSocket server
 var ros = new ROSLIB.Ros({
-    url: "ws://" + "10.7.101.111" + ":9090",
+    url: "ws://" + window.location.hostname + ":9090",
 });
 
 ros.on("connection", function () {
@@ -42,7 +42,7 @@ let shared_gyro_offset = 0.1;
 // LIDAR BAWAH
 // ===============================================================
 const LIDAR_TOPIC = "/scan";                // sensor_msgs/LaserScan
-const FIXED_FRAME = "lidar1_link";            // pick a frame that exists in your TF tree
+const FIXED_FRAME = "base_link";            // pick a frame that exists in your TF tree
 
 const statusEl = document.getElementById("lidar-status");
 const nextBtn = document.getElementById("next-1");
@@ -82,9 +82,9 @@ hidden.position.set(1000, 1000, 1000);
 viewer.addObject(hidden);
 // ============================================================================================
 // PARAMETER
-const boxWidth = 0.30;
+const boxWidth = 0.25;
 const notAllowedBoxHeight = 0.15;
-const allowedBoxHeigt = 0.2 - notAllowedBoxHeight;
+const allowedBoxHeight = 0.25 - notAllowedBoxHeight;
 const offsetAxisX = -1.5;
 
 function addCalibratedBox(x, y) {
@@ -117,20 +117,20 @@ function addCalibratedBox(x, y) {
     viewer.scene.add(mesh11);
 
     // ALLOWED (hijau atas)
-    var geo2 = new THREE.BoxGeometry(boxWidth, boxWidth, allowedBoxHeigt);
+    var geo2 = new THREE.BoxGeometry(boxWidth, boxWidth, allowedBoxHeight);
     var mat2 = new THREE.MeshBasicMaterial({
         color: 0x00ff00,
-        opacity: 0.5,
+        opacity: 0.05,
         transparent: true,
         polygonOffset: true,
         polygonOffsetFactor: 2,
         polygonOffsetUnits: 2
     });
     var mesh2 = new THREE.Mesh(geo2, mat2);
-    mesh2.position.set(x + offsetAxisX, y, notAllowedBoxHeight + allowedBoxHeigt / 2);
+    mesh2.position.set(x + offsetAxisX, y, notAllowedBoxHeight + allowedBoxHeight / 2);
     viewer.scene.add(mesh2);
 
-    var geo21 = new THREE.BoxGeometry(boxWidth, boxWidth, allowedBoxHeigt);
+    var geo21 = new THREE.BoxGeometry(boxWidth, boxWidth, allowedBoxHeight);
     var mat21 = new THREE.MeshBasicMaterial({
         color: 0x008800,
         opacity: 1,
@@ -141,21 +141,24 @@ function addCalibratedBox(x, y) {
         wireframe: true
     });
     var mesh21 = new THREE.Mesh(geo21, mat21);
-    mesh21.position.set(x + offsetAxisX, y, notAllowedBoxHeight + allowedBoxHeigt / 2);
+    mesh21.position.set(x + offsetAxisX, y, notAllowedBoxHeight + allowedBoxHeight / 2);
     viewer.scene.add(mesh21);
 }
 
+function addPoint(x, y, z, size, color) {
+    var sphereGeo = new THREE.SphereGeometry(size, 32, 32);
+    var sphereMat = new THREE.MeshBasicMaterial({ color: color });
+    var sphere = new THREE.Mesh(sphereGeo, sphereMat);
+    sphere.position.set(x, y, z);
+    viewer.scene.add(sphere);
+}
+
 // ============================================================================================
-addCalibratedBox(1, 0);
-addCalibratedBox(2, -1);
-addCalibratedBox(3, 1);
+addCalibratedBox(1.1, 0);
+addCalibratedBox(2.1, -1);
+addCalibratedBox(3.1, 1);
 
-var sphereGeo = new THREE.SphereGeometry(0.05, 32, 32);
-var sphereMat = new THREE.MeshBasicMaterial({ color: 0x0000ff });
-var sphere = new THREE.Mesh(sphereGeo, sphereMat);
-sphere.position.set(offsetAxisX, 0, 0);
-viewer.scene.add(sphere);
-
+addPoint(offsetAxisX, 0, 0, 0.03, 0x0000ff);
 // ============================================================================================
 window.lidarViewer = viewer;
 
@@ -176,22 +179,23 @@ window.setLidarCameraPose = setLidarCameraPose;
 // ============================================================================================
 
 // TF client (use a frame that exists; often map/odom/base_link/laser)
-const tfClient = new ROSLIB.TFClient({
-    ros,
-    fixedFrame: FIXED_FRAME,
-    angularThres: 0.01,
-    transThres: 0.01,
-    rate: 15.0
-});
+const tfClient = new ROSLIB.TFClient(
+    {
+        ros,
+        fixedFrame: FIXED_FRAME,
+        angularThres: 0.01,
+        transThres: 0.01,
+        rate: 15.0
+    }
+);
 
 // ====== LASERSCAN VISUALIZER ======
 const laser = new ROS3D.LaserScan({
-    ros,
-    tfClient,
+    ros: ros,
+    tfClient: tfClient,
     rootObject: viewer.scene,
     topic: LIDAR_TOPIC,
-    // Optional styling
-    material: { size: 0.02 }
+    material: { size: 0.05, color: 0xff0000 }
 });
 
 // Unlock Next when first message arrives
@@ -199,26 +203,103 @@ const scanSub = new ROSLIB.Topic({
     ros,
     name: LIDAR_TOPIC,
     messageType: "sensor_msgs/LaserScan",
-    throttle_rate: 500
+    throttle_rate: 1
 });
 
+function transformPoint3D(point, tf) {
+    const { x: px, y: py, z: pz } = point;
+    const q = tf.rotation;
+
+    // Quaternion rotation
+    const x = px, y = py, z = pz;
+    const qx = q.x, qy = q.y, qz = q.z, qw = q.w;
+
+    // apply quaternion rotation: p' = q * p * q_conj
+    const ix = qw * x + qy * z - qz * y;
+    const iy = qw * y + qz * x - qx * z;
+    const iz = qw * z + qx * y - qy * x;
+    const iw = -qx * x - qy * y - qz * z;
+
+    const rx = ix * qw + iw * -qx + iy * -qz - iz * -qy;
+    const ry = iy * qw + iw * -qy + iz * -qx - ix * -qz;
+    const rz = iz * qw + iw * -qz + ix * -qy - iy * -qx;
+
+    // apply translation
+    return {
+        x: rx + tf.translation.x + offsetAxisX,
+        y: ry + tf.translation.y,
+        z: rz + tf.translation.z
+    };
+}
+
 let firstMsg = false;
+let lidarPoints = [];
 scanSub.subscribe((msg) => {
     if (!firstMsg) {
         firstMsg = true;
         statusEl.textContent = `Streaming LiDAR: ${LIDAR_TOPIC} (${msg.ranges.length} beams)`;
-        nextBtn.disabled = false;  // ✅ enable Next when data flows
+    }
+
+    lidarPoints = [];
+
+    function eulerToQuaternion(yaw, pitch, roll) {
+        const cy = Math.cos(yaw * 0.5);
+        const sy = Math.sin(yaw * 0.5);
+        const cp = Math.cos(pitch * 0.5);
+        const sp = Math.sin(pitch * 0.5);
+        const cr = Math.cos(roll * 0.5);
+        const sr = Math.sin(roll * 0.5);
+
+        return {
+            w: cr * cp * cy + sr * sp * sy,
+            x: sr * cp * cy - cr * sp * sy,
+            y: cr * sp * cy + sr * cp * sy,
+            z: cr * cp * sy - sr * sp * cy
+        };
+    }
+
+    let hardcoded_tf = {
+        translation: { x: 0.00, y: 0.00, z: 0.22 },
+        rotation: eulerToQuaternion(0.00, 0.00, 3.1415)
+        // translation: { x: 1.378, y: 0.00, z: 0.22 },
+        // rotation: eulerToQuaternion(0.00, 0.00, 3.1415)
+    };
+
+    for (let i = 0; i < msg.ranges.length; i += 1) {
+        const angle = msg.angle_min + i * msg.angle_increment;
+        const range = msg.ranges[i];
+        const x_lidar = range * Math.cos(angle);
+        const y_lidar = range * Math.sin(angle);
+
+        const pointInBaseLink = transformPoint3D({ x: x_lidar, y: y_lidar, z: 0 }, hardcoded_tf);
+        lidarPoints.push(pointInBaseLink);
     }
 });
 
+setInterval(() => {
+    for (let i = viewer.scene.children.length - 1; i >= 0; i--) {
+        const obj = viewer.scene.children[i];
+        if (obj.userData && obj.userData.isLidarPoint) {
+            viewer.scene.remove(obj);
+        }
+    }
+
+    lidarPoints.forEach(point => {
+        const sphereGeo = new THREE.SphereGeometry(0.01, 8, 8);
+        const sphereMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+        const sphere = new THREE.Mesh(sphereGeo, sphereMat);
+        sphere.position.set(point.x, point.y, point.z);
+        sphere.userData.isLidarPoint = true;
+        viewer.scene.add(sphere);
+    });
+}, 3000);
+
 // Kamera
 // ===============================================================
-
 const img = document.getElementById('cam');
 const cvs = document.getElementById('overlay');
 const ctx = cvs.getContext('2d');
-// const url_kamera = "http://" + window.location.hostname + ":8080/stream?topic=/camera/rs2_cam_main/color/image_raw";
-const url_kamera = "http://" + "10.7.101.111" + ":8080/stream?topic=/image_bgr";
+const url_kamera = "http://" + window.location.hostname + ":8080/stream?topic=/camera/rs2_cam_main/color/image_raw";
 
 img.src = url_kamera;
 
@@ -244,27 +325,27 @@ function drawStaticBox() {
     // ctx.lineTo((640) / width * cvs.width, (180) / height * cvs.height);
     // ctx.stroke();
 
-    const distance1 = 100; // pixels from bottom
-    const distance2 = 120; // pixels from bottom
-    const distance3 = 140; // pixels from bottom
+    const distance1 = 40; // pixels from bottom
+    const distance2 = 105; // pixels from bottom
+    const distance3 = 145; // pixels from bottom
     const distance4 = 160; // pixels from bottom
     const distance5 = 180; // pixels from bottom
-    const distance6 = 200; // pixels from bottom
+    const distance6 = 105; // pixels from bottom
 
     ctx.beginPath();
     ctx.moveTo(0 / width * cvs.width, (height - distance1) / height * cvs.height);
     ctx.lineTo((640) / width * cvs.width, (height - distance1) / height * cvs.height);
     ctx.stroke();
 
-    // ctx.beginPath();
-    // ctx.moveTo(0 / width * cvs.width, (height - distance2) / height * cvs.height);
-    // ctx.lineTo((640) / width * cvs.width, (height - distance2) / height * cvs.height);
-    // ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(0 / width * cvs.width, (height - distance2) / height * cvs.height);
+    ctx.lineTo((640) / width * cvs.width, (height - distance2) / height * cvs.height);
+    ctx.stroke();
 
-    // ctx.beginPath();
-    // ctx.moveTo(0 / width * cvs.width, (height - distance3) / height * cvs.height);
-    // ctx.lineTo((640) / width * cvs.width, (height - distance3) / height * cvs.height);
-    // ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(0 / width * cvs.width, (height - distance3) / height * cvs.height);
+    ctx.lineTo((640) / width * cvs.width, (height - distance3) / height * cvs.height);
+    ctx.stroke();
 
     // ctx.beginPath();
     // ctx.moveTo(0 / width * cvs.width, (height - distance4) / height * cvs.height);
@@ -276,22 +357,22 @@ function drawStaticBox() {
     // ctx.lineTo((640) / width * cvs.width, (height - distance5) / height * cvs.height);
     // ctx.stroke();
 
-    ctx.beginPath();
-    ctx.moveTo(0 / width * cvs.width, (height - distance6) / height * cvs.height);
-    ctx.lineTo((640) / width * cvs.width, (height - distance6) / height * cvs.height);
-    ctx.stroke();
+    // ctx.beginPath();
+    // ctx.moveTo(0 / width * cvs.width, (height - distance6) / height * cvs.height);
+    // ctx.lineTo((640) / width * cvs.width, (height - distance6) / height * cvs.height);
+    // ctx.stroke();
 
     // make diagonal line
-    const offset_center = 100;
-    ctx.beginPath();
-    ctx.moveTo((320 + offset_center) / width * cvs.width, (0) / height * cvs.height);
-    ctx.lineTo((640) / width * cvs.width, (360) / height * cvs.height);
-    ctx.stroke();
+    // const offset_center = 100;
+    // ctx.beginPath();
+    // ctx.moveTo((320 + offset_center) / width * cvs.width, (0) / height * cvs.height);
+    // ctx.lineTo((640) / width * cvs.width, (360) / height * cvs.height);
+    // ctx.stroke();
 
-    ctx.beginPath();
-    ctx.moveTo((320 - offset_center) / width * cvs.width, (0) / height * cvs.height);
-    ctx.lineTo((0) / width * cvs.width, (360) / height * cvs.height);
-    ctx.stroke();
+    // ctx.beginPath();
+    // ctx.moveTo((320 - offset_center) / width * cvs.width, (0) / height * cvs.height);
+    // ctx.lineTo((0) / width * cvs.width, (360) / height * cvs.height);
+    // ctx.stroke();
 
 }
 
@@ -443,7 +524,7 @@ function set_steering(selector1, slector2, id_text, value1, value2, raw_actuatio
     circle2.style.transform = "rotate(-90deg)"; // Adjust the rotation as needed
     circle2.style.transformOrigin = "50% 50%"; // Ensure rotation is centered
 
-    progressText.textContent = `${raw_actuation.toFixed(1)}` + "°";
+    progressText.textContent = `${raw_actuation.toFixed(1)}`;
 }
 
 // GYRO
@@ -519,7 +600,7 @@ function set_gyro(selector0, selector1, selector2, id_text, value1, value2, raw_
     circle2.style.transform = "rotate(-90deg)"; // Adjust the rotation as needed
     circle2.style.transformOrigin = "50% 50%"; // Ensure rotation is centered
 
-    progressText.textContent = `${raw_actuation.toFixed(1)}` + "°";
+    progressText.textContent = `${raw_actuation.toFixed(1)}`;
 }
 
 class CallibratedBox {
@@ -562,48 +643,48 @@ let steering_test_fb = 0.5;
 let velocity_test_fb = 0.0;
 let gyro_test_fb = 0.0;
 
-setInterval(() => {
-    const steering_test_act = 1;
-    shared_steering_feedback = steering_test_fb;
+// setInterval(() => {
+//     const steering_test_act = 1;
+//     shared_steering_feedback = steering_test_fb;
 
 
-    let steering_target_value = shared_target_steering * 135 / 6.28;
-    let steering_current_value = steering_test_fb * 135 / 6.28;
-    let steering_current_deg = steering_test_fb * 180 / 3.14;
+//     let steering_target_value = shared_target_steering * 135 / 6.28;
+//     let steering_current_value = steering_test_fb * 135 / 6.28;
+//     let steering_current_deg = steering_test_fb * 180 / 3.14;
 
-    let velocity_test_act = 0.0;
-    shared_velocity_feedback = velocity_test_fb;
+//     let velocity_test_act = 0.0;
+//     shared_velocity_feedback = velocity_test_fb;
 
-    let velocity_actuation_display = shared_target_velocity * 10 * 3.6;
-    let velocity_feedback_display = velocity_test_fb * 10 * 3.6;
+//     let velocity_actuation_display = shared_target_velocity * 10 * 3.6;
+//     let velocity_feedback_display = velocity_test_fb * 10 * 3.6;
 
-    let gyro_current_value = gyro_test_fb * 135 / 6.28;
-    let gyro_yaw_deg = gyro_test_fb * 180 / 3.14;
-    shared_gyro_feedback = gyro_test_fb;
+//     let gyro_current_value = gyro_test_fb * 135 / 6.28;
+//     let gyro_yaw_deg = gyro_test_fb * 180 / 3.14;
+//     shared_gyro_feedback = gyro_test_fb;
 
-    let target_steering_value0 = 0.5 * 135 / 6.28;
-    let target_steering_value1 = 0.9 * 135 / 6.28;
+//     let target_steering_value0 = 0.5 * 135 / 6.28;
+//     let target_steering_value1 = 0.9 * 135 / 6.28;
 
-    let offset_steering = 0.5 * 135 / 6.28;
+//     let offset_steering = 0.5 * 135 / 6.28;
 
-    // set_target_steering(".steering-circle-target", target_steering_value0, offset_steering);
+//     // set_target_steering(".steering-circle-target", target_steering_value0, offset_steering);
 
-    if (idx_global.innerText == "4") {
-        set_steering(".steering-circle1", ".steering-circle2", "steering-text", steering_target_value, steering_current_value, steering_current_deg);
-        if (shared_target_steering > 0) {
-            steering_test_fb += 0.1;
-        }
-        else {
-            steering_test_fb -= 0.1;
-        }
-    } else if (idx_global.innerText == "5") {
-        set_velocity(".velocity-circle1", ".velocity-circle2", "velocity-text", velocity_actuation_display, velocity_feedback_display);
-        velocity_test_fb += 0.1;
-    } else if (idx_global.innerText == "6") {
-        gyro_test_fb += 0.05;
-        set_gyro(".gyro-circle00", ".gyro-circle1", ".gyro-circle2", "gyro-text", shared_gyro_target * 135 / 6.28, gyro_current_value, gyro_yaw_deg, shared_gyro_offset * 135 / 6.28);
-        if (gyro_test_fb > 3.14) {
-            gyro_test_fb -= 6.28;
-        }
-    }
-}, 100);
+//     if (idx_global.innerText == "4") {
+//         set_steering(".steering-circle1", ".steering-circle2", "steering-text", steering_target_value, steering_current_value, steering_current_deg);
+//         if (shared_target_steering > 0) {
+//             steering_test_fb += 0.1;
+//         }
+//         else {
+//             steering_test_fb -= 0.1;
+//         }
+//     } else if (idx_global.innerText == "5") {
+//         set_velocity(".velocity-circle1", ".velocity-circle2", "velocity-text", velocity_actuation_display, velocity_feedback_display);
+//         velocity_test_fb += 0.1;
+//     } else if (idx_global.innerText == "6") {
+//         gyro_test_fb += 0.05;
+//         set_gyro(".gyro-circle00", ".gyro-circle1", ".gyro-circle2", "gyro-text", shared_gyro_target * 135 / 6.28, gyro_current_value, gyro_yaw_deg, shared_gyro_offset * 135 / 6.28);
+//         if (gyro_test_fb > 3.14) {
+//             gyro_test_fb -= 6.28;
+//         }
+//     }
+// }, 100);

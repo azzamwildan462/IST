@@ -310,7 +310,7 @@
                     <circle class="steering-circle1" cx="50" cy="50" r="40" stroke="#4caf50"></circle>
                     <circle class="steering-circle2" cx="50" cy="50" r="30" stroke="#cf1f10"></circle>
 
-                    <text x="52" y="52" id="steering-text">0°</text>
+                    <text x="52" y="52" id="steering-text">0</text>
                 </svg>
 
                 <div class="comment-box" style="text-align: justify;">
@@ -419,7 +419,7 @@
                     <circle class="gyro-circle1" cx="50" cy="50" r="40" stroke="#4caf50"></circle>
                     <circle class="gyro-circle00" cx="50" cy="50" r="40" stroke="#e0e0e0"></circle>
                     <circle class="gyro-circle2" cx="50" cy="50" r="30" stroke="#cf1f10"></circle>
-                    <text x="52" y="52" id="gyro-text">0°</text>
+                    <text x="52" y="52" id="gyro-text">0</text>
                 </svg>
 
                 <div class="comment-box" style="text-align: justify;">
@@ -840,14 +840,14 @@
                         const hasil = localStorage.getItem(`hasil_${index}`);
                         if (hasil === 'sukses') {
                             if (komentar && komentar.length > 0) {
-                                el.textContent = '✅ Berhasil (dengan komentar)';
+                                el.textContent = 'Berhasil (dengan komentar)';
                                 el.style.color = 'orange';
                             } else {
-                                el.textContent = '✅ Berhasil';
+                                el.textContent = 'Berhasil';
                                 el.style.color = 'green';
                             }
                         } else if (hasil === 'gagal') {
-                            el.textContent = '❌ Gagal';
+                            el.textContent = 'Gagal';
                             el.style.color = 'red';
                         } else {
                             el.textContent = '';
