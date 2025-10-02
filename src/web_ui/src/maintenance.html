@@ -163,8 +163,8 @@
     Throttle gas di injak sampai target kecepatan
     Brake di injak sampai nyentuh 2 LS -->
 
-    <div id="var-global"></div>
-    <div id="idx-global"></div>
+    <div class="hidden" id="var-global"></div>
+    <div class="hidden" id="idx-global"></div>
 
     <div class="container is-fluid">
         <div id="maintenance">
@@ -316,7 +316,7 @@
                 <div class="comment-box" style="text-align: justify;">
                     <p><b>Petunjuk:</b></p>
                     <ul>
-                        <li>Lakukan pengujian dengan memutar kemudi sepenuhnya ke kanan lalu ke kiri untuk memastikan
+                        <li>Lakukan pengujian dengan memutar kemudi sepenuhnya ke kiri lalu ke kanan untuk memastikan
                             respons sistem.</li>
                     </ul>
                     <br>
@@ -425,7 +425,7 @@
                 <div class="comment-box" style="text-align: justify;">
                     <p><b>Petunjuk:</b></p>
                     <ul>
-                        <li>Lakukan pengujian dengan menggerakkan kendaraan ke 30 derajat ke kanan dan ke kiri.</li>
+                        <li>Lakukan pengujian dengan menggerakkan kendaraan ke 30 derajat ke kiri dan ke kanan.</li>
                     </ul>
                     <br>
                     <p><b>Catatan:</b></p>
@@ -461,8 +461,8 @@
                 <img id="ringkasan-image" src="" alt="Hasil Kalibrasi"
                     style="max-width: 25%; height: auto; display: none; margin: 0 auto;">
 
-                <div class="accordion" id="hasil-lidar-bawah">
-                    <div class="accordion-header" onclick="this.parentElement.classList.toggle('open')">
+                <div class="accordion open" id="hasil-lidar-bawah">
+                    <div class="accordion-header">
                         <span class="accordion-title">LIDAR Bawah</span>
                         <span class="accordion-status" id="status-1"></span>
                         <span class="chevron">
@@ -493,8 +493,8 @@
                         </ul>
                     </div>
                 </div>
-                <div class="accordion" id="hasil-kamera">
-                    <div class="accordion-header" onclick="this.parentElement.classList.toggle('open')">
+                <div class="accordion open" id="hasil-kamera">
+                    <div class="accordion-header">
                         <span class="accordion-title">Kamera</span>
                         <span class="accordion-status" id="status-2"></span>
                         <span class="chevron">
@@ -514,8 +514,8 @@
                         </ul>
                     </div>
                 </div>
-                <div class="accordion" id="hasil-lidar-samping">
-                    <div class="accordion-header" onclick="this.parentElement.classList.toggle('open')">
+                <div class="accordion open" id="hasil-lidar-samping">
+                    <div class="accordion-header">
                         <span class="accordion-title">LIDAR Samping</span>
                         <span class="accordion-status" id="status-3"></span>
                         <span class="chevron">
@@ -532,8 +532,8 @@
                         </ul>
                     </div>
                 </div>
-                <div class="accordion" id="hasil-steering">
-                    <div class="accordion-header" onclick="this.parentElement.classList.toggle('open')">
+                <div class="accordion open" id="hasil-steering">
+                    <div class="accordion-header">
                         <span class="accordion-title">Steering</span>
                         <span class="accordion-status" id="status-4"></span>
                         <span class="chevron">
@@ -550,8 +550,8 @@
                         </ul>
                     </div>
                 </div>
-                <div class="accordion" id="hasil-gas">
-                    <div class="accordion-header" onclick="this.parentElement.classList.toggle('open')">
+                <div class="accordion open" id="hasil-gas">
+                    <div class="accordion-header">
                         <span class="accordion-title">Gas</span>
                         <span class="accordion-status" id="status-5"></span>
                         <span class="chevron">
@@ -568,8 +568,8 @@
                         </ul>
                     </div>
                 </div>
-                <div class="accordion" id="hasil-gyroscope">
-                    <div class="accordion-header" onclick="this.parentElement.classList.toggle('open')">
+                <div class="accordion open" id="hasil-gyroscope">
+                    <div class="accordion-header">
                         <span class="accordion-title">Gyroscope</span>
                         <span class="accordion-status" id="status-6"></span>
                         <span class="chevron">
@@ -634,6 +634,26 @@
                     });
                 }
 
+                function captureCameraSnapshot() {
+                    const snapshotCanvas = document.createElement("canvas");
+                    const img = document.getElementById('cam');
+                    const cvs = document.getElementById('overlay');
+                    snapshotCanvas.width = cvs.width;
+                    snapshotCanvas.height = cvs.height;
+                    const snapshotCtx = snapshotCanvas.getContext("2d");
+
+                    snapshotCtx.drawImage(img, 0, 0, snapshotCanvas.width, snapshotCanvas.height);
+
+                    snapshotCtx.drawImage(cvs, 0, 0, snapshotCanvas.width, snapshotCanvas.height);
+
+                    const dataURL = snapshotCanvas.toDataURL("image/png");
+                    const camResult = document.querySelector(".kamera-img");
+                    if (camResult) {
+                        camResult.src = dataURL;
+                    }
+                }
+
+
                 // ====== Ambil Screenshot Lidar ======
                 if (takeLidar) {
                     takeLidar.addEventListener('click', async () => {
@@ -643,7 +663,7 @@
                         const poses = [
                             { x: -2.0, y: 0.0, z: 0.3, name: 'left' },
                             { x: 0.0, y: -2.0, z: 0.3, name: 'side' },
-                            { x: 0.0, y: 0.0, z: 4.0, name: 'top' }
+                            { x: 0.0, y: 0.0, z: 5.0, name: 'top' }
                         ];
 
                         const screenshots = [];
@@ -752,6 +772,9 @@
                             if (step == "1") {
                                 console.log("step 1 selesai, ambil screenshot LIDAR otomatis");
                                 takeLidar.click();
+                            } else if (step == "2") {
+                                console.log("step 2 selesai, ambil snapshot kamera");
+                                captureCameraSnapshot();
                             }
 
                             if (this.value === 'sukses') {

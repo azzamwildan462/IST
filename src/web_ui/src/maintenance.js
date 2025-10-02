@@ -89,7 +89,7 @@ const offsetAxisX = -1.5;
 
 function addCalibratedBox(x, y) {
     // NOT ALLOWED (merah bawah)
-    var geo1 = new THREE.BoxGeometry(boxWidth, boxWidth, notAllowedBoxHeight);
+    var geo1 = new THREE.BoxGeometry(0.1, boxWidth, notAllowedBoxHeight);
     var mat1 = new THREE.MeshBasicMaterial({
         color: 0xff0000,
         opacity: 0.5,
@@ -102,7 +102,7 @@ function addCalibratedBox(x, y) {
     mesh1.position.set(x + offsetAxisX, y, notAllowedBoxHeight / 2);
     viewer.scene.add(mesh1);
 
-    var geo11 = new THREE.BoxGeometry(boxWidth, boxWidth, notAllowedBoxHeight);
+    var geo11 = new THREE.BoxGeometry(0.1, boxWidth, notAllowedBoxHeight);
     var mat11 = new THREE.MeshBasicMaterial({
         color: 0xff0000,
         opacity: 1,
@@ -117,7 +117,7 @@ function addCalibratedBox(x, y) {
     viewer.scene.add(mesh11);
 
     // ALLOWED (hijau atas)
-    var geo2 = new THREE.BoxGeometry(boxWidth, boxWidth, allowedBoxHeight);
+    var geo2 = new THREE.BoxGeometry(0.1, boxWidth, allowedBoxHeight);
     var mat2 = new THREE.MeshBasicMaterial({
         color: 0x00ff00,
         opacity: 0.05,
@@ -130,7 +130,7 @@ function addCalibratedBox(x, y) {
     mesh2.position.set(x + offsetAxisX, y, notAllowedBoxHeight + allowedBoxHeight / 2);
     viewer.scene.add(mesh2);
 
-    var geo21 = new THREE.BoxGeometry(boxWidth, boxWidth, allowedBoxHeight);
+    var geo21 = new THREE.BoxGeometry(0.1, boxWidth, allowedBoxHeight);
     var mat21 = new THREE.MeshBasicMaterial({
         color: 0x008800,
         opacity: 1,
@@ -154,9 +154,9 @@ function addPoint(x, y, z, size, color) {
 }
 
 // ============================================================================================
-addCalibratedBox(1.1, 0);
-addCalibratedBox(2.1, -1);
-addCalibratedBox(3.1, 1);
+addCalibratedBox(1, 0);
+addCalibratedBox(2, -1);
+addCalibratedBox(3, 1);
 
 addPoint(offsetAxisX, 0, 0, 0.03, 0x0000ff);
 // ============================================================================================
@@ -301,6 +301,7 @@ const cvs = document.getElementById('overlay');
 const ctx = cvs.getContext('2d');
 const url_kamera = "http://" + window.location.hostname + ":8080/stream?topic=/camera/rs2_cam_main/color/image_raw";
 
+img.crossOrigin = "anonymous";
 img.src = url_kamera;
 
 const width = 640;
