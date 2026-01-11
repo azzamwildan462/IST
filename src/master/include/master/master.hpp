@@ -1,12 +1,16 @@
+//asd
 #ifndef MASTER_HPP
 #define MASTER_HPP
 
-#include "rclcpp/rclcpp.hpp"
-#include "sensor_msgs/msg/point_cloud.hpp"
+#include "boost/filesystem.hpp"
+#include "boost/thread/mutex.hpp"
+#include "fstream"
 #include "geometry_msgs/msg/point.hpp"
 #include "geometry_msgs/msg/pose_with_covariance_stamped.hpp"
 #include "geometry_msgs/msg/quaternion.hpp"
+#include "nav_msgs/msg/occupancy_grid.hpp"
 #include "nav_msgs/msg/odometry.hpp"
+#include "rclcpp/rclcpp.hpp"
 #include "ros2_interface/msg/point_array.hpp"
 #include "ros2_interface/msg/terminal_array.hpp"
 #include "ros2_utils/global_definitions.hpp"
@@ -14,39 +18,36 @@
 #include "ros2_utils/help_marker.hpp"
 #include "ros2_utils/pid.hpp"
 #include "ros2_utils/simple_fsm.hpp"
+#include "rtabmap_msgs/msg/info.hpp"
 #include "sensor_msgs/msg/joy.hpp"
 #include "sensor_msgs/msg/laser_scan.hpp"
+#include "sensor_msgs/msg/point_cloud.hpp"
 #include "std_msgs/msg/bool.hpp"
 #include "std_msgs/msg/float32.hpp"
 #include "std_msgs/msg/float32_multi_array.hpp"
-#include "std_msgs/msg/int32.hpp"
 #include "std_msgs/msg/int16.hpp"
+#include "std_msgs/msg/int32.hpp"
 #include "std_msgs/msg/int8.hpp"
 #include "std_msgs/msg/u_int16.hpp"
 #include "std_msgs/msg/u_int8.hpp"
 #include "std_msgs/msg/u_int8_multi_array.hpp"
-#include "rtabmap_msgs/msg/info.hpp"
-#include "nav_msgs/msg/occupancy_grid.hpp"
+#include "std_srvs/srv/set_bool.hpp"
 #include "tf2/LinearMath/Quaternion.h"
 #include "tf2/LinearMath/Transform.h"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
-#include "std_srvs/srv/set_bool.hpp"
 #include "vector"
-#include "boost/filesystem.hpp"
 #include <boost/algorithm/string.hpp>
-#include "boost/thread/mutex.hpp"
-#include "fstream"
 
-#include <tf2_ros/transform_listener.h>
-#include <tf2_ros/buffer.h>
-#include <tf2_sensor_msgs/tf2_sensor_msgs.h>
-#include <pcl_conversions/pcl_conversions.h>
-#include <pcl/point_cloud.h>
-#include <pcl/point_types.h>
 #include "pcl/filters/crop_box.h"
+#include "pcl_ros/transforms.hpp"
 #include <pcl/filters/passthrough.h>
 #include <pcl/filters/voxel_grid.h>
-#include "pcl_ros/transforms.hpp"
+#include <pcl/point_cloud.h>
+#include <pcl/point_types.h>
+#include <pcl_conversions/pcl_conversions.h>
+#include <tf2_ros/buffer.h>
+#include <tf2_ros/transform_listener.h>
+#include <tf2_sensor_msgs/tf2_sensor_msgs.h>
 
 #define FSM_GLOBAL_INIT 0
 #define FSM_GLOBAL_PREOP 1
@@ -110,6 +111,7 @@
 #define EMERGENCY_STOP_KARENA_OBSTACLE 0b1000000
 #define EMERGENCY_ALL_LIDAR_DETECTED 0b10000000
 #define EMERGENCY_GANDENGAN_LEPAS 0b100000000
+#define EMERGENCY_DEKAT_TEMAN 0b1000000000
 #define STATUS_TOWING_CONNECTED 0b01
 
 // using namespace std::chrono_literals;
@@ -130,8 +132,20 @@ typedef struct
     float y;
 } point_t;
 
-class Master : public rclcpp::Node
+typedef struct
 {
+    int terminal_terakhir;
+    float pose_x;
+    float pose_y;
+    float pose_theta;
+    float jarak_berdasarkan_jalan;
+    float jarak_terdekat;
+    uint8_t jalur_berapa;
+    uint8_t status_ring_scan;
+    uint16_t counter_masuk_ring;
+} info_teman_t;
+
+class Master : public rclcpp::Node {
 public:
     rclcpp::TimerBase::SharedPtr tim_50hz;
     rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr pub_initialpose;
@@ -187,10 +201,12 @@ public:
     rclcpp::Subscription<std_msgs::msg::Int8>::SharedPtr sub_detected_forklift;
     rclcpp::Subscription<std_msgs::msg::UInt8>::SharedPtr sub_gyro_counter;
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr sub_all_obstacle_filter;
+    rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr sub_info_teman;
+    rclcpp::Subscription<std_msgs::msg::UInt8>::SharedPtr sub_status_handrem;
 
     rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr srv_set_record_route_mode;
     rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr srv_set_terminal; // Aktif -> add terminal, InActive -> save terminal
-    rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr srv_rm_terminal;  // Aktif -> add terminal, InActive -> save terminal
+    rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr srv_rm_terminal; // Aktif -> add terminal, InActive -> save terminal
 
     std::shared_ptr<rclcpp::SyncParametersClient> lidar_obstacle_param_client;
 
@@ -225,13 +241,17 @@ public:
     float threshold_icp_score = 100.0;
     bool debug_motion = false;
     float thresh_toribay_real_detected = 10.0;
+    int towing_berapa = 2;
+    float ring_scan_teman = 7.0;
+    bool disable_deteksi_toribe = false;
 
-    std::vector<double> complementary_terms = {0.30, 0.03, 0.01, 0.9};
+    std::vector<double> complementary_terms = { 0.30, 0.03, 0.01, 0.9 };
 
     float offset_sudut_steering = 0;
 
     // Vars
     // ===============================================================================================
+    uint8_t status_handrem_dibawah = 0;
     HelpLogger logger;
     HelpMarker marker;
     MachineState local_fsm;
@@ -351,6 +371,8 @@ public:
     int16_t battery_soc = 0; // State of Charge dari Battery
     int32_t counter_lap = 0;
 
+    info_teman_t info_teman[3];
+
     Master();
     ~Master();
 
@@ -391,6 +413,8 @@ public:
     void callback_sub_detected_forklift(const std_msgs::msg::Int8::SharedPtr msg);
     void callback_sub_gyro_counter(const std_msgs::msg::UInt8::SharedPtr msg);
     void callback_sub_all_obstacle_filter(const std_msgs::msg::Float32MultiArray::SharedPtr msg);
+    void callback_sub_info_teman(const std_msgs::msg::Float32MultiArray::SharedPtr msg);
+    void callback_sub_status_handrem(const std_msgs::msg::UInt8::SharedPtr msg);
     void callback_srv_set_record_route_mode(const std_srvs::srv::SetBool::Request::SharedPtr request, std_srvs::srv::SetBool::Response::SharedPtr response);
     void callback_srv_set_terminal(const std_srvs::srv::SetBool::Request::SharedPtr request, std_srvs::srv::SetBool::Response::SharedPtr response);
     void callback_srv_rm_terminal(const std_srvs::srv::SetBool::Request::SharedPtr request, std_srvs::srv::SetBool::Response::SharedPtr response);
@@ -419,8 +443,8 @@ public:
     void fusion_follow_lane_waypoints(float vx, float vy, float wz, float lookahead_distance, bool is_loop = false);
     void fusion_follow_lane_waypoints_gas_manual(float vx, float vy, float wz, float lookahead_distance, bool is_loop = false);
     void fusion_follow_lane_waypoints_steer_manual(float vx, float vy, float wz, float lookahead_distance, bool is_loop = false);
-    void wp2velocity_steering(float lookahead_distance, float *pvelocity, float *psteering, bool is_loop = false);
-    void lane2velocity_steering(float *pvelocity, float *psteering, float *pconfidence);
+    void wp2velocity_steering(float lookahead_distance, float* pvelocity, float* psteering, bool is_loop = false);
+    void lane2velocity_steering(float* pvelocity, float* psteering, float* pconfidence);
     float pythagoras(float x1, float y1, float x2, float y2);
     float obstacle_influence(float gain);
     float local_obstacle_influence(float obs_scan_r, float gain = 0.5);

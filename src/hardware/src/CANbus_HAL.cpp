@@ -1,3 +1,4 @@
+// asd
 #include "rclcpp/rclcpp.hpp"
 #include "ros2_utils/global_definitions.hpp"
 #include "ros2_utils/help_logger.hpp"
@@ -26,6 +27,14 @@
 
 #include <termios.h>
 #include "hardware/jhctech_291.h"
+#include "hardware/ecb_306.h"
+
+#include <dirent.h>
+#include <string.h>
+#include <stdio.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <stdbool.h>
 
 #include <thread>
 
@@ -36,14 +45,23 @@
 #define COB_ID_EPS_ACTUATION 0x321
 #define COB_ID_EPS_ENCODER 0x231
 #define COB_ID_GYRO_RION 0x585
+#define COB_ID_HANDREM 0x384
 
 #define EPS_ENCODER_MAX_COUNTER 10000
 #define EPS_ENCODER_MAX_RAD 1.5708
+
+typedef struct
+{
+    int dev_sock;
+    char dev_id[128];
+    float suhu;
+} sensor_suhu_t;
 
 class CANbus_HAL : public rclcpp::Node
 {
 public:
     rclcpp::TimerBase::SharedPtr tim_50hz;
+    rclcpp::Publisher<std_msgs::msg::UInt8>::SharedPtr pub_status_handrem;
     rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr pub_battery;
     rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr pub_encoder;
     rclcpp::Publisher<std_msgs::msg::UInt8>::SharedPtr pub_fb_tps_accelerator;
@@ -68,6 +86,12 @@ public:
     int jhctech_can_id = -1; // Jika -1, masuk default, 1 untuk EPS, 2 untuk mobil
     int counter_divider_can_send = 4;
     int counter_divider_publish = 200;
+    int towing_berapa = 2;
+    bool enable_control_pwm = false;
+    int pwm_batas_bawah = 10;
+    int pwm_batas_atas = 50;
+    int setpoint_suhu = 65;
+    float kp_kontrol_suhu = 0.5;
 
     int socket_can = -1;
 
@@ -89,7 +113,19 @@ public:
     sensor_msgs::msg::Imu imu_msg;
 
     std::thread thread_routine;
+    std::thread thread_gpio;
     int counter_can_send = 0;
+
+    uint8_t status_handrem_dibawah = 0;
+
+    float suhu_sekarang = 0.0;
+
+    // GPIO
+    // ==================================================
+    OUTPUTPIN_TypeDef gpio_out;
+    INPUTPIN_TypeDef gpio_in;
+    std::vector<sensor_suhu_t> sensor_suhu;
+    int pwm_sekarang = 0;
 
     CANbus_HAL()
         : Node("CANbus_HAL")
@@ -123,11 +159,30 @@ public:
         this->declare_parameter("counter_divider_publish", 200);
         this->get_parameter("counter_divider_publish", counter_divider_publish);
 
+        this->declare_parameter("towing_berapa", 2);
+        this->get_parameter("towing_berapa", towing_berapa);
+
+        this->declare_parameter("enable_control_pwm", false);
+        this->get_parameter("enable_control_pwm", enable_control_pwm);
+
+        this->declare_parameter("pwm_batas_bawah", 10);
+        this->get_parameter("pwm_batas_bawah", pwm_batas_bawah);
+
+        this->declare_parameter("pwm_batas_atas", 50);
+        this->get_parameter("pwm_batas_atas", pwm_batas_atas);
+
+        this->declare_parameter("setpoint_suhu", 65);
+        this->get_parameter("setpoint_suhu", setpoint_suhu);
+
+        this->declare_parameter("kp_kontrol_suhu", 0.2);
+        this->get_parameter("kp_kontrol_suhu", kp_kontrol_suhu);
+
         //----Publiher
         if (use_socket_can)
         {
             if (can_to_car)
             {
+                pub_status_handrem = this->create_publisher<std_msgs::msg::UInt8>("/can/handrem", 1);
                 pub_battery = this->create_publisher<std_msgs::msg::Int16>("/can/battery", 1);
                 pub_encoder = this->create_publisher<std_msgs::msg::Int32>("/can/encoder", 1);
                 pub_fb_tps_accelerator = this->create_publisher<std_msgs::msg::UInt8>("/can/fb_tps_accelerator", 1);
@@ -136,32 +191,46 @@ public:
             }
             else
             {
-                pub_eps_encoder = this->create_publisher<std_msgs::msg::Float32>("/can/eps_encoder", 1);
-                pub_fb_eps_mode = this->create_publisher<std_msgs::msg::UInt8>("/can/eps_mode", 1);
+                if (towing_berapa == 2)
+                {
+                    pub_eps_encoder = this->create_publisher<std_msgs::msg::Float32>("/can/eps_encoder", 1);
+                    pub_fb_eps_mode = this->create_publisher<std_msgs::msg::UInt8>("/can/eps_mode", 1);
+                }
                 pub_imu_can = this->create_publisher<sensor_msgs::msg::Imu>("/can/imu", 1);
                 pub_gyro_counter = this->create_publisher<std_msgs::msg::UInt8>("/can/gyro_counter", 1);
             }
         }
         else
         {
+            pub_status_handrem = this->create_publisher<std_msgs::msg::UInt8>("/can/handrem", 1);
             pub_battery = this->create_publisher<std_msgs::msg::Int16>("/can/battery", 1);
             pub_encoder = this->create_publisher<std_msgs::msg::Int32>("/can/encoder", 1);
             pub_fb_tps_accelerator = this->create_publisher<std_msgs::msg::UInt8>("/can/fb_tps_accelerator", 1);
             pub_fb_transmission = this->create_publisher<std_msgs::msg::UInt8>("/can/fb_transmission", 1);
             pub_error_code = this->create_publisher<std_msgs::msg::Int16>("/can/error_code", 1);
-            pub_eps_encoder = this->create_publisher<std_msgs::msg::Float32>("/can/eps_encoder", 1);
-            pub_fb_eps_mode = this->create_publisher<std_msgs::msg::UInt8>("/can/eps_mode", 1);
+            if (towing_berapa == 2)
+            {
+                pub_eps_encoder = this->create_publisher<std_msgs::msg::Float32>("/can/eps_encoder", 1);
+                pub_fb_eps_mode = this->create_publisher<std_msgs::msg::UInt8>("/can/eps_mode", 1);
+            }
             pub_imu_can = this->create_publisher<sensor_msgs::msg::Imu>("/can/imu", 1);
             pub_gyro_counter = this->create_publisher<std_msgs::msg::UInt8>("/can/gyro_counter", 1);
         }
 
         //----Timer
         thread_routine = std::thread(std::bind(&CANbus_HAL::callback_routine_multi_thread, this), this);
+        if (enable_control_pwm && towing_berapa != 2)
+        {
+            thread_gpio = std::thread(std::bind(&CANbus_HAL::callback_routine_gpio, this), this);
+        }
         // tim_50hz = this->create_wall_timer(std::chrono::milliseconds(1), std::bind(&CANbus_HAL::callback_routine, this));
 
         //----Subscriber
-        sub_master_actuator = this->create_subscription<std_msgs::msg::Float32MultiArray>(
-            "/master/actuator", 1, std::bind(&CANbus_HAL::callback_sub_master_actuator, this, std::placeholders::_1));
+        if (towing_berapa == 2)
+        {
+            sub_master_actuator = this->create_subscription<std_msgs::msg::Float32MultiArray>(
+                "/master/actuator", 1, std::bind(&CANbus_HAL::callback_sub_master_actuator, this, std::placeholders::_1));
+        }
         sub_master_global_fsm = this->create_subscription<std_msgs::msg::Int16>(
             "/master/global_fsm", 1, std::bind(&CANbus_HAL::callback_sub_master_global_fsm, this, std::placeholders::_1));
 
@@ -196,6 +265,13 @@ public:
                 RCLCPP_ERROR(this->get_logger(), "Failed to initialize CAN Bitrate");
                 rclcpp::shutdown();
             }
+
+            int sensor_suhu = init_sensor_suhu();
+            logger.info("Sensor suhu count: %d", sensor_suhu);
+            if (sensor_suhu < 0)
+            {
+                RCLCPP_WARN(this->get_logger(), "Failed to prob sensor suhu");
+            }
         }
 
         logger.info("CANbus_HAL init success");
@@ -209,6 +285,98 @@ public:
     void callback_sub_master_actuator(const std_msgs::msg::Float32MultiArray::SharedPtr msg)
     {
         eps_actuation = msg->data[1];
+    }
+
+    void callback_routine_gpio()
+    {
+        uint64_t counter_ms = 0;
+        while (rclcpp::ok())
+        {
+            static uint16_t counter_pembagi_hitung_pwm = 0;
+            if (counter_pembagi_hitung_pwm++ >= 100)
+            {
+                counter_pembagi_hitung_pwm = 0;
+                hitung_pwm_kipas();
+                logger.info("PWM Kipas: %d | Suhu: %.2f", pwm_sekarang, suhu_sekarang);
+            }
+
+            static uint8_t status_high = 0;
+            static uint8_t prev_status_high = 1;
+            static uint64_t counter_edge = counter_ms;
+
+            uint8_t target_high_ms = pwm_sekarang;
+            uint8_t target_low_ms = 100 - pwm_sekarang;
+
+            // Memastikan clk dan data untuk kontaktor mati
+            gpio_out.OUTPUT0 = PIN_RESET;
+            gpio_out.OUTPUT1 = PIN_RESET;
+
+            static uint8_t status_always_high_init = 0;
+
+            if (status_always_high_init < 10)
+            {
+                gpio_out.OUTPUT2 = PIN_SET;
+                gpio_out.OUTPUT3 = PIN_SET;
+                jhctech_GPIO_Write(socket_can, gpio_out);
+            }
+
+            if (status_always_high_init++ >= 10)
+            {
+                break;
+            }
+
+            // logger.info("asdasdas %d %d %d || %ld %ld %ld || %.2f", pwm_sekarang, target_high_ms, target_low_ms, counter_ms, counter_edge, (counter_ms - counter_edge), suhu_sekarang);
+            // if (status_high == 1)
+            // {
+            //     if ((counter_ms - counter_edge) < target_high_ms)
+            //     {
+            //         if (gpio_out.OUTPUT3 != PIN_SET)
+            //         {
+            //             gpio_out.OUTPUT3 = PIN_SET;
+            //             jhctech_GPIO_Write(socket_can, gpio_out);
+            //         }
+            //         if (gpio_out.OUTPUT2 != PIN_SET)
+            //         {
+            //             gpio_out.OUTPUT2 = PIN_SET;
+            //             jhctech_GPIO_Write(socket_can, gpio_out);
+            //         }
+            //     }
+            //     else
+            //     {
+            //         status_high = 0;
+            //     }
+            // }
+            // else if (status_high == 0)
+            // {
+            //     if ((counter_ms - counter_edge) < target_low_ms)
+            //     {
+            //         if (gpio_out.OUTPUT3 != PIN_RESET)
+            //         {
+            //             gpio_out.OUTPUT3 = PIN_RESET;
+            //             jhctech_GPIO_Write(socket_can, gpio_out);
+            //         }
+            //         if (gpio_out.OUTPUT2 != PIN_RESET)
+            //         {
+            //             gpio_out.OUTPUT2 = PIN_RESET;
+            //             jhctech_GPIO_Write(socket_can, gpio_out);
+            //         }
+            //     }
+            //     else
+            //     {
+            //         status_high = 1;
+            //     }
+            // }
+
+            if (prev_status_high != status_high)
+            {
+                counter_edge = counter_ms;
+            }
+
+            prev_status_high = status_high;
+
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            counter_ms++;
+        }
     }
 
     void callback_routine_multi_thread()
@@ -231,57 +399,63 @@ public:
 
         if (use_socket_can)
         {
-            if (!can_to_car)
+            if (towing_berapa == 2)
             {
-                if (counter_can_send >= counter_divider_can_send)
+                if (!can_to_car)
                 {
-                    struct can_frame frame;
-                    frame.can_id = COB_ID_EPS_ACTUATION;
-                    frame.can_dlc = 3;
-
-                    static const float ENC_RAD2CNTR = EPS_ENCODER_MAX_COUNTER / EPS_ENCODER_MAX_RAD;
-                    int16_t eps_actuation_cntr = eps_actuation * ENC_RAD2CNTR;
-
-                    memcpy(&frame.data[0], &eps_flag, 1);
-                    memcpy(&frame.data[1], &eps_actuation_cntr, 2);
-
-                    if (write(socket_can, &frame, sizeof(struct can_frame)) != sizeof(struct can_frame))
+                    if (counter_can_send >= counter_divider_can_send)
                     {
-                        logger.warn("SOCKET CAN SEND FAILED\n");
+                        struct can_frame frame;
+                        frame.can_id = COB_ID_EPS_ACTUATION;
+                        frame.can_dlc = 3;
+
+                        static const float ENC_RAD2CNTR = EPS_ENCODER_MAX_COUNTER / EPS_ENCODER_MAX_RAD;
+                        int16_t eps_actuation_cntr = eps_actuation * ENC_RAD2CNTR;
+
+                        memcpy(&frame.data[0], &eps_flag, 1);
+                        memcpy(&frame.data[1], &eps_actuation_cntr, 2);
+
+                        if (write(socket_can, &frame, sizeof(struct can_frame)) != sizeof(struct can_frame))
+                        {
+                            logger.warn("SOCKET CAN SEND FAILED\n");
+                        }
+                        counter_can_send = 0;
                     }
-                    counter_can_send = 0;
                 }
+                counter_can_send++;
             }
-            counter_can_send++;
 
             parse_can_frame(); // Ini blocking
         }
         else
         {
-            if (counter_can_send >= counter_divider_can_send)
+            if (towing_berapa == 2)
             {
-                uint8_t data_send_buffer[3] = {0};
-
-                static const float ENC_RAD2CNTR = EPS_ENCODER_MAX_COUNTER / EPS_ENCODER_MAX_RAD;
-                int16_t eps_actuation_cntr = eps_actuation * ENC_RAD2CNTR;
-
-                memcpy(data_send_buffer, &eps_flag, 1);
-                memcpy(data_send_buffer + 1, &eps_actuation_cntr, 2);
-
-                int eps_jhctech_can_id = jhctech_can_id;
-                if (jhctech_can_id == -1)
+                if (counter_can_send >= counter_divider_can_send)
                 {
-                    eps_jhctech_can_id = 1;
-                }
+                    uint8_t data_send_buffer[3] = {0};
 
-                long ret = jhctech_SendDataFrame(socket_can, 't', eps_jhctech_can_id, COB_ID_EPS_ACTUATION, data_send_buffer, 3);
-                if (ret < 0)
-                {
-                    logger.warn("CAN%d SEND FAILED", eps_jhctech_can_id);
+                    static const float ENC_RAD2CNTR = EPS_ENCODER_MAX_COUNTER / EPS_ENCODER_MAX_RAD;
+                    int16_t eps_actuation_cntr = eps_actuation * ENC_RAD2CNTR;
+
+                    memcpy(data_send_buffer, &eps_flag, 1);
+                    memcpy(data_send_buffer + 1, &eps_actuation_cntr, 2);
+
+                    int eps_jhctech_can_id = jhctech_can_id;
+                    if (jhctech_can_id == -1)
+                    {
+                        eps_jhctech_can_id = 1;
+                    }
+
+                    long ret = jhctech_SendDataFrame(socket_can, 't', eps_jhctech_can_id, COB_ID_EPS_ACTUATION, data_send_buffer, 3);
+                    if (ret < 0)
+                    {
+                        logger.warn("CAN%d SEND FAILED", eps_jhctech_can_id);
+                    }
+                    counter_can_send = 0;
                 }
-                counter_can_send = 0;
+                counter_can_send++;
             }
-            counter_can_send++;
 
             parse_can_jhctech(); // Ini blocking
         }
@@ -298,9 +472,21 @@ public:
                     msg_battery.data = battery;
                     pub_battery->publish(msg_battery);
 
+                    std_msgs::msg::UInt8 msg_status_handrem;
+                    msg_status_handrem.data = status_handrem_dibawah;
+                    pub_status_handrem->publish(msg_status_handrem);
+
                     std_msgs::msg::Int16 msg_error_code;
                     msg_error_code.data = error_code;
                     pub_error_code->publish(msg_error_code);
+
+                    std_msgs::msg::UInt8 msg_fb_tps_accelerator;
+                    msg_fb_tps_accelerator.data = fb_tps_accelerator;
+                    pub_fb_tps_accelerator->publish(msg_fb_tps_accelerator);
+
+                    std_msgs::msg::UInt8 msg_fb_transmission;
+                    msg_fb_transmission.data = fb_transmission;
+                    pub_fb_transmission->publish(msg_fb_transmission);
                 }
 
                 if (prev_epoch_encoder != epoch_encoder)
@@ -309,30 +495,30 @@ public:
                     msg_encoder.data = encoder;
                     pub_encoder->publish(msg_encoder);
                 }
-
-                std_msgs::msg::UInt8 msg_fb_tps_accelerator;
-                msg_fb_tps_accelerator.data = fb_tps_accelerator;
-                pub_fb_tps_accelerator->publish(msg_fb_tps_accelerator);
-
-                std_msgs::msg::UInt8 msg_fb_transmission;
-                msg_fb_transmission.data = fb_transmission;
-                pub_fb_transmission->publish(msg_fb_transmission);
             }
             else
             {
-                std_msgs::msg::Float32 msg_eps_encoder;
-                msg_eps_encoder.data = eps_encoder_fb;
-                pub_eps_encoder->publish(msg_eps_encoder);
+                if (towing_berapa == 2)
+                {
+                    std_msgs::msg::Float32 msg_eps_encoder;
+                    msg_eps_encoder.data = eps_encoder_fb;
+                    pub_eps_encoder->publish(msg_eps_encoder);
 
-                std_msgs::msg::UInt8 msg_fb_eps_mode;
-                msg_fb_eps_mode.data = eps_mode_fb;
-                pub_fb_eps_mode->publish(msg_fb_eps_mode);
+                    std_msgs::msg::UInt8 msg_fb_eps_mode;
+                    msg_fb_eps_mode.data = eps_mode_fb;
+                    pub_fb_eps_mode->publish(msg_fb_eps_mode);
+                }
 
-                std_msgs::msg::UInt8 msg_gyro_counter;
-                msg_gyro_counter.data = counter_gyro_update;
-                pub_gyro_counter->publish(msg_gyro_counter);
+                static uint16_t counter_divider_pub_gyro_update = 0;
+                if (counter_divider_pub_gyro_update++ >= counter_divider_publish)
+                {
+                    counter_divider_pub_gyro_update = 0;
+                    std_msgs::msg::UInt8 msg_gyro_counter;
+                    msg_gyro_counter.data = counter_gyro_update;
+                    pub_gyro_counter->publish(msg_gyro_counter);
 
-                pub_imu_can->publish(imu_msg);
+                    pub_imu_can->publish(imu_msg);
+                }
             }
         }
         else
@@ -345,10 +531,26 @@ public:
                 msg_battery.data = battery;
                 pub_battery->publish(msg_battery);
 
+                std_msgs::msg::UInt8 msg_status_handrem;
+                msg_status_handrem.data = status_handrem_dibawah;
+                pub_status_handrem->publish(msg_status_handrem);
+
                 std_msgs::msg::Int16 msg_error_code;
                 msg_error_code.data = error_code;
                 pub_error_code->publish(msg_error_code);
+
+                std_msgs::msg::UInt8 msg_fb_tps_accelerator;
+                msg_fb_tps_accelerator.data = fb_tps_accelerator;
+                pub_fb_tps_accelerator->publish(msg_fb_tps_accelerator);
+
+                std_msgs::msg::UInt8 msg_fb_transmission;
+                msg_fb_transmission.data = fb_transmission;
+                pub_fb_transmission->publish(msg_fb_transmission);
             }
+            std_msgs::msg::UInt8 msg_gyro_counter;
+            msg_gyro_counter.data = counter_gyro_update;
+            pub_gyro_counter->publish(msg_gyro_counter);
+            pub_imu_can->publish(imu_msg);
 
             if (prev_epoch_encoder != epoch_encoder)
             {
@@ -357,28 +559,19 @@ public:
                 pub_encoder->publish(msg_encoder);
             }
 
-            std_msgs::msg::UInt8 msg_fb_tps_accelerator;
-            msg_fb_tps_accelerator.data = fb_tps_accelerator;
-            pub_fb_tps_accelerator->publish(msg_fb_tps_accelerator);
+            if (towing_berapa == 2)
+            {
+                std_msgs::msg::Float32 msg_eps_encoder;
+                msg_eps_encoder.data = eps_encoder_fb;
+                pub_eps_encoder->publish(msg_eps_encoder);
 
-            std_msgs::msg::UInt8 msg_fb_transmission;
-            msg_fb_transmission.data = fb_transmission;
-            pub_fb_transmission->publish(msg_fb_transmission);
-
-            std_msgs::msg::Float32 msg_eps_encoder;
-            msg_eps_encoder.data = eps_encoder_fb;
-            pub_eps_encoder->publish(msg_eps_encoder);
-
-            std_msgs::msg::UInt8 msg_fb_eps_mode;
-            msg_fb_eps_mode.data = eps_mode_fb;
-            pub_fb_eps_mode->publish(msg_fb_eps_mode);
-
-            std_msgs::msg::UInt8 msg_gyro_counter;
-            msg_gyro_counter.data = counter_gyro_update;
-            pub_gyro_counter->publish(msg_gyro_counter);
-
-            pub_imu_can->publish(imu_msg);
+                std_msgs::msg::UInt8 msg_fb_eps_mode;
+                msg_fb_eps_mode.data = eps_mode_fb;
+                pub_fb_eps_mode->publish(msg_fb_eps_mode);
+            }
         }
+
+        prev_epoch_encoder = epoch_encoder;
     }
 
     void parse_can_jhctech()
@@ -415,10 +608,37 @@ public:
                 {
                     encoder = (can_data->data[3] | (can_data->data[2] << 8));
 
-                    prev_epoch_encoder = epoch_encoder;
                     epoch_encoder++;
                     if (epoch_encoder >= 255)
                         epoch_encoder = 0;
+                }
+                if (can_data->canId == COB_ID_HANDREM)
+                {
+                    uint8_t raw = ((can_data->data[3] & 0x10) >> 4);
+
+                    static uint16_t counter_dibawah = 0;
+                    static uint16_t counter_diatas = 0;
+
+                    if (raw == 1)
+                    {
+                        counter_dibawah++;
+                        counter_diatas = 0;
+                        if (counter_dibawah >= 50)
+                        {
+                            status_handrem_dibawah = 1;
+                            counter_dibawah = 50;
+                        }
+                    }
+                    else
+                    {
+                        counter_diatas++;
+                        counter_dibawah = 0;
+                        if (counter_diatas >= 50)
+                        {
+                            status_handrem_dibawah = 0;
+                            counter_diatas = 50;
+                        }
+                    }
                 }
                 else if (can_data->canId == COB_ID_CAR_BATTERY)
                 {
@@ -552,15 +772,42 @@ public:
 
         error_code = 0;
 
-        // Check if the response is from the expected node
+        // Check if the response is from the expected nodee
         if (frame.can_id == COB_ID_CAR_ENCODER)
         {
             encoder = (frame.data[3] | (frame.data[2] << 8));
 
-            prev_epoch_encoder = epoch_encoder;
             epoch_encoder++;
             if (epoch_encoder >= 255)
                 epoch_encoder = 0;
+        }
+        if (frame.can_id == COB_ID_HANDREM)
+        {
+            uint8_t raw = ((frame.data[3] & 0x10) >> 4);
+
+            static uint16_t counter_dibawah = 0;
+            static uint16_t counter_diatas = 0;
+
+            if (raw > 0)
+            {
+                counter_dibawah++;
+                counter_diatas = 0;
+                if (counter_dibawah >= 50)
+                {
+                    status_handrem_dibawah = 1;
+                    counter_dibawah = 50;
+                }
+            }
+            else
+            {
+                counter_diatas++;
+                counter_dibawah = 0;
+                if (counter_diatas >= 50)
+                {
+                    status_handrem_dibawah = 0;
+                    counter_diatas = 50;
+                }
+            }
         }
         else if (frame.can_id == COB_ID_CAR_BATTERY)
         {
@@ -741,6 +988,110 @@ public:
         }
 
         return s;
+    }
+
+    int init_sensor_suhu()
+    {
+        sensor_suhu.clear();
+
+        const char *base_path = "/sys/devices/platform/coretemp.0/hwmon";
+        DIR *dir = opendir(base_path);
+        if (!dir)
+        {
+            perror("opendir hwmon");
+            return -1;
+        }
+
+        struct dirent *de;
+
+        while ((de = readdir(dir)) != NULL)
+        {
+            if (strncmp(de->d_name, "hwmon", 5) != 0)
+                continue;
+
+            char hwmon_path[512];
+            snprintf(hwmon_path, sizeof(hwmon_path),
+                     "%s/%s", base_path, de->d_name);
+
+            bool sensor_invalid = false;
+            int iter = 1;
+
+            while (!sensor_invalid)
+            {
+                sensor_suhu_t s;
+
+                snprintf(s.dev_id, sizeof(s.dev_id),
+                         "%s/temp%d_input", hwmon_path, iter);
+
+                s.dev_sock = open(s.dev_id, O_RDONLY);
+                if (s.dev_sock < 0)
+                {
+                    sensor_invalid = true;
+                    break;
+                }
+
+                sensor_suhu.push_back(s);
+                iter++;
+            }
+        }
+
+        closedir(dir);
+
+        return (int)sensor_suhu.size();
+    }
+
+    float hitung_suhu_mean()
+    {
+        sensor_suhu.clear();
+        init_sensor_suhu();
+
+        if (sensor_suhu.size() == 0)
+        {
+            return 0.0;
+        }
+
+        float sum = 0;
+        for (size_t i = 0; i < sensor_suhu.size(); i++)
+        {
+            char rd_buf[65];
+            ssize_t n = read(sensor_suhu[i].dev_sock, rd_buf, 64);
+
+            if (n < 0)
+            {
+            }
+            else if (n == 0)
+            {
+            }
+            else
+            {
+                rd_buf[n] = '\0';
+            }
+
+            // CLose socket
+            close(sensor_suhu[i].dev_sock);
+
+            int suhu = atoi(rd_buf);
+            sensor_suhu[i].suhu = suhu * 0.001;
+
+            sum += sensor_suhu[i].suhu;
+        }
+
+        return (sum / sensor_suhu.size());
+    }
+
+    void hitung_pwm_kipas()
+    {
+        suhu_sekarang = hitung_suhu_mean();
+        float error = setpoint_suhu - suhu_sekarang;
+
+        float proportional = kp_kontrol_suhu * -error;
+
+        pwm_sekarang += (int)proportional;
+
+        if (pwm_sekarang < pwm_batas_bawah)
+            pwm_sekarang = pwm_batas_bawah;
+        if (pwm_sekarang > pwm_batas_atas)
+            pwm_sekarang = pwm_batas_atas;
     }
 };
 

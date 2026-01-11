@@ -41,6 +41,8 @@ def generate_launch_description():
     # SetEnvironmentVariable(name='RMW_IMPLEMENTATION', value='rmw_cyclonedds_cpp'),
     # SetEnvironmentVariable(name='CYCLONEDDS_URI', value='file://' + path_config + 'cyclonedds.xml'),
 
+    TOWING_BERAPA = 1
+
     SetEnvironmentVariable("TESSDATA_PREFIX", "/usr/share/tesseract-ocr/4.00"),
 
     rosbridge_server = Node(
@@ -65,6 +67,12 @@ def generate_launch_description():
         name="web_video_server",
         output="screen",
         respawn=True,
+        # parameters=[{
+        #     "port": 8080,
+        #     # "publish_rate": -1.0,
+        #     "server_threads": 1,
+        #     "ros_threads": 1,
+        # }],
     )
 
     rviz2 = Node(
@@ -423,8 +431,9 @@ def generate_launch_description():
         output="screen",
         parameters=[
             {
+                "towing_berapa": TOWING_BERAPA,
                 "use_ekf_odometry": True,
-                "offset_sudut_steering": -0.04,
+                "offset_sudut_steering": -0.01,
                 "waypoint_file_path": os.path.join(path_config, "waypoint.csv"),
                 "terminal_file_path": os.path.join(path_config, "terminal.csv"),
                 "pid_terms": [0.0070, 0.000000, 0, 0.02, -1.4, 0.4, -0.0005, 0.0005],
@@ -441,9 +450,15 @@ def generate_launch_description():
                 "camera_scan_max_x_": 3.0,
                 "camera_scan_min_y_": -1.0,
                 "camera_scan_max_y_": 1.0,
-                "threshold_icp_score": 0.7,
+                # "threshold_icp_score": 0.7,
+                "threshold_icp_score": 0.7, # COBA
                 "debug_motion": True,
                 "all_obstacle_thr": 50000.0,
+		        "toribay_ready_threshold": 521.0, # kiri
+                "toribay_ready_threshold_kanan": 100.0, # kanan 
+                "debug_motion": True,
+                "disable_deteksi_toribe": True,
+
             }
         ],
         respawn=True,
@@ -469,13 +484,19 @@ def generate_launch_description():
                 "lidar_kanan_frame_id": "lidar_kanan_link",
                 "lidar_kiri_frame_id": "lidar_kiri_link",
                 "camera_frame_id": "camera_depth_optical_frame",
-                "scan_toribay_x_min": -2.0,
+                "scan_toribay_x_min": -3.0,
                 "scan_toribay_x_max": -0.3,
-                "scan_toribay_y_min": -0.7,
-                "scan_toribay_y_max": -0.7,
-                "scan_toribay_z_min": 0.3,
-                "scan_toribay_z_max": 1.0,
-                "gain_lidar": 70.0,
+                "scan_toribay_y_min": -1.7,
+                "scan_toribay_y_max": 2.4,
+                "scan_toribay_z_min": 0.7,
+                "scan_toribay_z_max": 2.0,
+                "scan_toribay_real_wtf_x_min": -3.0,
+                "scan_toribay_real_wtf_x_max": -0.3,
+                "scan_toribay_real_wtf_y_min": -1.0,
+                "scan_toribay_real_wtf_y_max": 1.0,
+                "scan_toribay_real_wtf_z_min": 0.7,
+                "scan_toribay_real_wtf_z_max": 2.0,
+                "gain_lidar": 10.0,
             }
         ],
         respawn=True,
@@ -509,16 +530,16 @@ def generate_launch_description():
         parameters=[
             {
                 ## Untuk 1 jalur
-                "scan_min_y": -1.0,
-                "scan_max_y": 1.0,
-                "scan_range": 3.5,
-                "obstacle_error_tolerance": 0.4,
-                "pgm_path": "/home/ist/map_baru_bagus.pgm",
-                "yaml_path": "/home/ist/map_baru_bagus.yaml",
-                "resolution": 0.3,
-                "origin_x": -211.59,
-                "origin_y": -22.645,
-                "icp_max_range": 8.0,
+                # "scan_min_y": -1.0,
+                # "scan_max_y": 1.0,
+                # "scan_range": 3.5,
+                # "obstacle_error_tolerance": 0.4,
+                # "pgm_path": "/home/ist/map_baru_bagus.pgm",
+                # "yaml_path": "/home/ist/map_baru_bagus.yaml",
+                # "resolution": 0.3,
+                # "origin_x": -211.59,
+                # "origin_y": -22.645,
+                # "icp_max_range": 8.0,
                 ## Untuk 2 Jalur
                 # "scan_min_y": -1.0,
                 # "scan_max_y": 1.0,
@@ -529,6 +550,15 @@ def generate_launch_description():
                 # "resolution": 0.3,
                 # "origin_x": -218.581,
                 # "origin_y": -21.8307,
+                "scan_min_y": -1.0,
+                "scan_max_y": 1.0,
+                "scan_range": 3.5,
+                "obstacle_error_tolerance": 0.4,
+                "pgm_path": "/home/ist/map_final.pgm",
+                "yaml_path": "/home/ist/map_final.yaml",
+                "resolution": 0.3,
+                "origin_x": -216.844,
+                "origin_y": -28.9506,
             }
         ],
         respawn=True,
@@ -548,7 +578,10 @@ def generate_launch_description():
                 # "encoder_to_meter" : 0.0000123550127, # sama navis
                 # "encoder_to_meter" : 0.0000279741933,
                 # "encoder_to_meter" : 0.0000282567609, # Hari pertama sebelum di IST
-                "encoder_to_meter": 0.0000279741933,  # Hari pertama sebelum di IST
+                # "encoder_to_meter": 0.0000279741933,  # Hari pertama sebelum di IST
+                # "encoder_to_meter": 0.0000270519671,  # Hari kedua sebelum di IST sama anak anak
+                # "encoder_to_meter": 0.0000279741333,  # Hari kedua sebelum di IST sama anak anak, lagi cuy
+                "encoder_to_meter": 0.0000274741333,  # Feeling langisung benar
                 "offset_sudut_steering": -0.04,
                 "gyro_type": 0,
                 "timer_period": 40,
@@ -621,11 +654,18 @@ def generate_launch_description():
         parameters=[
             {
                 # "if_name": "enp45s0",
-                "if_name": "enp5s0",
+                "if_name": "enp6s0",
                 # "if_name": "enxf8e43b8f7f88",
                 "po2so_config": 0,
                 "dac_velocity_maximum": 4.0,
-                "brake_idle_position": -50000,
+                # "dac_velocity_maximum": 5.0, # ini maksimal towing # COBA
+                "brake_idle_position": -10000,
+                "towing_berapa": TOWING_BERAPA,
+                "bypass_handrem_hw": True,
+                "k_pid_eps_torq_vel_pos": [10.0, 0.0, 0.0, 100.0, 2.0, 0.0, 150.0, 0.00, 0.0],
+                "k_eps_const": [1225.0, 100.0, 20.86168798, 1788.0, 70.67, 0.1, 0.1, 8.0, 1.28, 30.0, 200.0, 5600.0, 5600.0, 100.0, 50.0],
+                "disable_brake": False,
+                "max_change_rad_eps_tar": 0.0026,
             }
         ],
         respawn=True,
@@ -639,9 +679,12 @@ def generate_launch_description():
         output="screen",
         parameters=[
             {
-                "if_name": "/dev/serial/by-id/usb-STMicroelectronics_STM32_Virtual_ComPort_203631654D4D-if00",
+                "if_name": "/dev/serial/by-id/usb-STMicroelectronics_STM32_Virtual_ComPort_2074315D574B-if00",
                 "use_socket_can": False,
                 "counter_divider_can_send": 4,
+                "towing_berapa": TOWING_BERAPA,
+                "enable_control_pwm": True,
+                "setpoint_suhu": 56,
             }
         ],
         remappings=[("/can/imu", "/hardware/imu")],
@@ -720,9 +763,9 @@ def generate_launch_description():
             {
                 # "camera_path": "/dev/v4l/by-id/usb-046d_罗技高清网络摄像机_C930c-video-index0",
                 "camera_path": "/dev/v4l/by-id/usb-Chicony_Electronics_Co._Ltd._HD_User_Facing_0001-video-index0",
-                "hardcoded_image": os.path.join(
-                    ws_path, "src/vision/assets/coba_kam.png"
-                ),
+                # "hardcoded_image": os.path.join(
+                #     ws_path, "src/vision/assets/coba_kam.png"
+                # ),
             }
         ],
         respawn=True,
@@ -1079,7 +1122,7 @@ def generate_launch_description():
         executable="static_transform_publisher",
         name="tf_base_link_to_lidar_kanan_link",
         # fmt: off
-        arguments=["1.22","-0.45","0.800","0.00","0.00","1.57","base_link","lidar_kanan_link",
+        arguments=["1.22","-0.45","0.785","0.00","0.00","1.57","base_link","lidar_kanan_link",
             "--ros-args","--log-level","error",],
         # fmt: on
         respawn=True,
@@ -1090,7 +1133,7 @@ def generate_launch_description():
         executable="static_transform_publisher",
         name="tf_base_link_to_lidar_kiri_link",
         # fmt: off
-        arguments=["1.22","0.45","0.800","0.00","0.00","-1.57","base_link","lidar_kiri_link",
+        arguments=["1.22","0.45","0.785","0.00","0.00","-1.57","base_link","lidar_kiri_link",
             "--ros-args","--log-level","error",],
         # fmt: on
         respawn=True,
@@ -1320,7 +1363,7 @@ def generate_launch_description():
                 "Kp/MaxFeatures": "2000",
                 "RGBD/Enabled": "True",
                 "RGBD/OptimizeFromGraphEnd": "False",  # True agar robot tidak lompat
-                "RGBD/NeighborLinkRefining": "False",  # Added from documentation
+                "RGBD/NeighborLinkRefining": "False",  # Added from documentation, ikut odom saja
                 "RGBD/AngularUpdate": "0.1",  # Added from documentation
                 "RGBD/LinearUpdate": "0.1",  # Added from documentation
                 "RGBD/OptimizeMaxError": "3.0",  # Added from documentation
@@ -1341,7 +1384,7 @@ def generate_launch_description():
                 "GTSAM/Incremental": "False",  # Added by Azzam
                 "Bayes/PredictionMargin": "0",  # Added by Azzam
                 "Bayes/FullPredictionUpdate": "False",  # Added by Azzam
-                "Bayes/PredictionLC": "0.1",  # Added by Azzam
+                "Bayes/PredictionLC": "0.1 0.36 0.30 0.16 0.062 0.0151 0.00255 0.000324 2.5e-05 1.3e-06 4.8e-08 1.2e-09 1.9e-11 2.2e-13 1.7e-15 8.5e-18 2.9e-20 6.9e-23",  # Added by Azzam
                 "Odom/Strategy": "0",  # Added by Azzam
                 "Odom/ResetCountdown": "0",  # Added by Azzam
                 "Odom/Holonomic": "False",  # Added by Azzam
@@ -1362,7 +1405,7 @@ def generate_launch_description():
                 "Icp/Iterations": "30",  # Added by Azzam
                 "Icp/PointToPlane": "True",  # Added by Azzam
                 "Icp/VoxelSize": "0.05",  # Added by Azzam
-                "Icp/PointToPlaneMinComplexity": "0.09",  # to be more robust to long corridors with low geometry
+                "Icp/PointToPlaneMinComplexity": "0.03",  # to be more robust to long corridors with low geometry
                 "Icp/PointToPlaneLowComplexityStrategy": "1",  # to be more robust to long corridors with low geometry
                 "Vis/MaxDepth": "20.0",
                 "Vis/MinInliers": "15",
@@ -1378,8 +1421,8 @@ def generate_launch_description():
                 "Grid/RayTracing": "False",  # Added by Azzam
                 "use_sim_time": False,
                 # "Threads": 12, # Added by Azzam,
-                # "database_path": "/root/.ros/rtabmap.db", # Untuk 2 jalur
-                "database_path": "/home/ist/map_baru_bagus.db", # Untuk 1 jalur
+                "database_path": "/root/.ros/rtabmap.db", # Untuk 2 jalur
+                # "database_path": "/home/ist/map_baru_bagus.db", # Untuk 1 jalur
             }
         ],
         remappings=[
@@ -1634,7 +1677,8 @@ def generate_launch_description():
         parameters=[
             {
                 "use_sim_time": False,
-                "yaml_filename": "/home/wildan/Desktop/map_baru/map_baru_bagus.yaml",
+                # "yaml_filename": "/home/wildan/Desktop/map_baru/map_baru_bagus.yaml",
+                "yaml_filename": "/home/wildan/Desktop/lagi_map_baru/rtabmap.yaml",
             }
         ],
         remappings=[("map", "/slam/map")],
@@ -1655,49 +1699,44 @@ def generate_launch_description():
         remappings=[("map", "/slam/map")],
     )
 
+    udp_logger = Node(
+        package="communication",
+        executable="udp_logger.py",
+        name="udp_logger",
+        parameters=[{
+            "T_ID": TOWING_BERAPA,
+            "MY_SERVER_IP": "0.0.0.0",
+            "MY_SERVER_PORT": 1254,
+            "JB_IP": "10.20.30.221",
+            "JB_PORT": 1254,
+        }],
+        output="screen",
+        respawn=True,
+    )
+
     # return LaunchDescription(
     #     [
-    #         # DeclareLaunchArgument('auto_start', default_value='true'),
-    #         # hokuyo1_lidar_driver,
-    #         # hokuyo1_lidar_configure,
-    #         # hokuyo1_lidar_activate,
-    #         # hokuyo2_lidar_driver,
-    #         # hokuyo2_lidar_configure,
-    #         # hokuyo2_lidar_activate,
+    #         beckhoff,
+    #         # CANbus_HAL,
+    #         # udp_logger,
+    #         # master,
+    #     ]
+    # )
 
-
+    # return LaunchDescription(
+    #     [
     #         # beckhoff,
     #         # CANbus_HAL,
-
-    #         # tf_base_link_to_lidar2_link,
-    #         # tf_base_link_to_body_link,
-    #         # tf_base_link_to_lidar1_link,
-    #         # tf_base_link_to_imu_link,
-    #         # tf_base_link_to_lidar_kanan_link,
-    #         # tf_base_link_to_lidar_kiri_link,
-    #         # tf_base_link_to_camera_link,
-    #         # bpearl_lidar_kanan,
-    #         # bpearl_lidar_kiri,
-    #         rs2_cam_main,
-
-
-    #         # rviz2,
-    #         # CANbus_HAL_socket_can0,
-    #         # CANbus_HAL_socket_can1,
-    #         # rosapi_node,
-    #         # rosbridge_server,
-    #         # web_video_server,
+    #         # udp_logger,
     #         # master,
-    #         # ui_server,
-    #         # upload_server,
-    #         # test_map_server,
-    #         # test_map_server_lifecycle
-    #         # all_obstacle_filter,
-    #         # camera_obstacle_detector,
-    #         # lidar_obstacle_filter,
-    #         # forklift_detector
 
-    #         # rtabmap_slam_robust,
+    #         rosapi_node,
+    #         rosbridge_server,
+    #         web_video_server,
+    #         master,
+    #         ui_server,
+    #         upload_server,
+    #         udp_logger,
     #     ]
     # )
 
@@ -1705,85 +1744,63 @@ def generate_launch_description():
 
     return LaunchDescription(
         [
-            # ascamera_multi,
-            # TimerAction(
-            #     period=8.0,
-            #     actions=[
-            #         lane_detection,
-            #         aruco_detection,
-            #     ],
-            # ),
-            # =============================================================================
-            pose_estimator,
-            tf_base_link_to_lidar_kanan_link,
-            tf_base_link_to_lidar_kiri_link,
-            tf_base_link_to_lidar2_link,
-            tf_base_link_to_body_link,
-            tf_base_link_to_imu_link,
-            tf_base_link_to_lidar1_link,
-            tf_base_link_to_camera_link,
-            # # =============================================================================
-            rs2_cam_main,
-            # # =============================================================================
+            beckhoff,
             TimerAction(
-                period=8.0,
+                period=17.0,
                 actions=[
-                    bpearl_lidar_kanan,
-                    bpearl_lidar_kiri,
-                ],
-            ),
-            TimerAction(
-                period=1.5,
-                actions=[
-                    DeclareLaunchArgument("auto_start", default_value="true"),
-                    hokuyo1_lidar_driver,
-                    hokuyo1_lidar_activate,
-                    hokuyo1_lidar_configure,
+                    # =============================================================================
+                    pose_estimator,
+                    tf_base_link_to_lidar_kanan_link,
+                    tf_base_link_to_lidar_kiri_link,
+                    tf_base_link_to_lidar2_link,
+                    tf_base_link_to_body_link,
+                    tf_base_link_to_imu_link,
+                    tf_base_link_to_lidar1_link,
+                    tf_base_link_to_camera_link,
+                    # # =============================================================================
+                    rs2_cam_main,
+                    # # =============================================================================
+                    TimerAction(
+                        period=8.0,
+                        actions=[
+                            bpearl_lidar_kanan,
+                            bpearl_lidar_kiri,
+                        ],
+                    ),
+                    TimerAction(
+                        period=5.0,
+                        actions=[
+                            DeclareLaunchArgument("auto_start", default_value="true"),
+                            hokuyo1_lidar_driver,
+                            hokuyo1_lidar_activate,
+                            hokuyo1_lidar_configure,
+                        ],
+                    ),
+
+                    lidar_obstacle_filter,
+                    all_obstacle_filter,
+                    # # =============================================================================
+                    CANbus_HAL,
+                    # CANbus_HAL_socket_can0,  # Untuk PC tanpa embedded CAN
+                    # CANbus_HAL_socket_can1,  # Untuk PC tanpa embedded CAN
+                    # # =============================================================================
+                    rosapi_node,
+                    rosbridge_server,
+                    web_video_server,
+                    master,
+                    ui_server,
+                    upload_server,
+                    udp_logger,
+                    # # =============================================================================
+                    TimerAction(
+                        period=0.5,
+                        actions=[
+                            rtabmap_slam_robust,
+                            ekf_node,
+                        ],
+                    ),
                 ],
             ),
 
-            # obstacle_filter,
-            # camera_obstacle_detector,
-            lidar_obstacle_filter,
-            all_obstacle_filter,
-            # forklift_detector,
-            # forklift_detector_vision,
-            # # =============================================================================
-            # TimerAction(
-            #     period=1.0,
-            #     actions=[
-            #         # wit_ros2_imu,
-            #         # imu_serial,
-            #     ],
-            # ),
-            beckhoff,
-            # CANbus_HAL,
-            CANbus_HAL_socket_can0,  # Untuk PC tanpa embedded CAN
-            CANbus_HAL_socket_can1,  # Untuk PC tanpa embedded CAN
-            # # =============================================================================
-            rosapi_node,
-            rosbridge_server,
-            web_video_server,
-            master,
-            ui_server,
-            upload_server,
-            # # =============================================================================
-            TimerAction(
-                period=0.5,
-                actions=[
-                    # rtabmap_slam_rtabmap3,
-                    rtabmap_slam_robust,
-                    # icp_odom_node,
-                    # rgbd_odom_node,
-                    ekf_node,
-                ],
-            ),
-            # TimerAction(
-            #     period=300.0,
-            #     actions=[
-            #         ekf_node,
-            #     ],
-            # ),
-            # rviz2,
         ]
     )

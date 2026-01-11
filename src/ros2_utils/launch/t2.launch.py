@@ -450,14 +450,14 @@ def generate_launch_description():
                 "camera_scan_max_x_": 3.0,
                 "camera_scan_min_y_": -1.0,
                 "camera_scan_max_y_": 1.0,
-                # "threshold_icp_score": 0.7,
-                "threshold_icp_score": 3.0, # COBA
+                "threshold_icp_score": 0.7,
+                # "threshold_icp_score": 3.0, # COBA
                 "debug_motion": True,
                 "all_obstacle_thr": 50000.0,
 		        "toribay_ready_threshold": 470.0,
                 "toribay_ready_threshold_kanan": 100.0,
                 "debug_motion": True,
-                "disable_deteksi_toribe": True, # COBA
+                "disable_deteksi_toribe": False, 
 
             }
         ],
@@ -650,17 +650,19 @@ def generate_launch_description():
         output="screen",
         parameters=[
             {
-                # "if_name": "enp45s0",
-                "if_name": "enp6s0",
+                # "if_name": "enp5s0",
+                "if_name": "enp5s0",
                 # "if_name": "enxf8e43b8f7f88",
                 "po2so_config": 0,
-                # "dac_velocity_maximum": 4.0,
-                "dac_velocity_maximum": 5.0, # ini maksimal towing # COBA
+                "dac_velocity_maximum": 4.0,
+                # "dac_velocity_maximum": 5.0, # ini maksimal towing # COBA
                 "brake_idle_position": -50000,
                 "towing_berapa": TOWING_BERAPA,
                 "bypass_handrem_hw": True,
-                "k_pid_eps_torq_pos_vel": [10.0, 0.0, 0.0, 100.0, 2.0, 0.0, 135.0, 0.7, 0.0],
+                "k_pid_eps_torq_vel_pos": [10.0, 0.0, 0.0, 100.0, 2.0, 0.0, 135.0, 0.7, 0.0],
+                "k_eps_const": [1225.0, 100.0, 20.86168798, 1788.0, 70.67, 0.1, 0.1, 8.0, 1.28, 30.0, 200.0, 5600.0, 5600.0, 69.0, 7.0],
                 "disable_brake": False,
+                "max_change_rad_eps_tar": 0.0026,
             }
         ],
         respawn=True,
@@ -674,11 +676,11 @@ def generate_launch_description():
         output="screen",
         parameters=[
             {
-                "if_name": "/dev/serial/by-id/usb-STMicroelectronics_STM32_Virtual_ComPort_2074315D574B-if00",
+                "if_name": "/dev/serial/by-id/usb-STMicroelectronics_STM32_Virtual_ComPort_203631654D4D-if00",
                 "use_socket_can": False,
                 "counter_divider_can_send": 4,
                 "towing_berapa": TOWING_BERAPA,
-                "enable_control_pwm": True,
+                "enable_control_pwm": False,
                 "setpoint_suhu": 60,
             }
         ],
@@ -698,6 +700,7 @@ def generate_launch_description():
                 "bitrate": 125000,
                 "use_socket_can": True,
                 "can_to_car": False,
+                "enable_control_pwm": False,
             }
         ],
         respawn=True,
@@ -715,6 +718,7 @@ def generate_launch_description():
                 "bitrate": 125000,
                 "use_socket_can": True,
                 "can_to_car": True,
+                "enable_control_pwm": False,
             }
         ],
         respawn=True,
@@ -1117,7 +1121,7 @@ def generate_launch_description():
         executable="static_transform_publisher",
         name="tf_base_link_to_lidar_kanan_link",
         # fmt: off
-        arguments=["1.22","-0.45","0.780","0.00","0.00","1.57","base_link","lidar_kanan_link",
+        arguments=["1.22","-0.45","0.800","0.00","0.00","1.57","base_link","lidar_kanan_link",
             "--ros-args","--log-level","error",],
         # fmt: on
         respawn=True,
@@ -1128,7 +1132,7 @@ def generate_launch_description():
         executable="static_transform_publisher",
         name="tf_base_link_to_lidar_kiri_link",
         # fmt: off
-        arguments=["1.22","0.45","0.780","0.00","0.00","-1.57","base_link","lidar_kiri_link",
+        arguments=["1.22","0.45","0.800","0.00","0.00","-1.57","base_link","lidar_kiri_link",
             "--ros-args","--log-level","error",],
         # fmt: on
         respawn=True,
@@ -1702,9 +1706,8 @@ def generate_launch_description():
             "T_ID": TOWING_BERAPA,
             "MY_SERVER_IP": "0.0.0.0",
             "MY_SERVER_PORT": 1254,
-            "JB_IP": "10.20.30.221",
+            "JB_IP": "10.181.129.177",
             "JB_PORT": 1254,
-            "MODE_DEBUG": 1,
         }],
         output="screen",
         respawn=True,
@@ -1719,22 +1722,22 @@ def generate_launch_description():
     #     ]
     # )
 
-    return LaunchDescription(
-        [
-            # beckhoff,
-            # CANbus_HAL,
-            # udp_logger,
-            # master,
+    # return LaunchDescription(
+    #     [
+    #         # beckhoff,
+    #         # CANbus_HAL,
+    #         # udp_logger,
+    #         # master,
 
-            rosapi_node,
-            rosbridge_server,
-            web_video_server,
-            master,
-            ui_server,
-            upload_server,
-            udp_logger,
-        ]
-    )
+    #         rosapi_node,
+    #         rosbridge_server,
+    #         web_video_server,
+    #         master,
+    #         ui_server,
+    #         upload_server,
+    #         udp_logger,
+    #     ]
+    # )
 
     # ==============================================================================
 
@@ -1773,9 +1776,9 @@ def generate_launch_description():
             all_obstacle_filter,
             # # =============================================================================
             beckhoff,
-            CANbus_HAL,
-            # CANbus_HAL_socket_can0,  # Untuk PC tanpa embedded CAN
-            # CANbus_HAL_socket_can1,  # Untuk PC tanpa embedded CAN
+            # CANbus_HAL,
+            CANbus_HAL_socket_can0,  # Untuk PC tanpa embedded CAN
+            CANbus_HAL_socket_can1,  # Untuk PC tanpa embedded CAN
             # # =============================================================================
             rosapi_node,
             rosbridge_server,

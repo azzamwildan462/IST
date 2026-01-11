@@ -28,6 +28,14 @@ svg {
     /* Rotate to start at top left */
 }
 
+.steering-circle-target {
+    fill: none;
+    stroke-width: 20;
+    transform-origin: center;
+    transform: rotate(135deg);
+    /* Rotate to start at top left */
+}
+
 .steering-circle0 {
     fill: none;
     stroke-width: 10;
@@ -91,9 +99,7 @@ text {
 
 .comment-form {
     background-color: #101010;
-    border-left: 4px solid #10ccb0;
     padding: 20px;
-    margin: 20px 0;
     border-radius: 8px;
     font-family: Arial, sans-serif;
     color: #f1f1f1;
@@ -121,23 +127,13 @@ text {
     font-size: 14px;
 }
 
-.comment-form button {
-    background-color: #10ccb0;
-    color: black;
-    border: none;
-    padding: 10px 15px;
-    border-radius: 5px;
-    cursor: pointer;
-    font-size: 14px;
-}
-
-.comment-form button:hover {
-    background-color: #0da790;
-}
-
 .result-choice {
     margin-top: 15px;
     font-size: 16px;
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    margin: 1rem 0;
 }
 
 .result-choice label {

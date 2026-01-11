@@ -1,3 +1,5 @@
+// asd
+//  asd
 #include "master/master.hpp"
 #include "rclcpp/rclcpp.hpp"
 
@@ -6,6 +8,9 @@ Master::Master()
 {
     this->declare_parameter("offset_sudut_steering", 0.0);
     this->get_parameter("offset_sudut_steering", offset_sudut_steering);
+
+    this->declare_parameter("towing_berapa", 2);
+    this->get_parameter("towing_berapa", towing_berapa);
 
     this->declare_parameter("use_ekf_odometry", false);
     this->get_parameter("use_ekf_odometry", use_ekf_odometry);
@@ -76,6 +81,12 @@ Master::Master()
     this->declare_parameter("thresh_toribay_real_detected", thresh_toribay_real_detected);
     this->get_parameter("thresh_toribay_real_detected", thresh_toribay_real_detected);
 
+    this->declare_parameter("ring_scan_teman", ring_scan_teman);
+    this->get_parameter("ring_scan_teman", ring_scan_teman);
+
+    this->declare_parameter("disable_deteksi_toribe", disable_deteksi_toribe);
+    this->get_parameter("disable_deteksi_toribe", disable_deteksi_toribe);
+
     if (!logger.init())
     {
         RCLCPP_ERROR(this->get_logger(), "Failed to initialize logger");
@@ -115,6 +126,8 @@ Master::Master()
         "/can/eps_encoder", 1, std::bind(&Master::callback_sub_CAN_eps_encoder, this, std::placeholders::_1));
     sub_beckhoff_sensor = this->create_subscription<std_msgs::msg::Float32MultiArray>(
         "/beckhoff/analog_input", 1, std::bind(&Master::callback_sub_beckhoff_sensor, this, std::placeholders::_1));
+    sub_info_teman = this->create_subscription<std_msgs::msg::Float32MultiArray>(
+        "/udp/info_teman", 1, std::bind(&Master::callback_sub_info_teman, this, std::placeholders::_1));
     sub_all_obstacle_filter = this->create_subscription<std_msgs::msg::Float32MultiArray>(
         "/all_obstacle_filter/result_all_obstacle", 1, std::bind(&Master::callback_sub_all_obstacle_filter, this, std::placeholders::_1));
     sub_lane_kiri = this->create_subscription<ros2_interface::msg::PointArray>(
@@ -163,6 +176,8 @@ Master::Master()
         "/slam/map", 1, std::bind(&Master::callback_sub_map, this, std::placeholders::_1));
     sub_localization_pose = this->create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>(
         "/slam/localization_pose", 1, std::bind(&Master::callback_sub_localization_pose, this, std::placeholders::_1));
+    sub_status_handrem = this->create_subscription<std_msgs::msg::UInt8>(
+        "/can/handrem", 1, std::bind(&Master::callback_sub_status_handrem, this, std::placeholders::_1));
     if (enable_obs_detection_camera)
     {
         sub_camera_pcl = this->create_subscription<sensor_msgs::msg::PointCloud2>(
@@ -222,6 +237,55 @@ Master::Master()
 }
 Master::~Master()
 {
+}
+
+void Master::callback_sub_status_handrem(const std_msgs::msg::UInt8::SharedPtr msg)
+{
+    status_handrem_dibawah = msg->data;
+}
+
+void Master::callback_sub_info_teman(const std_msgs::msg::Float32MultiArray::SharedPtr msg)
+{
+    info_teman[0].terminal_terakhir = (int)msg->data[0];
+    info_teman[0].pose_x = msg->data[1];
+    info_teman[0].pose_y = msg->data[2];
+    info_teman[0].pose_theta = msg->data[3];
+
+    if (towing_berapa != 1)
+    {
+        float dx = info_teman[0].pose_x - fb_final_pose_xyo[0];
+        float dy = info_teman[0].pose_y - fb_final_pose_xyo[1];
+        info_teman[0].jarak_terdekat = std::sqrt(dx * dx + dy * dy);
+    }
+
+    info_teman[1].terminal_terakhir = (int)msg->data[4];
+    info_teman[1].pose_x = msg->data[5];
+    info_teman[1].pose_y = msg->data[6];
+    info_teman[1].pose_theta = msg->data[7];
+
+    if (towing_berapa != 2)
+    {
+        float dx = info_teman[1].pose_x - fb_final_pose_xyo[0];
+        float dy = info_teman[1].pose_y - fb_final_pose_xyo[1];
+        info_teman[1].jarak_terdekat = std::sqrt(dx * dx + dy * dy);
+    }
+
+    info_teman[2].terminal_terakhir = (int)msg->data[8];
+    info_teman[2].pose_x = msg->data[9];
+    info_teman[2].pose_y = msg->data[10];
+    info_teman[2].pose_theta = msg->data[11];
+
+    if (towing_berapa != 3)
+    {
+        float dx = info_teman[2].pose_x - fb_final_pose_xyo[0];
+        float dy = info_teman[2].pose_y - fb_final_pose_xyo[1];
+        info_teman[2].jarak_terdekat = std::sqrt(dx * dx + dy * dy);
+    }
+
+    logger.info("%d %.2f %.2f %.2f %d %.2f %.2f %.2f %d %.2f %.2f %.2f",
+                info_teman[0].terminal_terakhir, info_teman[0].pose_x, info_teman[0].pose_y, info_teman[0].pose_theta,
+                info_teman[1].terminal_terakhir, info_teman[1].pose_x, info_teman[1].pose_y, info_teman[1].pose_theta,
+                info_teman[2].terminal_terakhir, info_teman[2].pose_x, info_teman[2].pose_y, info_teman[2].pose_theta);
 }
 
 void Master::callback_sub_can_battery(const std_msgs::msg::Int16::SharedPtr msg)
@@ -992,10 +1056,11 @@ void Master::callback_tim_50hz()
                 }
             }
         }
-        else if ((fb_beckhoff_digital_input & IN_START_GAS_MANUAL) == IN_START_GAS_MANUAL)
-        {
-            global_fsm.value = FSM_GLOBAL_OP_5;
-        }
+        /* Nonaktifkan gas manual dari remote */
+        // else if ((fb_beckhoff_digital_input & IN_START_GAS_MANUAL) == IN_START_GAS_MANUAL)
+        // {
+        //     global_fsm.value = FSM_GLOBAL_OP_5;
+        // }
 
         if (!prev_is_rtabmap_ready && is_rtabmap_ready)
         {
@@ -1036,13 +1101,7 @@ void Master::callback_tim_50hz()
         }
 
         // Tetap kirim, untuk debugging
-        master_status_emergency &= ~(EMERGENCY_LIDAR_DEPAN_DETECTED |
-                                     EMERGENCY_CAMERA_OBS_DETECTED |
-                                     EMERGENCY_GYRO_ANOMALY_DETECTED |
-                                     EMERGENCY_ICP_SCORE_TERLALU_BESAR |
-                                     EMERGENCY_STOP_KARENA_OBSTACLE |
-                                     EMERGENCY_ALL_LIDAR_DETECTED |
-                                     EMERGENCY_GANDENGAN_LEPAS);
+        master_status_emergency &= ~(EMERGENCY_LIDAR_DEPAN_DETECTED | EMERGENCY_CAMERA_OBS_DETECTED | EMERGENCY_GYRO_ANOMALY_DETECTED | EMERGENCY_ICP_SCORE_TERLALU_BESAR | EMERGENCY_STOP_KARENA_OBSTACLE | EMERGENCY_ALL_LIDAR_DETECTED | EMERGENCY_GANDENGAN_LEPAS);
 
         if ((fb_beckhoff_digital_input & 0b011) == 0)
         {
@@ -1076,7 +1135,7 @@ void Master::callback_tim_50hz()
                 counter_gandengan_lepas = 0;
             }
 
-            if (counter_gandengan_lepas > 150)
+            if (counter_gandengan_lepas > 150 && disable_deteksi_toribe == false)
             {
                 master_status_emergency |= EMERGENCY_GANDENGAN_LEPAS;
             }
@@ -1108,7 +1167,11 @@ void Master::callback_tim_50hz()
         static uint16_t counter_stop = 0;
 
         // Jika di stop dari remot atau handler turun
-        if ((((fb_beckhoff_digital_input & IN_SYSTEM_FULL_ENABLE) == 0) && start_dari_handler == 0) || (fb_beckhoff_digital_input & IN_STOP_OP3_HANDLER) == IN_STOP_OP3_HANDLER)
+        if ((((fb_beckhoff_digital_input & IN_SYSTEM_FULL_ENABLE) == 0) && start_dari_handler == 0) || ((fb_beckhoff_digital_input & IN_STOP_OP3_HANDLER) == IN_STOP_OP3_HANDLER))
+        {
+            counter_stop++;
+        }
+        else if (((fb_beckhoff_digital_input & IN_EPS_nFAULT) == 0))
         {
             counter_stop++;
         }
@@ -1185,7 +1248,7 @@ void Master::callback_tim_50hz()
             fusion_follow_lane_waypoints_gas_manual(target_velocity_joy_x, 0, 0, 1.5, true);
         }
 
-        if ((fb_beckhoff_digital_input & IN_STOP_OP3) == IN_STOP_OP3)
+        if (((fb_beckhoff_digital_input & IN_STOP_OP3) == IN_STOP_OP3) || ((fb_beckhoff_digital_input & IN_STOP_OP3_HANDLER) == IN_STOP_OP3_HANDLER))
         {
             global_fsm.value = FSM_GLOBAL_SAFEOP;
             break;

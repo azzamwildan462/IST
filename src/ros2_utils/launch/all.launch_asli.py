@@ -41,8 +41,6 @@ def generate_launch_description():
     # SetEnvironmentVariable(name='RMW_IMPLEMENTATION', value='rmw_cyclonedds_cpp'),
     # SetEnvironmentVariable(name='CYCLONEDDS_URI', value='file://' + path_config + 'cyclonedds.xml'),
 
-    TOWING_BERAPA = 2
-
     SetEnvironmentVariable("TESSDATA_PREFIX", "/usr/share/tesseract-ocr/4.00"),
 
     rosbridge_server = Node(
@@ -431,7 +429,6 @@ def generate_launch_description():
         output="screen",
         parameters=[
             {
-                "towing_berapa": TOWING_BERAPA,
                 "use_ekf_odometry": True,
                 "offset_sudut_steering": -0.04,
                 "waypoint_file_path": os.path.join(path_config, "waypoint.csv"),
@@ -450,15 +447,11 @@ def generate_launch_description():
                 "camera_scan_max_x_": 3.0,
                 "camera_scan_min_y_": -1.0,
                 "camera_scan_max_y_": 1.0,
-                # "threshold_icp_score": 0.7,
-                "threshold_icp_score": 3.0, # COBA
+                "threshold_icp_score": 0.7,
                 "debug_motion": True,
                 "all_obstacle_thr": 50000.0,
 		        "toribay_ready_threshold": 470.0,
                 "toribay_ready_threshold_kanan": 100.0,
-                "debug_motion": True,
-                "disable_deteksi_toribe": True, # COBA
-
             }
         ],
         respawn=True,
@@ -651,16 +644,11 @@ def generate_launch_description():
         parameters=[
             {
                 # "if_name": "enp45s0",
-                "if_name": "enp6s0",
+                "if_name": "enp5s0",
                 # "if_name": "enxf8e43b8f7f88",
                 "po2so_config": 0,
-                # "dac_velocity_maximum": 4.0,
-                "dac_velocity_maximum": 5.0, # ini maksimal towing # COBA
+                "dac_velocity_maximum": 4.0,
                 "brake_idle_position": -50000,
-                "towing_berapa": TOWING_BERAPA,
-                "bypass_handrem_hw": True,
-                "k_pid_eps_torq_pos_vel": [10.0, 0.0, 0.0, 100.0, 2.0, 0.0, 135.0, 0.7, 0.0],
-                "disable_brake": False,
             }
         ],
         respawn=True,
@@ -674,12 +662,9 @@ def generate_launch_description():
         output="screen",
         parameters=[
             {
-                "if_name": "/dev/serial/by-id/usb-STMicroelectronics_STM32_Virtual_ComPort_2074315D574B-if00",
+                "if_name": "/dev/serial/by-id/usb-STMicroelectronics_STM32_Virtual_ComPort_203631654D4D-if00",
                 "use_socket_can": False,
                 "counter_divider_can_send": 4,
-                "towing_berapa": TOWING_BERAPA,
-                "enable_control_pwm": True,
-                "setpoint_suhu": 60,
             }
         ],
         remappings=[("/can/imu", "/hardware/imu")],
@@ -1117,7 +1102,7 @@ def generate_launch_description():
         executable="static_transform_publisher",
         name="tf_base_link_to_lidar_kanan_link",
         # fmt: off
-        arguments=["1.22","-0.45","0.780","0.00","0.00","1.57","base_link","lidar_kanan_link",
+        arguments=["1.22","-0.45","0.800","0.00","0.00","1.57","base_link","lidar_kanan_link",
             "--ros-args","--log-level","error",],
         # fmt: on
         respawn=True,
@@ -1128,7 +1113,7 @@ def generate_launch_description():
         executable="static_transform_publisher",
         name="tf_base_link_to_lidar_kiri_link",
         # fmt: off
-        arguments=["1.22","0.45","0.780","0.00","0.00","-1.57","base_link","lidar_kiri_link",
+        arguments=["1.22","0.45","0.800","0.00","0.00","-1.57","base_link","lidar_kiri_link",
             "--ros-args","--log-level","error",],
         # fmt: on
         respawn=True,
@@ -1699,47 +1684,91 @@ def generate_launch_description():
         executable="udp_logger.py",
         name="udp_logger",
         parameters=[{
-            "T_ID": TOWING_BERAPA,
+            "T_ID": 2,
             "MY_SERVER_IP": "0.0.0.0",
-            "MY_SERVER_PORT": 1254,
-            "JB_IP": "10.20.30.221",
+            "MY_SERVER_PORT": 1255,
+            "JB_IP": "10.7.101.232",
             "JB_PORT": 1254,
-            "MODE_DEBUG": 1,
         }],
         output="screen",
         respawn=True,
     )
 
+    return LaunchDescription([
+        rosbridge_server,
+        web_video_server,
+        master,
+        ui_server,
+        upload_server,
+        tf_base_link_to_camera_link,
+        rs2_cam_main,
+        # # vision_capture,
+
+        # test_map_server,
+        # test_map_server_lifecycle
+
+
+        # udp_logger
+    ])
+
     # return LaunchDescription(
     #     [
-    #         beckhoff,
+    #         # DeclareLaunchArgument('auto_start', default_value='true'),
+    #         # hokuyo1_lidar_driver,
+    #         # hokuyo1_lidar_configure,
+    #         # hokuyo1_lidar_activate,
+    #         # hokuyo2_lidar_driver,
+    #         # hokuyo2_lidar_configure,
+    #         # hokuyo2_lidar_activate,
+
+
+    #         # beckhoff,
     #         # CANbus_HAL,
-    #         # udp_logger,
-    #         # master,
+
+    #         # tf_base_link_to_lidar2_link,
+    #         # tf_base_link_to_body_link,
+    #         # tf_base_link_to_lidar1_link,
+    #         # tf_base_link_to_imu_link,
+    #         # tf_base_link_to_lidar_kanan_link,
+    #         # tf_base_link_to_lidar_kiri_link,
+    #         # tf_base_link_to_camera_link,
+    #         # bpearl_lidar_kanan,
+    #         # bpearl_lidar_kiri,
+    #         # rs2_cam_main,
+
+
+    #         # rviz2,
+    #         # CANbus_HAL_socket_can0,
+    #         # CANbus_HAL_socket_can1,
+    #         rosapi_node,
+    #         rosbridge_server,
+    #         web_video_server,
+    #         master,
+    #         ui_server,
+    #         upload_server,
+    #         # test_map_server,
+    #         # test_map_server_lifecycle
+    #         # all_obstacle_filter,
+    #         # camera_obstacle_detector,
+    #         # lidar_obstacle_filter,
+    #         # forklift_detector
+
+    #         # rtabmap_slam_robust,
     #     ]
     # )
-
-    return LaunchDescription(
-        [
-            # beckhoff,
-            # CANbus_HAL,
-            # udp_logger,
-            # master,
-
-            rosapi_node,
-            rosbridge_server,
-            web_video_server,
-            master,
-            ui_server,
-            upload_server,
-            udp_logger,
-        ]
-    )
 
     # ==============================================================================
 
     return LaunchDescription(
         [
+            # ascamera_multi,
+            # TimerAction(
+            #     period=8.0,
+            #     actions=[
+            #         lane_detection,
+            #         aruco_detection,
+            #     ],
+            # ),
             # =============================================================================
             pose_estimator,
             tf_base_link_to_lidar_kanan_link,
@@ -1760,7 +1789,7 @@ def generate_launch_description():
                 ],
             ),
             TimerAction(
-                period=5.0,
+                period=1.5,
                 actions=[
                     DeclareLaunchArgument("auto_start", default_value="true"),
                     hokuyo1_lidar_driver,
@@ -1769,13 +1798,24 @@ def generate_launch_description():
                 ],
             ),
 
+            # obstacle_filter,
+            # camera_obstacle_detector,
             lidar_obstacle_filter,
             all_obstacle_filter,
+            # forklift_detector,
+            # forklift_detector_vision,
             # # =============================================================================
+            # TimerAction(
+            #     period=1.0,
+            #     actions=[
+            #         # wit_ros2_imu,
+            #         # imu_serial,
+            #     ],
+            # ),
             beckhoff,
-            CANbus_HAL,
-            # CANbus_HAL_socket_can0,  # Untuk PC tanpa embedded CAN
-            # CANbus_HAL_socket_can1,  # Untuk PC tanpa embedded CAN
+            # CANbus_HAL,
+            CANbus_HAL_socket_can0,  # Untuk PC tanpa embedded CAN
+            CANbus_HAL_socket_can1,  # Untuk PC tanpa embedded CAN
             # # =============================================================================
             rosapi_node,
             rosbridge_server,
@@ -1783,14 +1823,23 @@ def generate_launch_description():
             master,
             ui_server,
             upload_server,
-            udp_logger,
             # # =============================================================================
             TimerAction(
                 period=0.5,
                 actions=[
+                    # rtabmap_slam_rtabmap3,
                     rtabmap_slam_robust,
+                    # icp_odom_node,
+                    # rgbd_odom_node,
                     ekf_node,
                 ],
             ),
+            # TimerAction(
+            #     period=300.0,
+            #     actions=[
+            #         ekf_node,
+            #     ],
+            # ),
+            # rviz2,
         ]
     )

@@ -149,10 +149,10 @@ document.addEventListener('keydown', function (event) {
         ui_target_velocity = 0.48;
     }
     else if (event.key == 'u') {
-        ui_target_velocity = 0.85;
+        ui_target_velocity = 1.0;
     }
     else if (event.key == 'i') {
-        ui_target_velocity = 2.5;
+        ui_target_velocity = 1.97;
     }
     else if (event.key == 'm') {
         ui_target_steering = steering_feedback - 0.1;

@@ -80,7 +80,9 @@
         "coroutine": "cpp",
         "source_location": "cpp",
         "jhctech_291.h": "c",
-        "valarray": "cpp"
+        "valarray": "cpp",
+        "hash_map": "cpp",
+        "hash_set": "cpp"
     },
     "ros.distro": "noetic",
     "C_Cpp.default.compilerPath": "/usr/bin/g++",

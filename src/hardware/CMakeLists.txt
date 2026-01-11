@@ -33,6 +33,7 @@ ament_target_dependencies(serial_imu rclcpp std_msgs sensor_msgs ros2_utils tf2_
 ament_target_dependencies(keyboard_input rclcpp std_msgs)
 
 target_link_libraries(beckhoff ${CURRENT_WORKING_DIRECTORY}/../../SOEM_local/install/lib/libsoem.a)
+target_link_libraries(CANbus_HAL ${CURRENT_WORKING_DIRECTORY}/lib/ecb_306.a)
 target_link_libraries(serial_imu ${Boost_LIBRARIES})
 
 set_target_properties(serial_imu PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)

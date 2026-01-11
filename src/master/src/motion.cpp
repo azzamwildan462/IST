@@ -1,3 +1,5 @@
+// asd
+//  asd
 #include "master/master.hpp"
 
 float Master::pythagoras(float x1, float y1, float x2, float y2)
@@ -132,15 +134,25 @@ void Master::manual_motion(float vx, float vy, float wz)
         }
     }
 
-    if (vx_buffer < 0)
+    if (status_handrem_dibawah == 1)
     {
-        actuation_vx = vx_buffer;
-        actuation_ay = 0;
-        actuation_wz = offset_sudut_steering + wz_buffer;
+        if (vx_buffer < 0)
+        {
+            actuation_vx = vx_buffer;
+            actuation_ay = 0;
+            actuation_wz = offset_sudut_steering + wz_buffer;
+        }
+        else
+        {
+            actuation_vx = pid_vx.calculate(vx_buffer - fb_encoder_meter);
+            actuation_ay = 0;
+            actuation_wz = offset_sudut_steering + wz_buffer;
+        }
     }
-    else
+    else if (status_handrem_dibawah == 0)
     {
-        actuation_vx = pid_vx.calculate(vx_buffer - fb_encoder_meter);
+        vx_buffer = 0;
+        actuation_vx = -1;
         actuation_ay = 0;
         actuation_wz = offset_sudut_steering + wz_buffer;
     }
@@ -273,6 +285,8 @@ void Master::wp2velocity_steering(float lookahead_distance, float *pvelocity, fl
     static const float offset_fb_velocity = 3;
     static const float threshold_error_arah_hadap_waypoint = 1.57;
     static const float threshold_error_arah_hadap_terminal = 1.37;
+    static const float threshold_teman_depan = 0.7;
+    static const float maksimum_kecepatan_belakang_teman = 1.0;
     static int16_t terminal_now = 0;
     static int16_t prev_terminal = 0;
     static uint8_t prev_gyro_counter = 0;
@@ -375,28 +389,6 @@ void Master::wp2velocity_steering(float lookahead_distance, float *pvelocity, fl
                 camera_scan_max_y_ = terminals.terminals[i].scan_max_y;
                 camera_scan_max_x_ = terminals.terminals[i].scan_max_x;
                 camera_scan_min_x_ = terminals.terminals[i].scan_min_x;
-
-                /* Deteksi forklift */
-                // if (detected_forklift_contour > obs_scan_camera_thr_terminal)
-                // {
-                //     counter_request_stop++;
-                //     counter_request_start_again = 0;
-
-                //     if (counter_request_stop > 1000)
-                //     {
-                //         counter_request_stop = 1000;
-                //     }
-                // }
-                // else
-                // {
-                //     counter_request_start_again++;
-                //     counter_request_stop = 0;
-
-                //     if (counter_request_start_again > 1000)
-                //     {
-                //         counter_request_start_again = 1000;
-                //     }
-                // }
                 break;
             }
         }
@@ -430,22 +422,96 @@ void Master::wp2velocity_steering(float lookahead_distance, float *pvelocity, fl
     lidar_obs_scan_thr = obs_scan_r;
     all_obstacle_thr = obs_scan_camera_thr_terminal;
 
-    /* Mencari waypoint sesuai lookahead_distance */
+    /* Reset status ring sacn teman */
+    float lookahead_mencari_teman = lookahead_distance + ring_scan_teman;
+    info_teman[0].status_ring_scan = 0;
+    info_teman[1].status_ring_scan = 0;
+    info_teman[2].status_ring_scan = 0;
+
+    /* Mencari waypoint sesuai lookahead_distance dan scan teman ke depan */
     index_lookahead = index_sekarang;
     if (!is_loop)
     {
+        bool lookahead_distance_ditemukan = false;
         for (size_t i = index_sekarang; i < waypoints.size(); i++)
         {
             float error = pythagoras(pose_used_x, pose_used_y, waypoints[i].x, waypoints[i].y);
-            if (error > lookahead_distance)
+            if (error > lookahead_distance && !lookahead_distance_ditemukan)
             {
                 index_lookahead = i;
+                lookahead_distance_ditemukan = true;
+            }
+
+            float error_teman_1 = 9999;
+            float error_teman_2 = 9999;
+            float error_teman_3 = 9999;
+            if (towing_berapa != 1)
+            {
+                error_teman_2 = pythagoras(info_teman[1].pose_x, info_teman[1].pose_y, waypoints[i].x, waypoints[i].y);
+                error_teman_3 = pythagoras(info_teman[2].pose_x, info_teman[2].pose_y, waypoints[i].x, waypoints[i].y);
+            }
+            else if (towing_berapa != 2)
+            {
+                error_teman_1 = pythagoras(info_teman[0].pose_x, info_teman[0].pose_y, waypoints[i].x, waypoints[i].y);
+                error_teman_3 = pythagoras(info_teman[2].pose_x, info_teman[2].pose_y, waypoints[i].x, waypoints[i].y);
+            }
+            else if (towing_berapa != 3)
+            {
+                error_teman_1 = pythagoras(info_teman[0].pose_x, info_teman[0].pose_y, waypoints[i].x, waypoints[i].y);
+                error_teman_2 = pythagoras(info_teman[1].pose_x, info_teman[1].pose_y, waypoints[i].x, waypoints[i].y);
+            }
+
+            if (error_teman_1 < threshold_teman_depan)
+            {
+                info_teman[0].status_ring_scan = 1;
+                info_teman[0].counter_masuk_ring++;
+                if (info_teman[0].counter_masuk_ring > 1000)
+                {
+                    info_teman[0].counter_masuk_ring = 1000;
+                }
+            }
+            else
+            {
+                info_teman[0].counter_masuk_ring = 0;
+            }
+
+            if (error_teman_2 < threshold_teman_depan)
+            {
+                info_teman[1].status_ring_scan = 1;
+                info_teman[1].counter_masuk_ring++;
+                if (info_teman[1].counter_masuk_ring > 1000)
+                {
+                    info_teman[1].counter_masuk_ring = 1000;
+                }
+            }
+            else
+            {
+                info_teman[1].counter_masuk_ring = 0;
+            }
+
+            if (error_teman_3 < threshold_teman_depan)
+            {
+                info_teman[2].status_ring_scan = 1;
+                info_teman[2].counter_masuk_ring++;
+                if (info_teman[2].counter_masuk_ring > 1000)
+                {
+                    info_teman[2].counter_masuk_ring = 1000;
+                }
+            }
+            else
+            {
+                info_teman[2].counter_masuk_ring = 0;
+            }
+
+            if (error > lookahead_mencari_teman)
+            {
                 break;
             }
         }
     }
     else
     {
+        bool lookahead_distance_ditemukan = false;
         for (size_t i = index_sekarang; i < waypoints.size() * 2; i++)
         {
             size_t index_used = i;
@@ -456,9 +522,80 @@ void Master::wp2velocity_steering(float lookahead_distance, float *pvelocity, fl
             }
 
             float error = pythagoras(pose_used_x, pose_used_y, waypoints[index_used].x, waypoints[index_used].y);
-            if (error > lookahead_distance)
+            if (error > lookahead_distance && !lookahead_distance_ditemukan)
             {
                 index_lookahead = index_used;
+                lookahead_distance_ditemukan = true;
+            }
+
+            float error_teman_1 = 9999;
+            float error_teman_2 = 9999;
+            float error_teman_3 = 9999;
+            if (towing_berapa != 1)
+            {
+                error_teman_2 = pythagoras(info_teman[1].pose_x, info_teman[1].pose_y, waypoints[index_used].x, waypoints[index_used].y);
+                error_teman_3 = pythagoras(info_teman[2].pose_x, info_teman[2].pose_y, waypoints[index_used].x, waypoints[index_used].y);
+            }
+            else if (towing_berapa != 2)
+            {
+                error_teman_1 = pythagoras(info_teman[0].pose_x, info_teman[0].pose_y, waypoints[index_used].x, waypoints[index_used].y);
+                error_teman_3 = pythagoras(info_teman[2].pose_x, info_teman[2].pose_y, waypoints[index_used].x, waypoints[index_used].y);
+            }
+            else if (towing_berapa != 3)
+            {
+                error_teman_1 = pythagoras(info_teman[0].pose_x, info_teman[0].pose_y, waypoints[index_used].x, waypoints[index_used].y);
+                error_teman_2 = pythagoras(info_teman[1].pose_x, info_teman[1].pose_y, waypoints[index_used].x, waypoints[index_used].y);
+            }
+
+            if (error_teman_1 < threshold_teman_depan)
+            {
+                info_teman[0].status_ring_scan = 1;
+                info_teman[0].counter_masuk_ring++;
+                if (info_teman[0].counter_masuk_ring > 1000)
+                {
+                    info_teman[0].counter_masuk_ring = 1000;
+                }
+            }
+            else
+            {
+                info_teman[0].counter_masuk_ring = 0;
+            }
+
+            if (error_teman_2 < threshold_teman_depan)
+            {
+                info_teman[1].status_ring_scan = 1;
+                info_teman[1].counter_masuk_ring++;
+                if (info_teman[1].counter_masuk_ring > 1000)
+                {
+                    info_teman[1].counter_masuk_ring = 1000;
+                }
+            }
+            else
+            {
+                info_teman[1].counter_masuk_ring = 0;
+            }
+
+            if (error_teman_3 < threshold_teman_depan)
+            {
+                info_teman[2].status_ring_scan = 1;
+                info_teman[2].counter_masuk_ring++;
+                if (info_teman[2].counter_masuk_ring > 1000)
+                {
+                    info_teman[2].counter_masuk_ring = 1000;
+                }
+            }
+            else
+            {
+                info_teman[2].counter_masuk_ring = 0;
+            }
+
+            if (error > lookahead_mencari_teman)
+            {
+                break;
+            }
+
+            if (error > lookahead_mencari_teman)
+            {
                 break;
             }
         }
@@ -481,17 +618,11 @@ void Master::wp2velocity_steering(float lookahead_distance, float *pvelocity, fl
 
     if (debug_motion)
     {
-        logger.info("(%.2f %.2f %.2f %.2f) (%d %d) (%d %.2f %.2f) Pose: %.2f %.2f %.2f || idx %d %d || term %d %.2f %.2f %.2f %.2f || %.2f %.2f || (%d)", icp_score, dx_icp, dy_icp, dth_icp, gyro_counter, counter_gyro_anomali, request_stop, detected_forklift_contour, obs_scan_camera_thr_terminal, pose_used_x, pose_used_y, fb_final_pose_xyo[2], index_sekarang, index_lookahead, terminal_now, lookahead_distance, obs_scan_r, lidar_obs_scan_thr, obs_scan_camera_thr_terminal, obs_find_baru, camera_scan_obs_result, is_toribay_ready);
+        logger.info("(%.2f %.2f %.2f %.2f) (%d %d) (%d %.2f %.2f) Pose: %.2f %.2f %.2f || idx %d %d || term %d %.2f %.2f %.2f %.2f || %.2f %.2f || (%d) || %d %d %d || %.2f %.2f", icp_score, dx_icp, dy_icp, dth_icp, gyro_counter, counter_gyro_anomali, request_stop, detected_forklift_contour, obs_scan_camera_thr_terminal, pose_used_x, pose_used_y, fb_final_pose_xyo[2], index_sekarang, index_lookahead, terminal_now, lookahead_distance, obs_scan_r, lidar_obs_scan_thr, obs_scan_camera_thr_terminal, obs_find_baru, camera_scan_obs_result, is_toribay_ready, info_teman[0].counter_masuk_ring, info_teman[1].counter_masuk_ring, info_teman[2].counter_masuk_ring, result_toribay_real_wtf_kiri, result_toribay_real_wtf_kanan);
     }
 
     // Reset status emergency
-    master_status_emergency &= ~(EMERGENCY_LIDAR_DEPAN_DETECTED |
-                                 EMERGENCY_CAMERA_OBS_DETECTED |
-                                 EMERGENCY_GYRO_ANOMALY_DETECTED |
-                                 EMERGENCY_ICP_SCORE_TERLALU_BESAR |
-                                 EMERGENCY_STOP_KARENA_OBSTACLE |
-                                 EMERGENCY_ALL_LIDAR_DETECTED |
-                                 EMERGENCY_GANDENGAN_LEPAS);
+    master_status_emergency &= ~(EMERGENCY_LIDAR_DEPAN_DETECTED | EMERGENCY_CAMERA_OBS_DETECTED | EMERGENCY_GYRO_ANOMALY_DETECTED | EMERGENCY_ICP_SCORE_TERLALU_BESAR | EMERGENCY_STOP_KARENA_OBSTACLE | EMERGENCY_ALL_LIDAR_DETECTED | EMERGENCY_GANDENGAN_LEPAS | EMERGENCY_DEKAT_TEMAN);
 
     /* Jika sudah mencapai waypoint terakhir */
     if (index_lookahead == waypoints.size() - 1)
@@ -508,8 +639,8 @@ void Master::wp2velocity_steering(float lookahead_distance, float *pvelocity, fl
         }
     }
 
+    /* Cek anomali lingkungan */
     static uint16_t counter_icp_score_terlalu_besar = 0;
-
     if (icp_score > threshold_icp_score_terminal)
     {
         counter_icp_score_terlalu_besar++;
@@ -572,7 +703,7 @@ void Master::wp2velocity_steering(float lookahead_distance, float *pvelocity, fl
         counter_gandengan_lepas = 0;
     }
 
-    if (counter_gandengan_lepas > 150)
+    if (counter_gandengan_lepas > 150 && disable_deteksi_toribe == false)
     {
         *pvelocity = -1;
         *psteering = 0;
@@ -600,9 +731,24 @@ void Master::wp2velocity_steering(float lookahead_distance, float *pvelocity, fl
     while (target_steering_angle < -M_PI)
         target_steering_angle += 2 * M_PI;
 
+    /* Cek didepan ada teman atau tidak, kalau ada, kurangi kecepatan*/
+    for (size_t i = 0; i < 3; i++)
+    {
+        if (info_teman[i].counter_masuk_ring > 50)
+        {
+            master_status_emergency |= EMERGENCY_DEKAT_TEMAN;
+        }
+    }
+
+    /* Saturasi velocity agar siap untuk rem mendadak */
+    if ((master_status_emergency & EMERGENCY_DEKAT_TEMAN) == EMERGENCY_DEKAT_TEMAN)
+    {
+        target_velocity = fminf(target_velocity, maksimum_kecepatan_belakang_teman);
+    }
+
     if (debug_motion)
     {
-        logger.info("vstr %.2f %.2f || obs %.2f %d", target_velocity, target_steering_angle, obs_find_baru, camera_scan_obs_result);
+        logger.info("vstr %.2f %.2f || obs %.2f %d || %.2f %.2f %.2f", target_velocity, target_steering_angle, obs_find_baru, camera_scan_obs_result, result_lidar_kanan, result_lidar_kiri, result_camera);
     }
 
     /* Menghitung obstacle */
